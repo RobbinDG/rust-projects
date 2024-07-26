@@ -19,6 +19,31 @@ enum CubeFace {
     Right,
 }
 
+impl CubeFace {
+    fn orientation(&self) -> f64 {
+        match *self {
+            CubeFace::Front => { -1.0 }
+            CubeFace::Back => { 1.0 }
+            CubeFace::Bottom => { -1.0 }
+            CubeFace::Top => { 1.0 }
+            CubeFace::Left => { -1.0 }
+            CubeFace::Right => { 1.0 }
+        }
+    }
+
+    fn plane_coordinate(&self) -> usize {
+        match *self {
+            CubeFace::Front => { 2 }
+            CubeFace::Back => { 2 }
+            CubeFace::Bottom => { 1 }
+            CubeFace::Top => { 1 }
+            CubeFace::Left => { 0 }
+            CubeFace::Right => { 0 }
+        }
+    }
+}
+
+
 impl Cube {
     fn in_face(&self, orientation: f64, i: usize, ray: &Ray) -> Option<(Vector<f64, 3>, f64)> {
         let t = (self.c[i] - ray.s[i] + orientation * self.d) / ray.d.z();
@@ -34,18 +59,18 @@ impl Cube {
 
     fn intersect_face(&self, ray: &Ray) -> Option<(Vector<f64, 3>, f64, CubeFace)> {
         let faces = vec![
-            (CubeFace::Front, -1.0, 2), // Front (-1, -1, -1) to (1, 1, -1)
-            (CubeFace::Back, 1.0, 2), // Back  (-1, -1, 1) to (1, 1, 1)
-            (CubeFace::Left, -1.0, 0), // Left (-1, -1, -1) to (-1, 1, 1)
-            (CubeFace::Right, 1.0, 0), // Right (1, -1, -1) to (1, 1, 1)
-            (CubeFace::Bottom, -1.0, 1), // Bottom (-1, -1, -1) to (1, -1, 1)
-            (CubeFace::Top, 1.0, 1), // Top (-1, 1, -1) to (1, 1, 1)
+            CubeFace::Front, // Front (-1, -1, -1) to (1, 1, -1)
+            CubeFace::Back, // Back  (-1, -1, 1) to (1, 1, 1)
+            CubeFace::Left, // Left (-1, -1, -1) to (-1, 1, 1)
+            CubeFace::Right, // Right (1, -1, -1) to (1, 1, 1)
+            CubeFace::Bottom, // Bottom (-1, -1, -1) to (1, -1, 1)
+            CubeFace::Top, // Top (-1, 1, -1) to (1, 1, 1)
         ];
 
         // t = (c_z - s_z + -1 * d_bz) / d_rz
         let mut closest: Option<(Vector<f64, 3>, f64, CubeFace)> = None;
-        for (face, orientation, i) in faces {
-             if let Some((h, t)) = self.in_face(orientation, i, ray){
+        for face in faces {
+            if let Some((h, t)) = self.in_face(face.orientation(), face.plane_coordinate(), ray) {
                 if let Some((_, tc, _)) = closest {
                     if t < tc {
                         closest = Some((h, t, face));
@@ -62,8 +87,6 @@ impl Cube {
 
 impl Object for Cube {
     fn intersect(&self, ray: &Ray) -> Option<(Vector<f64, 3>, f64)> {
-        // Front (-1, -1, -1) to (1, 1, -1)
-        // t = (c_z - s_z + -1 * d_bz) / d_rz
         if let Some((h, t, _)) = self.intersect_face(ray) {
             return Some((h, t));
         }
