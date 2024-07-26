@@ -1,3 +1,4 @@
+use crate::object::Object;
 use crate::sphere::Sphere;
 use crate::vector::Vector;
 
@@ -9,5 +10,5 @@ pub struct Camera {
 }
 pub struct Scene {
     pub camera: Camera,
-    pub objects: Vec<Sphere>,
+    pub objects: Vec<Box<dyn Object>>,
 }

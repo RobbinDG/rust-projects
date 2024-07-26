@@ -11,8 +11,9 @@ mod tracer;
 mod vector;
 mod sphere;
 mod colour;
-mod square;
+mod r#box;
 mod plane;
+mod object;
 
 fn main() {
     let imgx = 100;
@@ -29,16 +30,16 @@ fn main() {
             height: imgx,
         },
         objects: vec![
-            Sphere {
+            Box::new(Sphere {
                 c: Vector::new([0.5, 0.5, 3.5]),
                 r: 2.0,
                 colour: Colour {r: 255, g: 0, b: 0, a: 255},
-            },
-            Sphere {
+            }),
+            Box::new(Sphere {
                 c: Vector::new([0.0, -0.5, 2.5]),
                 r: 1.0,
                 colour: Colour {r: 0, g: 0, b: 255, a: 255},
-            },
+            }),
         ],
     };
 

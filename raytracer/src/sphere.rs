@@ -1,4 +1,5 @@
 use crate::colour::Colour;
+use crate::object::Object;
 use crate::ray::Ray;
 use crate::vector::Vector;
 
@@ -8,8 +9,8 @@ pub struct Sphere {
     pub colour: Colour,
 }
 
-impl Sphere {
-    pub fn intersect(&self, ray: &Ray) -> Option<(Vector<f64, 3>, f64)> {
+impl Object for Sphere {
+    fn intersect(&self, ray: &Ray) -> Option<(Vector<f64, 3>, f64)> {
         // || x - c ||^2  = r^2
         let v = &ray.s - &self.c;
         let vd = v.dot(&ray.d);
@@ -26,7 +27,11 @@ impl Sphere {
         return Some((ray.at(t), t));
     }
 
-    pub fn normal(&self, at: &Vector<f64, 3>) -> Vector<f64, 3> {
+    fn normal(&self, at: &Vector<f64, 3>) -> Vector<f64, 3> {
         return (at - &self.c).normalise();
+    }
+
+    fn material(&self) -> Colour {
+        return self.colour
     }
 }
