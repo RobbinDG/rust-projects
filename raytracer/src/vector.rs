@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Index, Mul, Sub};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vector<T, const N: usize> {
@@ -22,6 +22,15 @@ impl<T: Default + Add<T, Output = T> + Mul<T, Output = T> + Clone, const N: usiz
             val = val + self.vals[i].clone() * rhs.vals[i].clone();
         }
         return val;
+    }
+}
+
+impl<T: Copy, const N: usize> Index<usize> for Vector<T, N> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if 0 > index || index >= N { panic!("Index out of bounds.") }
+        return &self.vals[index];
     }
 }
 
