@@ -3,6 +3,7 @@ use crate::object::Object;
 use crate::ray::Ray;
 use crate::vector::Vector;
 
+const E: f64 = 0.0000001;
 pub struct Cube {
     pub c: Vector<f64, 3>, // Centre
     pub d: f64,  // Distance from centre to face centres
@@ -15,10 +16,11 @@ impl Object for Cube {
         // t = (c_z - s_z + -1 * d_bz) / d_rz
         let t = (self.c.z() - ray.s.z() + -1.0 * self.d) / ray.d.z();
         let h = ray.at(t);
-        if h.x() < self.c.x() + -1.0 * self.d || h.x() > self.c.x() + 1.0 * self.d {
+        if h.x() < self.c.x() + -1.0 * self.d - E || h.x() > self.c.x() + 1.0 * self.d + E {
             return None
         }
-        if h.y() < self.c.y() + -1.0 * self.d || h.y() > self.c.y() + 1.0 * self.d {
+        if h.y() < self.c.y() + -1.0 * self.d - E || h.y() > self.c.y() + 1.0 * self.d + E {
+            println!("{:?} {} {}", h, h.y(), self.c.y() + -1.0 * self.d);
             return None
         }
 
