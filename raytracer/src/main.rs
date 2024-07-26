@@ -1,5 +1,6 @@
 use sphere::Sphere;
 use crate::colour::Colour;
+use crate::cube::Cube;
 use crate::ray::Ray;
 use crate::scene::{Camera, Scene};
 use crate::tracer::trace;
@@ -11,9 +12,9 @@ mod tracer;
 mod vector;
 mod sphere;
 mod colour;
-mod r#box;
 mod plane;
 mod object;
+mod cube;
 
 fn main() {
     let imgx = 100;
@@ -22,7 +23,7 @@ fn main() {
     // Create a new ImgBuf with width: imgx and height: imgy
     let mut imgbuf = image::ImageBuffer::new(imgx, imgy);
 
-    let scene = Scene {
+    let scene_spheres = Scene {
         camera: Camera {
             eye_pos: Vector::new([0.0, 0.0, 0.0]),
             fov: 2.0,
@@ -43,6 +44,23 @@ fn main() {
         ],
     };
 
+    let scene_box = Scene {
+        camera: Camera {
+            eye_pos: Vector::new([0.0, 0.0, 0.0]),
+            fov: 2.0,
+            width: imgy,
+            height: imgx,
+        },
+        objects: vec![
+            Box::new(Cube {
+                c: Vector::new([0.0, 0.0, 3.5]),
+                d: 1.0,
+                colour: Colour {r: 255, g: 0, b: 0, a: 255},
+            }),
+        ],
+    };
+
+    let scene = scene_box;
 
     // Iterate over the coordinates and pixels of the image
     for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
