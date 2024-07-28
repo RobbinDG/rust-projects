@@ -48,8 +48,8 @@ fn main() {
 
     let scene_box = Scene {
         camera: Camera {
-            eye_pos: Vector::new([1.5, 0.0, 0.0]),
-            dir: Vector::new([-0.2, 0.0, 1.0]),
+            eye_pos: Vector::new([-1.5, 0.0, 0.0]),
+            dir: Vector::new([0.2, 0.0, 1.0]),
             fov: 2.0,
             width: imgy,
             height: imgx,

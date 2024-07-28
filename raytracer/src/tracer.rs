@@ -7,7 +7,6 @@ fn hit_object(ray: &Ray, object: &Box<dyn Object>) -> Option<(f64, Colour)> {
     if let Some(hit) = object.clone().intersect(&ray) {
         let n = hit.normal;
         let cos_theta = (-&n).cos_angle_between(&ray.d);
-        println!("{} {:?} {:?} {:?}", cos_theta, n, ray.d, hit.material.r);
         if cos_theta >= 0.0 {  // Front side
             Some((hit.t, &hit.material * cos_theta.sqrt()))
         } else { // Back side
@@ -29,7 +28,6 @@ pub fn trace(ray: Ray, scene: &Scene) -> image::Rgb<u8> {
             };
         }
     }
-    println!("{:?}", closest);
 
     match closest {
         Some((_, c)) => image::Rgb([c.r, c.g, c.b]),

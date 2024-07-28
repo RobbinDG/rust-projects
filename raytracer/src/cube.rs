@@ -57,7 +57,6 @@ impl Cube {
         let i2 = (i + 2) % 3;
         let in_1 = h[i1] >= self.c[i1] - (self.d + E) && h[i1] <= self.c[i1] + (self.d + E);
         let in_2 = h[i2] >= self.c[i2] - (self.d + E) && h[i2] <= self.c[i2] + (self.d + E);
-        // println!("{} {} {} {:?} {} {} {} {} {} {}", i1, i2, t, h, self.c[i1] + -1.0 * self.d - E, self.c[i1] + 1.0 * self.d - E, h[i2] >= self.c[i2] - (self.d + E), h[i2] <= self.c[i2] + (self.d + E), self.c[i2] - (self.d + E), self.c[i2] + (self.d + E));
 
         // Create normal vector from face information.
         let mut n = [0.0, 0.0, 0.0];
@@ -79,29 +78,21 @@ impl Cube {
     fn intersect_face(&self, ray: &Ray) -> Option<Hit> {
         let faces = vec![
             CubeFace::Front, // Front (-1, -1, -1) to (1, 1, -1)
-            // CubeFace::Back, // Back  (-1, -1, 1) to (1, 1, 1)
-            // CubeFace::Left, // Left (-1, -1, -1) to (-1, 1, 1)
+            CubeFace::Back, // Back  (-1, -1, 1) to (1, 1, 1)
+            CubeFace::Left, // Left (-1, -1, -1) to (-1, 1, 1)
             CubeFace::Right, // Right (1, -1, -1) to (1, 1, 1)
-            // CubeFace::Bottom, // Bottom (-1, -1, -1) to (1, -1, 1)
-            // CubeFace::Top, // Top (-1, 1, -1) to (1, 1, 1)
+            CubeFace::Bottom, // Bottom (-1, -1, -1) to (1, -1, 1)
+            CubeFace::Top, // Top (-1, 1, -1) to (1, 1, 1)
         ];
 
         let mut closest: Option<Hit> = None;
         for face in faces {
             if let Some(h) = self.in_face(face.orientation(), face.plane_coordinate(), ray) {
-                // println!("Hit {:?} {:?}", h.loc, h.normal);
                 closest = match closest {
                     Some(hc) if h.t < hc.t => { Some(h) }
                     None => { Some(h) }
                     _ => { closest }
-                }
-                // if let Some((hit_c, _)) = closest {
-                //     if h.t < hit_c.t {
-                //         closest = Some((h, face));
-                //     }
-                // } else {
-                //     closest = Some((h, face));
-                // }
+                };
             }
         }
 
