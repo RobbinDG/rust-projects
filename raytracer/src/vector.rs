@@ -15,11 +15,11 @@ impl<T: Clone, const N: usize> Vector<T, N> {
     pub fn z(&self) -> T { self.vals[2].clone() }
 }
 
-impl<T: Default + Add<T, Output = T> + Mul<T, Output = T> + Clone, const N: usize> Vector<T, N> {
+impl<T: Default + Add<T, Output=T> + Mul<T, Output=T> + Copy, const N: usize> Vector<T, N> {
     pub fn dot(&self, rhs: &Vector<T, N>) -> T {
         let mut val = T::default();
         for i in 0..N {
-            val = val + self.vals[i].clone() * rhs.vals[i].clone();
+            val = val + self.vals[i] * rhs.vals[i];
         }
         return val;
     }
@@ -35,22 +35,22 @@ impl<T: Copy, const N: usize> Index<usize> for Vector<T, N> {
 }
 
 trait HasSqrt {
-  fn sqrt(&self) -> Self;
+    fn sqrt(&self) -> Self;
 }
 
 impl HasSqrt for f32 {
-  fn sqrt(&self) -> Self {
-    (*self).sqrt()
-  }
+    fn sqrt(&self) -> Self {
+        (*self).sqrt()
+    }
 }
 
 impl HasSqrt for f64 {
-  fn sqrt(&self) -> Self {
-    (*self).sqrt()
-  }
+    fn sqrt(&self) -> Self {
+        (*self).sqrt()
+    }
 }
 
-impl<T: HasSqrt + Default + Add<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T> + Copy, const N: usize> Vector<T, N> {
+impl<T: HasSqrt + Default + Add<T, Output=T> + Mul<T, Output=T> + Div<T, Output=T> + Copy, const N: usize> Vector<T, N> {
     pub fn mag(&self) -> T {
         self.dot(self).sqrt()
     }
@@ -59,9 +59,25 @@ impl<T: HasSqrt + Default + Add<T, Output = T> + Mul<T, Output = T> + Div<T, Out
         let m = self.mag();
         self.div(m)
     }
+
+    pub fn cos_angle_between(&self, other: &Vector<T, N>) -> T {
+        self.dot(other) / (self.mag() * other.mag())
+    }
 }
 
-impl<T: Default + Mul<S, Output = T> + Copy, S: Copy, const N: usize> Mul<S> for &Vector<T, N> {
+impl<const N: usize> Vector<f64, N> {
+    pub fn signed_angle_to(&self, other: &Vector<f64, N>) -> f64 {
+        if N != 2 {
+            panic!("Can only be computed for N == 2")
+        }
+        let cross = self.x() * other.y() - self.y() * other.x();
+        // return cross.signum() * self.cos_angle_between(other).acos();
+        let dot = self.dot(other);
+        return cross.atan2(dot);
+    }
+}
+
+impl<T: Default + Mul<S, Output=T> + Copy, S: Copy, const N: usize> Mul<S> for &Vector<T, N> {
     type Output = Vector<T, N>;
 
     fn mul(self, rhs: S) -> Self::Output {
@@ -74,7 +90,7 @@ impl<T: Default + Mul<S, Output = T> + Copy, S: Copy, const N: usize> Mul<S> for
     }
 }
 
-impl<T: Default + Div<S, Output = T> + Copy, S: Copy, const N: usize> Div<S> for &Vector<T, N> {
+impl<T: Default + Div<S, Output=T> + Copy, S: Copy, const N: usize> Div<S> for &Vector<T, N> {
     type Output = Vector<T, N>;
 
     fn div(self, rhs: S) -> Self::Output {
@@ -87,7 +103,7 @@ impl<T: Default + Div<S, Output = T> + Copy, S: Copy, const N: usize> Div<S> for
     }
 }
 
-impl<T: Mul<f64, Output = T> + Default + Copy, const N: usize> Mul<&Vector<T, N>> for f64 {
+impl<T: Mul<f64, Output=T> + Default + Copy, const N: usize> Mul<&Vector<T, N>> for f64 {
     type Output = Vector<T, N>;
 
     fn mul(self, rhs: &Vector<T, N>) -> Self::Output {
@@ -95,7 +111,7 @@ impl<T: Mul<f64, Output = T> + Default + Copy, const N: usize> Mul<&Vector<T, N>
     }
 }
 
-impl<T: Add<T, Output = T> + Copy + Default, const N: usize> Add<&Vector<T, N>> for &Vector<T, N> {
+impl<T: Add<T, Output=T> + Copy + Default, const N: usize> Add<&Vector<T, N>> for &Vector<T, N> {
     type Output = Vector<T, N>;
 
     fn add(self, rhs: &Vector<T, N>) -> Self::Output {
@@ -108,7 +124,7 @@ impl<T: Add<T, Output = T> + Copy + Default, const N: usize> Add<&Vector<T, N>> 
     }
 }
 
-impl<T: Add<T, Output = T> + Copy + Default, const N: usize> Add<&Vector<T, N>> for Vector<T, N> {
+impl<T: Add<T, Output=T> + Copy + Default, const N: usize> Add<&Vector<T, N>> for Vector<T, N> {
     type Output = Vector<T, N>;
 
     fn add(self, rhs: &Vector<T, N>) -> Self::Output {
@@ -116,7 +132,7 @@ impl<T: Add<T, Output = T> + Copy + Default, const N: usize> Add<&Vector<T, N>> 
     }
 }
 
-impl<T: Add<T, Output = T> + Copy + Default, const N: usize> Add<Vector<T, N>> for Vector<T, N> {
+impl<T: Add<T, Output=T> + Copy + Default, const N: usize> Add<Vector<T, N>> for Vector<T, N> {
     type Output = Vector<T, N>;
 
     fn add(self, rhs: Vector<T, N>) -> Self::Output {
@@ -124,7 +140,7 @@ impl<T: Add<T, Output = T> + Copy + Default, const N: usize> Add<Vector<T, N>> f
     }
 }
 
-impl<T: Sub<T, Output = T> + Default + Copy, const N: usize> Sub<&Vector<T, N>> for &Vector<T, N> {
+impl<T: Sub<T, Output=T> + Default + Copy, const N: usize> Sub<&Vector<T, N>> for &Vector<T, N> {
     type Output = Vector<T, N>;
 
     fn sub(self, rhs: &Vector<T, N>) -> Self::Output {

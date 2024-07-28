@@ -26,6 +26,7 @@ fn main() {
     let scene_spheres = Scene {
         camera: Camera {
             eye_pos: Vector::new([0.0, 0.0, 0.0]),
+            dir: Vector::new([-1.0, 0.0, 1.0]),
             fov: 2.0,
             width: imgy,
             height: imgx,
@@ -47,6 +48,7 @@ fn main() {
     let scene_box = Scene {
         camera: Camera {
             eye_pos: Vector::new([0.0, 0.0, 0.0]),
+            dir: Vector::new([0.2, 0.0, 1.0]),
             fov: 2.0,
             width: imgy,
             height: imgx,
@@ -64,9 +66,7 @@ fn main() {
 
     // Iterate over the coordinates and pixels of the image
     for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
-        let rel_x = (2.0 * x as f64 - scene.camera.width as f64) / (scene.camera.width as f64);
-        let rel_y = (2.0 * y as f64 - scene.camera.height as f64) / (scene.camera.height as f64);
-        let ray = Ray::new(scene.camera.eye_pos.clone(), Vector::new([rel_x, rel_y, 1.0]));
+        let ray = scene.camera.ray_for_pixel(x, y);
         *pixel = trace(ray, &scene)
     }
 
