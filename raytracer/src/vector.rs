@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Index, Mul, Sub};
+use std::ops::{Add, Div, Index, Mul, Neg, Sub};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vector<T, const N: usize> {
@@ -13,6 +13,18 @@ impl<T: Clone, const N: usize> Vector<T, N> {
     pub fn x(&self) -> T { self.vals[0].clone() }
     pub fn y(&self) -> T { self.vals[1].clone() }
     pub fn z(&self) -> T { self.vals[2].clone() }
+}
+
+impl<T: Default + Neg<Output = T> + Copy, const N: usize> Neg for &Vector<T, N> {
+    type Output = Vector<T, N>;
+
+    fn neg(self) -> Self::Output {
+        let mut vals: [T; N] = [T::default(); N];
+        for i in 0..N {
+            vals[i] = -self.vals[i];
+        }
+        return Vector::new(vals);
+    }
 }
 
 impl<T: Default + Add<T, Output=T> + Mul<T, Output=T> + Copy, const N: usize> Vector<T, N> {

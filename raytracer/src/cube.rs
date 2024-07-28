@@ -1,4 +1,5 @@
 use crate::colour::Colour;
+use crate::hit::Hit;
 use crate::object::Object;
 use crate::ray::Ray;
 use crate::vector::Vector;
@@ -45,39 +46,62 @@ impl CubeFace {
 
 
 impl Cube {
-    fn in_face(&self, orientation: f64, i: usize, ray: &Ray) -> Option<(Vector<f64, 3>, f64)> {
-        let t = (self.c[i] - ray.s[i] + orientation * self.d) / ray.d.z();
+    fn in_face(&self, orientation: f64, i: usize, ray: &Ray) -> Option<Hit> {
+        if ray.d[i].abs() < E {
+            return None;
+        }
+        let t = (self.c[i] - ray.s[i] + orientation * self.d) / ray.d[i];
         let h = ray.at(t);
 
         let i1 = (i + 1) % 3;
         let i2 = (i + 2) % 3;
-        let in_1 = h[i1] >= self.c[i1] + -1.0 * self.d - E && h[i1] <= self.c[i1] + 1.0 * self.d + E;
-        let in_2 = h[i2] >= self.c[i2] + -1.0 * self.d - E && h[i2] <= self.c[i2] + 1.0 * self.d + E;
-        if in_1 && in_2 { return Some((h, t)); }
+        let in_1 = h[i1] >= self.c[i1] - (self.d + E) && h[i1] <= self.c[i1] + (self.d + E);
+        let in_2 = h[i2] >= self.c[i2] - (self.d + E) && h[i2] <= self.c[i2] + (self.d + E);
+        // println!("{} {} {} {:?} {} {} {} {} {} {}", i1, i2, t, h, self.c[i1] + -1.0 * self.d - E, self.c[i1] + 1.0 * self.d - E, h[i2] >= self.c[i2] - (self.d + E), h[i2] <= self.c[i2] + (self.d + E), self.c[i2] - (self.d + E), self.c[i2] + (self.d + E));
+
+        // Create normal vector from face information.
+        let mut n = [0.0, 0.0, 0.0];
+        n[i] = orientation;
+        let mut material: [u8; 3] = [0, 0, 0];
+        for i in 0..3 {
+            material[i] = (n[i].abs() * 255.0) as u8;
+        }
+
+        if in_1 && in_2 { return Some(Hit {
+            loc: h,
+            t,
+            normal: Vector::new(n),
+            material: Colour {r: material[0], g: material[1], b: material[2], a: 255},
+        }); }
         return None;
     }
 
-    fn intersect_face(&self, ray: &Ray) -> Option<(Vector<f64, 3>, f64, CubeFace)> {
+    fn intersect_face(&self, ray: &Ray) -> Option<Hit> {
         let faces = vec![
             CubeFace::Front, // Front (-1, -1, -1) to (1, 1, -1)
-            CubeFace::Back, // Back  (-1, -1, 1) to (1, 1, 1)
-            CubeFace::Left, // Left (-1, -1, -1) to (-1, 1, 1)
+            // CubeFace::Back, // Back  (-1, -1, 1) to (1, 1, 1)
+            // CubeFace::Left, // Left (-1, -1, -1) to (-1, 1, 1)
             CubeFace::Right, // Right (1, -1, -1) to (1, 1, 1)
-            CubeFace::Bottom, // Bottom (-1, -1, -1) to (1, -1, 1)
-            CubeFace::Top, // Top (-1, 1, -1) to (1, 1, 1)
+            // CubeFace::Bottom, // Bottom (-1, -1, -1) to (1, -1, 1)
+            // CubeFace::Top, // Top (-1, 1, -1) to (1, 1, 1)
         ];
 
-        // t = (c_z - s_z + -1 * d_bz) / d_rz
-        let mut closest: Option<(Vector<f64, 3>, f64, CubeFace)> = None;
+        let mut closest: Option<Hit> = None;
         for face in faces {
-            if let Some((h, t)) = self.in_face(face.orientation(), face.plane_coordinate(), ray) {
-                if let Some((_, tc, _)) = closest {
-                    if t < tc {
-                        closest = Some((h, t, face));
-                    }
-                } else {
-                    closest = Some((h, t, face));
+            if let Some(h) = self.in_face(face.orientation(), face.plane_coordinate(), ray) {
+                // println!("Hit {:?} {:?}", h.loc, h.normal);
+                closest = match closest {
+                    Some(hc) if h.t < hc.t => { Some(h) }
+                    None => { Some(h) }
+                    _ => { closest }
                 }
+                // if let Some((hit_c, _)) = closest {
+                //     if h.t < hit_c.t {
+                //         closest = Some((h, face));
+                //     }
+                // } else {
+                //     closest = Some((h, face));
+                // }
             }
         }
 
@@ -86,19 +110,11 @@ impl Cube {
 }
 
 impl Object for Cube {
-    fn intersect(&self, ray: &Ray) -> Option<(Vector<f64, 3>, f64)> {
-        if let Some((h, t, _)) = self.intersect_face(ray) {
-            return Some((h, t));
+    fn intersect(&self, ray: &Ray) -> Option<Hit> {
+        if let Some(h) = self.intersect_face(ray) {
+            return Some(h);
         }
 
         None
-    }
-
-    fn normal(&self, at: &Vector<f64, 3>) -> Vector<f64, 3> {
-        Vector::new([0.0, 0.0, -1.0])
-    }
-
-    fn material(&self) -> Colour {
-        self.colour
     }
 }

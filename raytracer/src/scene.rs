@@ -21,9 +21,9 @@ impl Camera {
         let theta = &base.signed_angle_to(&angled);
 
         let dir = Vector::new([
-            self.eye_pos[0] + (rel_x * theta.cos() + rel_z * -theta.sin()),
+            rel_x * theta.cos() + rel_z * -theta.sin(),
             rel_y,
-            self.eye_pos[2] + (rel_x * theta.sin() + rel_z * theta.cos()),
+            rel_x * theta.sin() + rel_z * theta.cos(),
         ]);
 
         return Ray::new(self.eye_pos.clone(), dir);

@@ -1,7 +1,7 @@
 use sphere::Sphere;
+
 use crate::colour::Colour;
 use crate::cube::Cube;
-use crate::ray::Ray;
 use crate::scene::{Camera, Scene};
 use crate::tracer::trace;
 use crate::vector::Vector;
@@ -15,6 +15,7 @@ mod colour;
 mod plane;
 mod object;
 mod cube;
+mod hit;
 
 fn main() {
     let imgx = 100;
@@ -47,8 +48,8 @@ fn main() {
 
     let scene_box = Scene {
         camera: Camera {
-            eye_pos: Vector::new([0.0, 0.0, 0.0]),
-            dir: Vector::new([0.2, 0.0, 1.0]),
+            eye_pos: Vector::new([1.5, 0.0, 0.0]),
+            dir: Vector::new([-0.2, 0.0, 1.0]),
             fov: 2.0,
             width: imgy,
             height: imgx,
