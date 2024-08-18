@@ -15,10 +15,10 @@ shade the sphere by computing the normal vectors. With that working, and iterati
 several times to account for oversights and bugs, I added a secondary sphere into the scene. 
 After fixing problems with object intersection, I also implemented colouring of objects.
 
-![image](result1.png)
-![image](result2.png)
-![image](result3.png)
-![image](result4.png)
+![image](images/result1.png)
+![image](images/result2.png)
+![image](images/result3.png)
+![image](images/result4.png)
 
 ### Phase 2: generic vector structs
 Up to this point, I had only needed vectors of type `f64` and magnitude 3. As such, I created a 
@@ -43,12 +43,12 @@ either the cube or the camera. This is obviously required to see if all side of 
 as expected. I rendered all sides with the colour of their normal vector and checked the sides 
 by moving and rotating the camera using my new implementation.
 
-![image](result_cube_1.png)
-![image](result_cube_2.png)
-![image](result_cube_3.png)
-![image](result_cube_4.png)
-![image](result_cube_5.png)
-![image](result_cube_6.png)
+![image](images/result_cube_1.png)
+![image](images/result_cube_2.png)
+![image](images/result_cube_3.png)
+![image](images/result_cube_4.png)
+![image](images/result_cube_5.png)
+![image](images/result_cube_6.png)
 
 ### Phase 4: file handling
 Up to and until now, I had hardcoded my scenes into the `main.rs` file. This is an obvious no-go 
@@ -60,4 +60,4 @@ combination and of any size. Fortunately, I could remedy this by writing a custo
 a `Box<dyn Object>`, and make `serde` handle the rest. Finally, I was able to render any scene 
 without needing to recompile my sources.
 
-![image](result_file_handling.png)
+![image](images/result_file_handling.png)
