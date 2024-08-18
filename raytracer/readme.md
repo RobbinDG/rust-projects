@@ -7,6 +7,19 @@ Contrary to my course, I aimed to implement my linear algebra framework from scr
 teach me about using generics, traits, and data management. With those aims in mind, I started 
 the project.
 
+## Skills practiced
+- Data management
+- Borrow checker rules
+- Pattern matching and destructuring
+- Generics
+- Trait bounds
+- External crates/libraries
+- Basic file handling
+
+## Tech stack
+- rust
+- serde + serde_json
+
 ## Progress
 ### Phase 1: rending of spheres
 My initial goal was to get basic rending of a view frustrum working. By hard coding all 
