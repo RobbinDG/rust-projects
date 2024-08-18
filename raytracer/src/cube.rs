@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use crate::colour::Colour;
 use crate::hit::Hit;
 use crate::object::Object;
@@ -5,6 +6,8 @@ use crate::ray::Ray;
 use crate::vector::Vector;
 
 const E: f64 = 0.0000001;
+
+#[derive(Deserialize)]
 pub struct Cube {
     pub c: Vector<f64, 3>, // Centre
     pub d: f64,  // Distance from centre to face centres

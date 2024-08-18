@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::path::Path;
 use sphere::Sphere;
 
 use crate::colour::Colour;
@@ -16,54 +18,16 @@ mod plane;
 mod object;
 mod cube;
 mod hit;
+mod scene_loader;
 
 fn main() {
+    let scene = load_scene("scene.json");
+
     let imgx = 100;
     let imgy = 100;
 
     // Create a new ImgBuf with width: imgx and height: imgy
     let mut imgbuf = image::ImageBuffer::new(imgx, imgy);
-
-    let scene_spheres = Scene {
-        camera: Camera {
-            eye_pos: Vector::new([0.0, 0.0, 0.0]),
-            dir: Vector::new([-1.0, 0.0, 1.0]),
-            fov: 2.0,
-            width: imgy,
-            height: imgx,
-        },
-        objects: vec![
-            Box::new(Sphere {
-                c: Vector::new([0.5, 0.5, 3.5]),
-                r: 2.0,
-                colour: Colour {r: 255, g: 0, b: 0, a: 255},
-            }),
-            Box::new(Sphere {
-                c: Vector::new([0.0, -0.5, 2.5]),
-                r: 1.0,
-                colour: Colour {r: 0, g: 0, b: 255, a: 255},
-            }),
-        ],
-    };
-
-    let scene_box = Scene {
-        camera: Camera {
-            eye_pos: Vector::new([-1.5, 0.0, 0.0]),
-            dir: Vector::new([0.2, 0.0, 1.0]),
-            fov: 2.0,
-            width: imgy,
-            height: imgx,
-        },
-        objects: vec![
-            Box::new(Cube {
-                c: Vector::new([0.0, 0.0, 3.5]),
-                d: 1.0,
-                colour: Colour {r: 255, g: 0, b: 0, a: 255},
-            }),
-        ],
-    };
-
-    let scene = scene_box;
 
     // Iterate over the coordinates and pixels of the image
     for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
@@ -73,4 +37,10 @@ fn main() {
 
     // Save the image as “fractal.png”, the format is deduced from the path
     imgbuf.save("result.png").unwrap();
+}
+
+fn load_scene(file_name: &str) -> Scene {
+    let file = File::open(&Path::new("scene.json")).unwrap();
+    let scene_loaded: Scene = serde_json::from_reader(file).unwrap();
+    scene_loaded
 }

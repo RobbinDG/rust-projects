@@ -1,7 +1,9 @@
+use serde::Deserialize;
 use crate::object::Object;
 use crate::ray::Ray;
 use crate::vector::Vector;
 
+#[derive(Deserialize)]
 pub struct Camera {
     pub eye_pos: Vector<f64, 3>,  // E vector
     pub dir: Vector<f64, 3>,
@@ -30,6 +32,7 @@ impl Camera {
     }
 }
 
+#[derive(Deserialize)]
 pub struct Scene {
     pub camera: Camera,
     pub objects: Vec<Box<dyn Object>>,

@@ -1,9 +1,11 @@
+use serde::Deserialize;
 use crate::colour::Colour;
 use crate::hit::Hit;
 use crate::object::Object;
 use crate::ray::Ray;
 use crate::vector::Vector;
 
+#[derive(Deserialize)]
 pub struct Sphere {
     pub c: Vector<f64, 3>,
     pub r: f64,

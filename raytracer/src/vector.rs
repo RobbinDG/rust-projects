@@ -1,7 +1,8 @@
 use std::ops::{Add, Div, Index, Mul, Neg, Sub};
-
+// #[serde_as]
 #[derive(Debug, Copy, Clone)]
 pub struct Vector<T, const N: usize> {
+    // #[serde_as(as = "[_; N]")]
     vals: [T; N],
 }
 
@@ -15,7 +16,7 @@ impl<T: Clone, const N: usize> Vector<T, N> {
     pub fn z(&self) -> T { self.vals[2].clone() }
 }
 
-impl<T: Default + Neg<Output = T> + Copy, const N: usize> Neg for &Vector<T, N> {
+impl<T: Default + Neg<Output=T> + Copy, const N: usize> Neg for &Vector<T, N> {
     type Output = Vector<T, N>;
 
     fn neg(self) -> Self::Output {
