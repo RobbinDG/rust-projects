@@ -19,6 +19,7 @@ mod object;
 mod cube;
 mod hit;
 mod scene_loader;
+mod light;
 
 fn main() {
     let scene = load_scene("scene.json");

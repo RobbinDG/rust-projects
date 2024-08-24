@@ -6,6 +6,7 @@ use serde::de::{Error, SeqAccess, Visitor};
 
 use crate::cube::Cube;
 use crate::hit::Hit;
+use crate::light::{Light, PointLight};
 use crate::object::Object;
 use crate::ray::Ray;
 use crate::sphere::Sphere;
@@ -28,7 +29,7 @@ impl Object for AllObjects {
 impl<'de> Deserialize<'de> for AllObjects {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>
+        D: Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
 
@@ -47,10 +48,47 @@ impl<'de> Deserialize<'de> for AllObjects {
 impl<'de> Deserialize<'de> for Box<dyn Object> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>
+        D: Deserializer<'de>,
     {
         let object_type = AllObjects::deserialize(deserializer)?;
         Ok(Box::new(object_type))
+    }
+}
+
+enum AllLights {
+    PointLight(PointLight),
+}
+
+impl Light for AllLights {
+    fn vec(&self, point: &Vector<f64, 3>) -> Vector<f64, 3> {
+        match self {
+            AllLights::PointLight(p) => p.vec(point),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for AllLights {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        if let Ok(point_light) = serde_json::from_value::<PointLight>(value.clone()) {
+            return Ok(AllLights::PointLight(point_light));
+        }
+
+        Err(Error::custom("Light type unknown"))
+    }
+}
+
+impl<'de> Deserialize<'de> for Box<dyn Light> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let light_type = AllLights::deserialize(deserializer)?;
+        Ok(Box::new(light_type))
     }
 }
 
