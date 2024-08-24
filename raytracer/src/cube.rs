@@ -69,12 +69,14 @@ impl Cube {
             material[i] = (n[i].abs() * 255.0) as u8;
         }
 
-        if in_1 && in_2 { return Some(Hit {
-            loc: h,
-            t,
-            normal: Vector::new(n),
-            material: Colour {r: material[0], g: material[1], b: material[2], a: 255},
-        }); }
+        if in_1 && in_2 {
+            return Some(Hit {
+                loc: h,
+                t,
+                normal: Vector::new(n),
+                material: Colour::new_rgba([material[0], material[1], material[2], 255]),
+            });
+        }
         return None;
     }
 

@@ -2,7 +2,6 @@ use std::ops::{Add, Div, Index, Mul, Neg, Sub};
 // #[serde_as]
 #[derive(Debug, Copy, Clone)]
 pub struct Vector<T, const N: usize> {
-    // #[serde_as(as = "[_; N]")]
     vals: [T; N],
 }
 

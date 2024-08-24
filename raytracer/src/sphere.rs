@@ -18,7 +18,7 @@ impl Sphere {
     }
 
     fn material(&self) -> Colour {
-        return self.colour
+        return self.colour.clone()
     }
 }
 
