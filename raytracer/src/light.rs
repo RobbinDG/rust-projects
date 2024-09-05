@@ -1,8 +1,12 @@
 use serde::Deserialize;
+
+use crate::colour::Colour;
 use crate::vector::Vector;
 
 pub trait Light {
     fn vec(&self, point: &Vector<f64, 3>) -> Vector<f64, 3>;
+
+    fn colour(&self) -> Colour;
 }
 
 #[derive(Deserialize)]
@@ -13,5 +17,9 @@ pub struct PointLight {
 impl Light for PointLight {
     fn vec(&self, point: &Vector<f64, 3>) -> Vector<f64, 3> {
         return &self.centre - point;
+    }
+
+    fn colour(&self) -> Colour {
+        Colour::new_rgba([255, 255, 255, 255])
     }
 }

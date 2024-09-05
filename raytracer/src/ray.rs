@@ -14,6 +14,6 @@ impl Ray {
     }
 
     pub fn at(&self, t: f64) -> Vector<f64, 3> {
-        self.s + t * &self.d
+        self.s + &self.d * t
     }
 }

@@ -15,20 +15,32 @@ fn ambient_illumination(ray: &Ray, hit: &Hit) -> Option<Colour> {
     }
 }
 
-// fn phong_illumination(ray: &Ray, hit: &Hit, lights: &Vec<Box<dyn Light>>) -> Option<Colour> {
-//     let ks = 0.0;
-//     let kd = 0.0;
-//     let ka = 0.0;
-//     let alpha = 0.0;
-//
-//     let ia = ambient_illumination(ray, hit)?;
-//
-//     let ambient = ka * ia;
-// }
+fn phong_illumination(ray: &Ray, hit: &Hit, lights: &Vec<Box<dyn Light>>) -> Option<Colour> {
+    let ks = 0.0;
+    let kd = 0.0;
+    let ka = 0.0;
+    let alpha = 0.0;
+
+    let ia = ambient_illumination(ray, hit)?;
+
+    let mut i = &ia * ka;
+    for light in lights {
+        let hit_col = &hit.material * &light.colour();
+        let l = light.vec(&hit.loc);
+        let ln = l.dot(&hit.normal);
+        let r = &(&hit.normal * (2.0 * ln)) - &l;
+
+        let i_ln = &hit_col * (kd * ln);
+        let v = -&ray.d;
+        let i_rv = &Colour::new_rgba([255, 255, 255, 255]) * (ks * r.dot(&v).powf(alpha));
+        i = i + i_ln + i_rv;
+    }
+    return Some(i);
+}
 
 fn hit_object(ray: &Ray, object: &Box<dyn Object>, lights: &Vec<Box<dyn Light>>) -> Option<(f64, Colour)> {
     if let Some(hit) = object.clone().intersect(&ray) {
-        let i = ambient_illumination(&ray, &hit)?;
+        let i = phong_illumination(&ray, &hit, lights)?;
         Some((hit.t, i))
     } else {
         None

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use serde::{de, Deserialize, Deserializer};
 use serde::de::{Error, SeqAccess, Visitor};
-
+use crate::colour::Colour;
 use crate::cube::Cube;
 use crate::hit::Hit;
 use crate::light::{Light, PointLight};
@@ -63,6 +63,12 @@ impl Light for AllLights {
     fn vec(&self, point: &Vector<f64, 3>) -> Vector<f64, 3> {
         match self {
             AllLights::PointLight(p) => p.vec(point),
+        }
+    }
+
+    fn colour(&self) -> Colour {
+        match self {
+            AllLights::PointLight(p) => p.colour(),
         }
     }
 }

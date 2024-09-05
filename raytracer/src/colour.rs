@@ -1,10 +1,12 @@
-use std::ops::Mul;
+use std::ops::{Add, Mul};
+
 use serde::Deserialize;
+
 use crate::vector::Vector;
 
 #[derive(Deserialize, Clone)]
 pub struct Colour {
-    rgba: Vector<f64, 4>
+    rgba: Vector<f64, 4>,
 }
 
 impl Colour {
@@ -25,10 +27,26 @@ impl Colour {
     pub fn a(&self) -> u8 { self.rgba[3] as u8 }
 }
 
+impl Add<Colour> for Colour {
+    type Output = Colour;
+
+    fn add(self, rhs: Colour) -> Self::Output {
+        Colour { rgba: &self.rgba + &self.rgba }
+    }
+}
+
 impl Mul<f64> for &Colour {
     type Output = Colour;
 
     fn mul(self, rhs: f64) -> Self::Output {
-        Colour{rgba: &self.rgba * rhs}
+        Colour { rgba: &self.rgba * rhs }
+    }
+}
+
+impl Mul<&Colour> for &Colour {
+    type Output = Colour;
+
+    fn mul(self, rhs: &Colour) -> Self::Output {
+        Colour { rgba: &self.rgba * &rhs.rgba }
     }
 }
