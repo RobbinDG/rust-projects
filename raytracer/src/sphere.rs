@@ -14,11 +14,11 @@ pub struct Sphere {
 
 impl Sphere {
     fn normal(&self, at: &Vector<f64, 3>) -> Vector<f64, 3> {
-        return (at - &self.c).normalise();
+        (at - &self.c).normalise()
     }
 
     fn material(&self) -> Colour {
-        return self.colour.clone()
+        self.colour.clone()
     }
 }
 
@@ -38,11 +38,11 @@ impl Object for Sphere {
         let t2 = -vd - sqrt_det;
         let t = if t1 <= t2 { t1 } else { t2 };
         let h = ray.at(t);
-        return Some(Hit {
+        Some(Hit {
             loc: h,
             t,
             normal: self.normal(&h),
             material: self.material(),
-        });
+        })
     }
 }

@@ -16,26 +16,26 @@ fn ambient_illumination(ray: &Ray, hit: &Hit) -> Option<Colour> {
 }
 
 fn phong_illumination(ray: &Ray, hit: &Hit, lights: &Vec<Box<dyn Light>>) -> Option<Colour> {
+    let ka = 0.8;
+    let kd = 0.2;
     let ks = 0.0;
-    let kd = 0.0;
-    let ka = 0.0;
     let alpha = 0.0;
 
     let ia = ambient_illumination(ray, hit)?;
 
     let mut i = &ia * ka;
     for light in lights {
-        let hit_col = &hit.material * &light.colour();
+        let v = -&ray.d;
         let l = light.vec(&hit.loc);
         let ln = l.dot(&hit.normal);
         let r = &(&hit.normal * (2.0 * ln)) - &l;
 
+        let hit_col = &hit.material * &light.colour();
         let i_ln = &hit_col * (kd * ln);
-        let v = -&ray.d;
         let i_rv = &Colour::new_rgba([255, 255, 255, 255]) * (ks * r.dot(&v).powf(alpha));
         i = i + i_ln + i_rv;
     }
-    return Some(i);
+    Some(i)
 }
 
 fn hit_object(ray: &Ray, object: &Box<dyn Object>, lights: &Vec<Box<dyn Light>>) -> Option<(f64, Colour)> {

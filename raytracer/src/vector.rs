@@ -23,7 +23,7 @@ impl<T: Default + Neg<Output=T> + Copy, const N: usize> Neg for &Vector<T, N> {
         for i in 0..N {
             vals[i] = -self.vals[i];
         }
-        return Vector::new(vals);
+        Vector::new(vals)
     }
 }
 
@@ -33,7 +33,7 @@ impl<T: Default + Add<T, Output=T> + Mul<T, Output=T> + Copy, const N: usize> Ve
         for i in 0..N {
             val = val + self.vals[i] * rhs.vals[i];
         }
-        return val;
+        val
     }
 }
 
@@ -41,8 +41,8 @@ impl<T: Copy, const N: usize> Index<usize> for Vector<T, N> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
-        if 0 > index || index >= N { panic!("Index out of bounds.") }
-        return &self.vals[index];
+        if index >= N { panic!("Index out of bounds.") }
+        &self.vals[index]
     }
 }
 
@@ -85,7 +85,7 @@ impl<const N: usize> Vector<f64, N> {
         let cross = self.x() * other.y() - self.y() * other.x();
         // return cross.signum() * self.cos_angle_between(other).acos();
         let dot = self.dot(other);
-        return cross.atan2(dot);
+        cross.atan2(dot)
     }
 }
 

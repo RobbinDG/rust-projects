@@ -1,12 +1,8 @@
 use std::fs::File;
 use std::path::Path;
-use sphere::Sphere;
 
-use crate::colour::Colour;
-use crate::cube::Cube;
-use crate::scene::{Camera, Scene};
+use crate::scene::Scene;
 use crate::tracer::trace;
-use crate::vector::Vector;
 
 mod scene;
 mod ray;
@@ -33,7 +29,7 @@ fn main() {
     // Iterate over the coordinates and pixels of the image
     for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
         let ray = scene.camera.ray_for_pixel(x, y);
-        *pixel = trace(ray, &scene)
+        *pixel = trace(ray, &scene);
     }
 
     // Save the image as “fractal.png”, the format is deduced from the path

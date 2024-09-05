@@ -16,7 +16,7 @@ pub struct PointLight {
 
 impl Light for PointLight {
     fn vec(&self, point: &Vector<f64, 3>) -> Vector<f64, 3> {
-        return &self.centre - point;
+        (&self.centre - point).normalise()
     }
 
     fn colour(&self) -> Colour {
