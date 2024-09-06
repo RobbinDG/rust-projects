@@ -6,7 +6,7 @@ use serde::de::{Error, SeqAccess, Visitor};
 use crate::colour::Colour;
 use crate::cube::Cube;
 use crate::hit::Hit;
-use crate::light::{Light, PointLight};
+use crate::light::{Light, PointLight, Sun};
 use crate::object::Object;
 use crate::ray::Ray;
 use crate::sphere::Sphere;
@@ -57,18 +57,21 @@ impl<'de> Deserialize<'de> for Box<dyn Object> {
 
 enum AllLights {
     PointLight(PointLight),
+    Sun(Sun),
 }
 
 impl Light for AllLights {
     fn vec(&self, point: &Vector<f64, 3>) -> Vector<f64, 3> {
         match self {
             AllLights::PointLight(p) => p.vec(point),
+            AllLights::Sun(s) => s.vec(point),
         }
     }
 
     fn colour(&self) -> Colour {
         match self {
             AllLights::PointLight(p) => p.colour(),
+            AllLights::Sun(s) => s.colour(),
         }
     }
 }
@@ -82,6 +85,9 @@ impl<'de> Deserialize<'de> for AllLights {
 
         if let Ok(point_light) = serde_json::from_value::<PointLight>(value.clone()) {
             return Ok(AllLights::PointLight(point_light));
+        }
+        if let Ok(sun) = serde_json::from_value::<Sun>(value.clone()) {
+            return Ok(AllLights::Sun(sun));
         }
 
         Err(Error::custom("Light type unknown"))
