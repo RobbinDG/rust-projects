@@ -12,7 +12,7 @@ fn simple_illumination(ray: &Ray, hit: &Hit) -> Option<Colour> {
     }
 }
 
-fn phong_illumination(ray: &Ray, hit: &Hit, lights: &Vec<Box<dyn Light>>) -> Option<Colour> {
+fn phong_illumination(ray: &Ray, hit: &Hit, lights: &Vec<Box<dyn Light>>) -> Colour {
     let ka = hit.material.ka;
     let kd = hit.material.kd;
     let ks = hit.material.ks;
@@ -31,32 +31,35 @@ fn phong_illumination(ray: &Ray, hit: &Hit, lights: &Vec<Box<dyn Light>>) -> Opt
         let c_specular = &Colour::new_rgba([255, 255, 255, 255]) * (ks * spec.powf(alpha));
         c = c + c_diffuse + c_specular;
     }
-    Some(c)
+    c
 }
 
-fn hit_object(ray: &Ray, object: &Box<dyn Object>, lights: &Vec<Box<dyn Light>>) -> Option<(f64, Colour)> {
-    if let Some(hit) = object.clone().intersect(&ray) {
-        let i = phong_illumination(&ray, &hit, lights)?;
-        Some((hit.t, i))
-    } else {
-        None
-    }
-}
-pub fn trace(ray: Ray, scene: &Scene) -> image::Rgb<u8> {
-    let mut closest: Option<(f64, Colour)> = None;
+fn closest_object(ray: &Ray, scene: &Scene) -> Option<Hit> {
+    let mut closest: Option<Hit> = None;
+
     for object in &scene.objects {
-        let hit = hit_object(&ray, object, &scene.lights);
-        if let Some((tn, cn)) = hit {
+        // let hit = hit_object(&ray, object, &scene.lights);
+        if let Some(hit) = object.intersect(&ray) {
             closest = match closest {
-                Some((tc, _)) if tc < tn => { Some((tn, cn)) }
-                None => { Some((tn, cn)) }
-                _ => { closest }
-            };
+                Some(c) if hit.t < c.t => Some(hit),
+                None => Some(hit),
+                _ => closest,
+             }
         }
     }
+    closest
+}
+
+pub fn trace(ray: Ray, scene: &Scene) -> image::Rgb<u8> {
+    // Determine closest intersecting object
+    // let mut closest: Option<(f64, Colour)> = None;
+    let closest = closest_object(&ray, scene);
 
     match closest {
-        Some((_, c)) => image::Rgb([c.r(), c.g(), c.b()]),
+        Some(hit) => {
+            let c = phong_illumination(&ray, &hit, &scene.lights);
+            image::Rgb([c.r(), c.g(), c.b()])
+        },
         None => image::Rgb([0, 0, 0]),
     }
 }
