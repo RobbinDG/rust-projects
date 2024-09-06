@@ -1,4 +1,4 @@
-use crate::material::Material;
+use crate::composition::Material;
 use crate::vector::Vector;
 
 pub struct Hit {

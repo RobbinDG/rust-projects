@@ -1,22 +1,14 @@
 use std::fs::File;
 use std::path::Path;
 
-use crate::scene::Scene;
+use composition::Scene;
 use crate::tracer::trace;
 
-mod scene;
 mod ray;
 mod tracer;
 mod vector;
-mod sphere;
-mod colour;
-mod plane;
-mod object;
-mod cube;
 mod hit;
-mod scene_loader;
-mod light;
-mod material;
+mod composition;
 
 fn main() {
     let scene = load_scene("scene.json");

@@ -1,6 +1,4 @@
 use serde::Deserialize;
-use crate::light::Light;
-use crate::object::Object;
 use crate::ray::Ray;
 use crate::vector::Vector;
 
@@ -31,11 +29,4 @@ impl Camera {
 
         return Ray::new(self.eye_pos.clone(), dir);
     }
-}
-
-#[derive(Deserialize)]
-pub struct Scene {
-    pub camera: Camera,
-    pub objects: Vec<Box<dyn Object>>,
-    pub lights: Vec<Box< dyn Light>>,
 }

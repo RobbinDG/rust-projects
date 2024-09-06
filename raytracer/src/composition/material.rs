@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use crate::colour::Colour;
+use crate::composition::colour::Colour;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Material {

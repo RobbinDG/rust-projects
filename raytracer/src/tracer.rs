@@ -1,9 +1,6 @@
-use crate::colour::Colour;
+use crate::composition::{Colour, Light, Object, Scene};
 use crate::hit::Hit;
-use crate::light::Light;
-use crate::object::Object;
 use crate::ray::Ray;
-use crate::scene::Scene;
 
 fn simple_illumination(ray: &Ray, hit: &Hit) -> Option<Colour> {
     let n = hit.normal;
