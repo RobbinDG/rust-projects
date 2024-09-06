@@ -5,7 +5,7 @@ use crate::object::Object;
 use crate::ray::Ray;
 use crate::scene::Scene;
 
-fn ambient_illumination(ray: &Ray, hit: &Hit) -> Option<Colour> {
+fn simple_illumination(ray: &Ray, hit: &Hit) -> Option<Colour> {
     let n = hit.normal;
     let cos_theta = (-&n).cos_angle_between(&ray.d);
     if cos_theta >= 0.0 {  // Front side
@@ -16,23 +16,24 @@ fn ambient_illumination(ray: &Ray, hit: &Hit) -> Option<Colour> {
 }
 
 fn phong_illumination(ray: &Ray, hit: &Hit, lights: &Vec<Box<dyn Light>>) -> Option<Colour> {
-    let ka = 0.8;
-    let kd = 0.2;
-    let ks = 0.0;
-    let alpha = 0.0;
+    let ka = 0.2;
+    let kd = 0.5;
+    let ks = 0.3;
+    let alpha = 4.0;
 
-    let ia = ambient_illumination(ray, hit)?;
+    let ia = &hit.material;
 
-    let mut i = &ia * ka;
+    let mut i = ia * ka;
     for light in lights {
         let v = -&ray.d;
         let l = light.vec(&hit.loc);
         let ln = l.dot(&hit.normal);
-        let r = &(&hit.normal * (2.0 * ln)) - &l;
+        let r = (&(&hit.normal * (2.0 * ln)) - &l).normalise();
 
         let hit_col = &hit.material * &light.colour();
         let i_ln = &hit_col * (kd * ln);
-        let i_rv = &Colour::new_rgba([255, 255, 255, 255]) * (ks * r.dot(&v).powf(alpha));
+        let spec = r.dot(&v).max(0.0);
+        let i_rv = &Colour::new_rgba([255, 255, 255, 255]) * (ks * spec.powf(alpha));
         i = i + i_ln + i_rv;
     }
     Some(i)
