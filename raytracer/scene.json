@@ -11,8 +11,8 @@
 	  1.0
 	],
 	"fov": 1.0,
-	"width": 100,
-	"height": 100
+	"width": 200,
+	"height": 200
   },
   "background": {
 	"rgba": [
