@@ -16,7 +16,7 @@ pub struct Camera {
 impl Camera {
     pub fn ray_for_pixel(&self, x: u32, y: u32) -> Ray {
         let rel_x = (2.0 * x as f64 - self.width as f64) / (self.width as f64);
-        let rel_y = (2.0 * y as f64 - self.height as f64) / (self.height as f64);
+        let rel_y = -(2.0 * y as f64 - self.height as f64) / (self.height as f64);
         let rel_z = 1.0;
 
         let base = Vector::new([0.0, 1.0]);  // x = 0, z = 1
