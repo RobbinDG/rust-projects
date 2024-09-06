@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use crate::colour::Colour;
 use crate::hit::Hit;
+use crate::material::Material;
 use crate::object::Object;
 use crate::ray::Ray;
 use crate::vector::Vector;
@@ -9,7 +10,7 @@ use crate::vector::Vector;
 pub struct Sphere {
     pub c: Vector<f64, 3>,
     pub r: f64,
-    pub colour: Colour,
+    pub material: Material,
 }
 
 impl Sphere {
@@ -17,8 +18,8 @@ impl Sphere {
         (at - &self.c).normalise()
     }
 
-    fn material(&self) -> Colour {
-        self.colour.clone()
+    fn material(&self) -> Material {
+        self.material.clone()
     }
 }
 

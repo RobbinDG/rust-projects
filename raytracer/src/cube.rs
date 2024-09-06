@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use crate::colour::Colour;
 use crate::hit::Hit;
+use crate::material::Material;
 use crate::object::Object;
 use crate::ray::Ray;
 use crate::vector::Vector;
@@ -11,7 +12,7 @@ const E: f64 = 0.0000001;
 pub struct Cube {
     pub c: Vector<f64, 3>, // Centre
     pub d: f64,  // Distance from centre to face centres
-    pub colour: Colour,
+    pub material: Material,
 }
 
 enum CubeFace {
@@ -74,7 +75,7 @@ impl Cube {
                 loc: h,
                 t,
                 normal: Vector::new(n),
-                material: Colour::new_rgba([material[0], material[1], material[2], 255]),
+                material: self.material.clone(),
             });
         }
         return None;
