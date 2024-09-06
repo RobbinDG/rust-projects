@@ -2,13 +2,11 @@ use std::fs::File;
 use std::path::Path;
 
 use composition::Scene;
-use crate::tracer::trace;
+use rendering::tracer::trace;
 
-mod ray;
-mod tracer;
 mod vector;
-mod hit;
 mod composition;
+mod rendering;
 
 fn main() {
     let scene = load_scene("scene.json");
@@ -30,7 +28,7 @@ fn main() {
 }
 
 fn load_scene(file_name: &str) -> Scene {
-    let file = File::open(&Path::new("scene.json")).unwrap();
+    let file = File::open(&Path::new(file_name)).unwrap();
     let scene_loaded: Scene = serde_json::from_reader(file).unwrap();
     scene_loaded
 }

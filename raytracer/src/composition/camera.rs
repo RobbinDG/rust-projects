@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use crate::ray::Ray;
+use crate::rendering::ray::Ray;
 use crate::vector::Vector;
 
 #[derive(Deserialize)]

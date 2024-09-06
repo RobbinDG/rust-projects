@@ -1,10 +1,9 @@
-use serde::Deserialize;
-use crate::composition::colour::Colour;
-use crate::hit::Hit;
 use crate::composition::material::Material;
 use crate::composition::objects::object::Object;
-use crate::ray::Ray;
+use crate::rendering::hit::Hit;
+use crate::rendering::ray::Ray;
 use crate::vector::Vector;
+use serde::Deserialize;
 
 const E: f64 = 0.0000001;
 

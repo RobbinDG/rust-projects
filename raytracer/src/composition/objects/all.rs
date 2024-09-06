@@ -3,8 +3,8 @@ use serde::de::Error;
 use crate::composition::Object;
 use crate::composition::objects::cube::Cube;
 use crate::composition::objects::sphere::Sphere;
-use crate::hit::Hit;
-use crate::ray::Ray;
+use crate::rendering::hit::Hit;
+use crate::rendering::ray::Ray;
 
 pub enum AllObjects {
     Sphere(Sphere),
