@@ -41,25 +41,42 @@ fn closest_object(ray: &Ray, scene: &Scene) -> Option<Hit> {
         // let hit = hit_object(&ray, object, &scene.lights);
         if let Some(hit) = object.intersect(&ray) {
             closest = match closest {
-                Some(c) if hit.t < c.t => Some(hit),
-                None => Some(hit),
+                Some(c) if hit.t >= 0.0 && hit.t < c.t => Some(hit),
+                None if hit.t >= 0.0 => Some(hit),
                 _ => closest,
-             }
+            }
         }
     }
     closest
 }
 
+fn reflect_ray(ray: &Ray, hit: &Hit, hit_colour: Colour) -> Ray {
+    Ray {
+        s: hit.loc,
+        d: (&ray.d - &(&hit.normal * (2.0 * ray.d.dot(&hit.normal)))).normalise(),
+        c: hit_colour,
+    }
+}
+
 pub fn trace(ray: Ray, scene: &Scene) -> image::Rgb<u8> {
-    // Determine closest intersecting object
-    // let mut closest: Option<(f64, Colour)> = None;
+    let c = trace_reflect(ray, scene, 1);
+    image::Rgb([c.r(), c.g(), c.b()])
+}
+
+pub fn trace_reflect(ray: Ray, scene: &Scene, depth: u8) -> Colour {
+    // Determine the closest intersecting object
     let closest = closest_object(&ray, scene);
 
     match closest {
         Some(hit) => {
-            let c = phong_illumination(&ray, &hit, &scene.lights);
-            image::Rgb([c.r(), c.g(), c.b()])
-        },
-        None => image::Rgb([0, 0, 0]),
+            match hit.material.ref_coef {
+                Some(coef) if depth > 0 => {
+                    let reflection = reflect_ray(&ray, &hit, ray.c.clone());
+                    trace_reflect(reflection, scene, depth - 1)
+                }
+                _ => phong_illumination(&ray, &hit, &scene.lights) // Not reflective material
+            }
+        }
+        None => scene.background.clone(),
     }
 }

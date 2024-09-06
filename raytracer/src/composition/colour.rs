@@ -25,6 +25,10 @@ impl Colour {
     pub fn g(&self) -> u8 { (self.rgba[1] * 255.0) as u8 }
     pub fn b(&self) -> u8 { (self.rgba[2] * 255.0) as u8 }
     pub fn a(&self) -> u8 { (self.rgba[3] * 255.0) as u8 }
+
+    pub fn black() -> Colour {
+        Self::new_rgba([0, 0, 0, 0])
+    }
 }
 
 impl Add<Colour> for Colour {
