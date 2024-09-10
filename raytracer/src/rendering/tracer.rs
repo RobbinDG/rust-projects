@@ -28,7 +28,7 @@ fn phong_illumination(ray: &Ray, hit: &Hit, lights: &Vec<Box<dyn Light>>) -> Col
         let c_hit = &hit.material.colour * &light.colour();
         let c_diffuse = &c_hit * (kd * ln);
         let spec = r.dot(&v).max(0.0);
-        let c_specular = &Colour::new_rgba([255, 255, 255, 255]) * (ks * spec.powf(alpha));
+        let c_specular = &light.colour() * (ks * spec.powf(alpha));
         c = c + c_diffuse + c_specular;
     }
     c
@@ -65,14 +65,16 @@ pub fn trace(ray: Ray, scene: &Scene) -> image::Rgb<u8> {
 
 pub fn trace_reflect(ray: Ray, scene: &Scene, depth: u8) -> Colour {
     // Determine the closest intersecting object
-    let closest = closest_object(&ray, scene);
+    let mut closest = closest_object(&ray, scene);
 
     match closest {
-        Some(hit) => {
+        Some(mut hit) => {
             match hit.material.ref_coef {
                 Some(coef) if depth > 0 => {
                     let reflection = reflect_ray(&ray, &hit, ray.c.clone());
-                    trace_reflect(reflection, scene, depth - 1)
+                    let c = trace_reflect(reflection, scene, depth - 1);
+                    hit.material.colour = &hit.material.colour * &c;
+                    phong_illumination(&ray, &hit, &scene.lights)
                 }
                 _ => phong_illumination(&ray, &hit, &scene.lights) // Not reflective material
             }
