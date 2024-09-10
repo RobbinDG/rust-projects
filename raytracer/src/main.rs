@@ -3,6 +3,7 @@ use std::path::Path;
 
 use composition::Scene;
 use rendering::tracer::trace;
+use crate::rendering::viewport::Viewport;
 
 mod vector;
 mod composition;
@@ -13,10 +14,11 @@ fn main() {
 
     // Create a new ImgBuf with width: imgx and height: imgy
     let mut imgbuf = image::ImageBuffer::new(scene.camera.width, scene.camera.height);
+    let viewport = Viewport::new(&scene.camera);
 
     // Iterate over the coordinates and pixels of the image
     for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
-        let ray = scene.camera.ray_for_pixel(x, y);
+        let ray = viewport.ray_for_pixel(x as usize, y as usize);
         *pixel = trace(ray, &scene);
     }
 

@@ -11,3 +11,4 @@ pub use lights::light::Light;
 pub use colour::Colour;
 pub use material::Material;
 pub use scene::Scene;
+pub use camera::Camera;

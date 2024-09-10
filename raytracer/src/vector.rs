@@ -181,3 +181,15 @@ impl<T: Sub<T, Output=T> + Default + Copy, const N: usize> Sub<&Vector<T, N>> fo
         Vector { vals }
     }
 }
+
+
+impl<T> Vector<T, 3>
+where T: Mul<T, Output=T> + Sub<T, Output=T> + Clone {
+    pub fn cross(&self, other: &Vector<T, 3>) -> Vector<T, 3> {
+        Vector::new([
+            self.y() * other.z() - self.z() * other.y(),
+            self.z() * other.x() - self.x() * other.z(),
+            self.x() * other.y() - self.y() * other.x(),
+        ])
+    }
+}
