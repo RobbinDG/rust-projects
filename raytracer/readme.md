@@ -87,15 +87,15 @@ without needing to recompile my sources.
 ### Phase 5: Lighting
 
 Next, I returned to doing more fundamental parts of raytracing: implementing a lighting model. The
-obvious choice for a lighting model is the Phong model. I won't bore you with the details. To 
-get this to work, I had to overhaul my main tracing implementation. I added a `Light` trait, and 
-updated the `Scene` to contain a `Vec<box<dyn Light>>` in preparation of supporting several 
-light types. I then implemented diffuse lighting and a simple `PointLight` implementation to 
-work with. After that, the specular component was added, as well as a `Sun` implementation, 
-which acts as an infinite-distance light from a given direction. I wanted to store the Phong 
-constants as material properties for each object. That way, I could make all objects have their 
-own characteristics. I created a `Material` class that contains all such constants, as well as 
-the colour. In the future, this can support things like reflection types and textures without 
+obvious choice for a lighting model is the Phong model. I won't bore you with the details. To
+get this to work, I had to overhaul my main tracing implementation. I added a `Light` trait, and
+updated the `Scene` to contain a `Vec<box<dyn Light>>` in preparation of supporting several
+light types. I then implemented diffuse lighting and a simple `PointLight` implementation to
+work with. After that, the specular component was added, as well as a `Sun` implementation,
+which acts as an infinite-distance light from a given direction. I wanted to store the Phong
+constants as material properties for each object. That way, I could make all objects have their
+own characteristics. I created a `Material` class that contains all such constants, as well as
+the colour. In the future, this can support things like reflection types and textures without
 needing modifications to the main raytracer.
 
 ![image](images/result_phong_1.png)
@@ -105,5 +105,13 @@ needing modifications to the main raytracer.
 
 ### Phase 6: Reflection
 
-![image](images/result_viewport.png)
+To continue with the tracer implementation, it is high time to implement light transport logic. 
+This means reflections and shadows. Both of these involve casting a ray from the hit point, 
+in the direction of a light or the reflection. Implementing this is relatively straightforward, 
+requiring minimal changes to the main tracer, which are, fundamentally, only generalisations of 
+the existing implementation. 
+
+<img src="images/result_viewport.png" alt="result_viewport" width="200px"/>
+<img src="images/result_reflection.png" alt="result_reflection" width="200px"/>
+<img src="images/result_shadows.png" alt="result_shadows" width="200px"/>
 
