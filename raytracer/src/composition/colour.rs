@@ -29,6 +29,9 @@ impl Colour {
     pub fn black() -> Colour {
         Self::new_rgba([0, 0, 0, 0])
     }
+    pub fn white() -> Colour {
+        Self::new_rgba([255, 255, 255, 0])
+    }
 }
 
 impl Add<Colour> for Colour {

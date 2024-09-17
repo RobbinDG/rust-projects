@@ -56,6 +56,14 @@ fn reflect_ray(ray: &Ray, hit: &Hit, hit_colour: Colour) -> Ray {
     }
 }
 
+fn refract_ray(ray: &Ray, hit: &Hit, hit_colour: Colour) -> Ray {
+    Ray {
+        s: hit.loc + &ray.d * 0.00001,
+        d: ray.d,
+        c: hit_colour,
+    }
+}
+
 pub fn trace(ray: Ray, scene: &Scene) -> image::Rgb<u8> {
     let c = trace_reflect(ray, scene, 1);
     image::Rgb([c.r(), c.g(), c.b()])
@@ -78,15 +86,26 @@ pub fn trace_reflect(ray: Ray, scene: &Scene, depth: u8) -> Colour {
 
     match closest {
         Some(mut hit) => {
-            match hit.material.ref_coef {
-                Some(coef) if depth > 0 => {
+            if depth > 0 {
+                let mut leftover = 1.0;
+                let mut colour = Colour::black();
+                if let Some(reflectivity) = hit.material.reflectivity {
                     let reflection = reflect_ray(&ray, &hit, ray.c.clone());
                     let c = trace_reflect(reflection, scene, depth - 1);
-                    hit.material.colour = &hit.material.colour * &c;
-                    illuminate(&ray, &hit, &scene)
+                    colour = colour + &(&hit.material.colour * &c) * reflectivity;
+                    leftover -= reflectivity;
+                } else {
+                    colour = colour + hit.material.colour.clone();
                 }
-                _ => illuminate(&ray, &hit, &scene) // Not reflective material
+                if let Some(transmittance) = hit.material.transmittance {
+                    let refraction = refract_ray(&ray, &hit, ray.c.clone());
+                    let c = trace_reflect(refraction, scene, depth - 1);
+                    colour = colour + &(&hit.material.colour * &c) * transmittance;
+                    leftover -= transmittance;
+                }
+                hit.material.colour = colour + &hit.material.colour * leftover;
             }
+            illuminate(&ray, &hit, &scene)
         }
         None => scene.background.clone(),
     }
