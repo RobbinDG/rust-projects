@@ -30,6 +30,7 @@ impl Object for Square {
             t,
             normal: self.normal,
             material: self.material.clone(),
+            back_side: nd > 0.0,
         })
     }
 }

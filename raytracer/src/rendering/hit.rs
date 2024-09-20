@@ -6,4 +6,5 @@ pub struct Hit {
     pub t: f64,
     pub normal: Vector<f64, 3>,
     pub material: Material,
+    pub back_side: bool,
 }

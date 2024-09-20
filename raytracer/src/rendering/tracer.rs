@@ -1,4 +1,4 @@
-use crate::composition::{Colour, Light, Object, Scene};
+use crate::composition::{Colour, Light, Material, Object, Scene};
 use crate::rendering::hit::Hit;
 use crate::rendering::ray::Ray;
 
@@ -48,20 +48,33 @@ fn closest_object(ray: &Ray, scene: &Scene) -> Option<Hit> {
     closest
 }
 
-fn reflect_ray(ray: &Ray, hit: &Hit, hit_colour: Colour) -> Ray {
+fn reflect_ray(ray: &Ray, hit: &Hit) -> Ray {
     Ray {
         s: hit.loc,
         d: (&ray.d - &(&hit.normal * (2.0 * ray.d.dot(&hit.normal)))).normalise(),
-        c: hit_colour,
+        in_material: hit.material.clone(),
     }
 }
 
-fn refract_ray(ray: &Ray, hit: &Hit, hit_colour: Colour) -> Ray {
-    Ray {
-        s: hit.loc + &ray.d * 0.00001,
-        d: ray.d,
-        c: hit_colour,
+fn refract_ray(ray: &Ray, hit: &Hit) -> Option<Ray> {
+    let n1 = ray.in_material.refractive_index.unwrap_or(1.0);
+    let n2 = hit.material.refractive_index.unwrap_or(1.0);
+    let n12 = n1 / n2;
+    let cos_theta_1 = -ray.d.dot(&hit.normal);
+    let cos_theta_2 = (1.0 - n12 * n12 * (1.0 - cos_theta_1 * cos_theta_1)).sqrt();
+    let d_rfr = (&ray.d * n12 + &hit.normal * (n12 * cos_theta_1 - cos_theta_2)).normalise();
+
+    let asin_n21 = (n2 / n1).asin();
+    let cos_theta_crit = (1.0 - asin_n21 * asin_n21).sqrt();
+    if cos_theta_1 >= cos_theta_crit {
+        return None;
     }
+    // println!("{:?} {:?} {} {} {} {}", ray.d, d_rfr, n12, cos_theta_1, cos_theta_2, (cos_theta_1.acos().sin() * n1 / n2).asin().cos());
+    Some(Ray {
+        s: hit.loc + &d_rfr * 0.00001,
+        d: d_rfr,
+        in_material: hit.material.clone(),
+    })
 }
 
 pub fn trace(ray: Ray, scene: &Scene) -> image::Rgb<u8> {
@@ -90,18 +103,21 @@ pub fn trace_reflect(ray: Ray, scene: &Scene, depth: u8) -> Colour {
                 let mut leftover = 1.0;
                 let mut colour = Colour::black();
                 if let Some(reflectivity) = hit.material.reflectivity {
-                    let reflection = reflect_ray(&ray, &hit, ray.c.clone());
-                    let c = trace_reflect(reflection, scene, depth - 1);
-                    colour = colour + &(&hit.material.colour * &c) * reflectivity;
-                    leftover -= reflectivity;
+                    if !hit.back_side {
+                        let reflection = reflect_ray(&ray, &hit);
+                        let c = trace_reflect(reflection, scene, depth - 1);
+                        colour = colour + &(&hit.material.colour * &c) * reflectivity;
+                        leftover -= reflectivity;
+                    }
                 } else {
                     colour = colour + hit.material.colour.clone();
                 }
                 if let Some(transmittance) = hit.material.transmittance {
-                    let refraction = refract_ray(&ray, &hit, ray.c.clone());
-                    let c = trace_reflect(refraction, scene, depth - 1);
-                    colour = colour + &(&hit.material.colour * &c) * transmittance;
-                    leftover -= transmittance;
+                    if let Some(refraction) = refract_ray(&ray, &hit) {
+                        let c = trace_reflect(refraction, scene, depth - hit.back_side as u8);
+                        colour = colour + &(&hit.material.colour * &c) * transmittance;
+                        leftover -= transmittance;
+                    }
                 }
                 hit.material.colour = colour + &hit.material.colour * leftover;
             }

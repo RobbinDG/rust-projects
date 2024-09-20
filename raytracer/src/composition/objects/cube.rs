@@ -70,11 +70,13 @@ impl Cube {
         }
 
         if in_1 && in_2 {
+            let normal = Vector::new(n);
             return Some(Hit {
                 loc: h,
                 t,
-                normal: Vector::new(n),
+                normal,
                 material: self.material.clone(),
+                back_side: normal.dot(&ray.d) > 0.0
             });
         }
         return None;

@@ -1,10 +1,10 @@
-use crate::composition::Colour;
+use crate::composition::{Colour, Material};
 use crate::vector::Vector;
 
 pub struct Ray {
     pub s: Vector<f64, 3>,
     pub d: Vector<f64, 3>,
-    pub c: Colour,
+    pub in_material: Material,
 }
 
 impl Ray {
@@ -12,7 +12,7 @@ impl Ray {
         Ray {
             s,
             d: d.normalise(),
-            c: Colour::new_rgba([255, 255, 255, 255]),
+            in_material: Material::air(),
         }
     }
 

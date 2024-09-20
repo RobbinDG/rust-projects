@@ -31,7 +31,7 @@ impl Object for Sphere {
         let det = vd * vd - &v.dot(&v) + self.r * self.r;
 
         if det < 0.0 {
-            return None;
+            return None
         }
 
         let sqrt_det = f64::sqrt(det);
@@ -39,11 +39,13 @@ impl Object for Sphere {
         let t2 = -vd - sqrt_det;
         let t = if t1 <= t2 { t1 } else { t2 };
         let h = ray.at(t);
+        let normal = self.normal(&h);
         Some(Hit {
             loc: h,
             t,
-            normal: self.normal(&h),
+            normal,
             material: self.material(),
+            back_side: normal.dot(&ray.d) > 0.0,
         })
     }
 }
