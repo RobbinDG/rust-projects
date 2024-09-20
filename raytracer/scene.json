@@ -43,8 +43,8 @@
 		"kd": 0.1,
 		"ks": 0.2,
 		"alpha": 4.0,
-		"reflectivity": 0.1,
-		"transmittance": 0.9,
+		"reflectivity": 0.7,
+		"transmittance": 0.2,
 		"refractive_index": 1.15
 	  }
 	},
