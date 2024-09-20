@@ -105,13 +105,26 @@ needing modifications to the main raytracer.
 
 ### Phase 6: Reflection
 
-To continue with the tracer implementation, it is high time to implement light transport logic. 
-This means reflections and shadows. Both of these involve casting a ray from the hit point, 
-in the direction of a light or the reflection. Implementing this is relatively straightforward, 
-requiring minimal changes to the main tracer, which are, fundamentally, only generalisations of 
-the existing implementation. 
+To continue with the tracer implementation, it is high time to implement light transport logic.
+This means reflections and shadows. Both of these involve casting a ray from the hit point,
+in the direction of a light or the reflection. Implementing this is relatively straightforward,
+requiring minimal changes to the main tracer, which are, fundamentally, only generalisations of
+the existing implementation.
 
 <img src="images/result_viewport.png" alt="result_viewport" width="200px"/>
 <img src="images/result_reflection.png" alt="result_reflection" width="200px"/>
 <img src="images/result_shadows.png" alt="result_shadows" width="200px"/>
+
+### Phase 7: Refraction
+
+Using Snell's law, we can implement partially transparent objects and have light bend naturally.
+To implement this, we extend the tracer once more by casting a secondary ray on transparent objects.
+We give each object a index of refraction to compute the light-bending effect described by Snell's
+law. Currently, this model does not support total internal reflection. We do check for this
+phenomenon, and stop the recursive tracing once we encounter it.
+
+
+<img src="images/result_blending.png" alt="result_blending" width="200px"/>
+<img src="images/result_refraction.png" alt="result_refraction" width="200px"/>
+<img src="images/result_refraction_2.png" alt="result_refraction_2" width="200px"/>
 
