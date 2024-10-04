@@ -132,14 +132,6 @@ impl<T: Default + Div<S, Output=T> + Copy, S: Copy, const N: usize> Div<S> for &
     }
 }
 
-// impl<T: Mul<f64, Output=T> + Default + Copy, const N: usize> Mul<&Vector<T, N>> for f64 {
-//     type Output = Vector<T, N>;
-//
-//     fn mul(self, rhs: &Vector<T, N>) -> Self::Output {
-//         rhs * self
-//     }
-// }
-
 impl<T: Add<T, Output=T> + Copy + Default, const N: usize> Add<&Vector<T, N>> for &Vector<T, N> {
     type Output = Vector<T, N>;
 
@@ -182,9 +174,38 @@ impl<T: Sub<T, Output=T> + Default + Copy, const N: usize> Sub<&Vector<T, N>> fo
     }
 }
 
+impl<const N: usize> Vector<f64, N>
+{
+    pub fn abs(&self) -> Vector<f64, N> {
+        let mut vals: [f64; N] = [f64::default(); N];
+        for i in 0..N {
+            vals[i] = if self[i] < 0.0 { -&self[i] } else { self[i] };
+        }
+        Vector::new(vals)
+    }
+
+    pub fn max(&self) -> f64 {
+        let mut max = f64::MIN;
+        for i in 0..N {
+            max = f64::max(max, self[i]);
+        }
+        max
+    }
+}
+
+impl<'a, T, const N: usize> Vector<T, N>
+where
+    T: Default + Copy + Add<T, Output=T> + std::iter::Sum<&'a T> + 'a,
+{
+    pub fn sum(&'a self) -> T {
+        self.vals.iter().sum()
+    }
+}
 
 impl<T> Vector<T, 3>
-where T: Mul<T, Output=T> + Sub<T, Output=T> + Clone {
+where
+    T: Mul<T, Output=T> + Sub<T, Output=T> + Clone,
+{
     pub fn cross(&self, other: &Vector<T, 3>) -> Vector<T, 3> {
         Vector::new([
             self.y() * other.z() - self.z() * other.y(),

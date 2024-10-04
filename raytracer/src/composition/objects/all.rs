@@ -2,6 +2,7 @@ use serde::{de, Deserialize, Deserializer};
 use serde::de::Error;
 use crate::composition::Object;
 use crate::composition::objects::cube::Cube;
+use crate::composition::objects::plane::Plane;
 use crate::composition::objects::sphere::Sphere;
 use crate::composition::objects::square::Square;
 use crate::rendering::hit::Hit;
@@ -10,6 +11,7 @@ use crate::rendering::ray::Ray;
 pub enum AllObjects {
     Sphere(Sphere),
     Cube(Cube),
+    Plane(Plane),
     Square(Square),
 }
 
@@ -18,6 +20,7 @@ impl Object for AllObjects {
         match self {
             AllObjects::Sphere(s) => s.intersect(ray),
             AllObjects::Cube(c) => c.intersect(ray),
+            AllObjects::Plane(p) => p.intersect(ray),
             AllObjects::Square(s) => s.intersect(ray),
         }
     }
@@ -36,6 +39,10 @@ impl<'de> Deserialize<'de> for AllObjects {
 
         if let Ok(cube) = serde_json::from_value::<Cube>(value.clone()) {
             return Ok(AllObjects::Cube(cube));
+        }
+
+        if let Ok(plane) = serde_json::from_value::<Plane>(value.clone()) {
+            return Ok(AllObjects::Plane(plane));
         }
 
         if let Ok(square) = serde_json::from_value::<Square>(value.clone()) {
