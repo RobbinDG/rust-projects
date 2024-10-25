@@ -38,6 +38,7 @@ impl Object for Plane {
             normal: self.normal,
             material: self.material.clone(),
             back_side: nd > 0.0,
+            uv: None,
         })
     }
 }

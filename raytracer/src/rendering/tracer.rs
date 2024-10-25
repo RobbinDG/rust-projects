@@ -1,4 +1,4 @@
-use crate::composition::{Colour, Light, Material, Object, Scene};
+use crate::composition::{Colour, Light, Object, Scene};
 use crate::rendering::hit::Hit;
 use crate::rendering::ray::Ray;
 
@@ -49,9 +49,10 @@ fn closest_object(ray: &Ray, scene: &Scene) -> Option<Hit> {
 }
 
 fn reflect_ray(ray: &Ray, hit: &Hit) -> Ray {
+    let dir = (&ray.d - &(&hit.normal * (2.0 * ray.d.dot(&hit.normal)))).normalise();
     Ray {
-        s: hit.loc,
-        d: (&ray.d - &(&hit.normal * (2.0 * ray.d.dot(&hit.normal)))).normalise(),
+        s: hit.loc + &dir * 0.0001,
+        d: dir,
         in_material: hit.material.clone(),
     }
 }
@@ -102,24 +103,25 @@ pub fn trace_reflect(ray: Ray, scene: &Scene, depth: u8) -> Colour {
             if depth > 0 {
                 let mut leftover = 1.0;
                 let mut colour = Colour::black();
+                let hit_colour = hit.colour_at();
                 if let Some(reflectivity) = hit.material.reflectivity {
                     if !hit.back_side {
                         let reflection = reflect_ray(&ray, &hit);
                         let c = trace_reflect(reflection, scene, depth - 1);
-                        colour = colour + &(&hit.material.colour * &c) * reflectivity;
+                        colour = colour + &(&hit_colour * &c) * reflectivity;
                         leftover -= reflectivity;
                     }
                 } else {
-                    colour = colour + hit.material.colour.clone();
+                    colour = colour + hit_colour.clone();
                 }
                 if let Some(transmittance) = hit.material.transmittance {
                     if let Some(refraction) = refract_ray(&ray, &hit) {
                         let c = trace_reflect(refraction, scene, depth - hit.back_side as u8);
-                        colour = colour + &(&hit.material.colour * &c) * transmittance;
+                        colour = colour + &(&hit_colour * &c) * transmittance;
                         leftover -= transmittance;
                     }
                 }
-                hit.material.colour = colour + &hit.material.colour * leftover;
+                hit.material.colour = colour + &hit_colour * leftover;
             }
             illuminate(&ray, &hit, &scene)
         }

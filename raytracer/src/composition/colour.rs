@@ -1,5 +1,5 @@
 use std::ops::{Add, Mul};
-
+use image::{Pixel, Rgba};
 use serde::Deserialize;
 
 use crate::vector::Vector;
@@ -19,6 +19,12 @@ impl Colour {
                 rgba[3] as f64 / 255.0,
             ])
         }
+    }
+
+    pub fn from_pixel(pixel: Rgba<u8>) -> Colour {
+        let pixel_tuple = pixel.channels();
+        assert!(pixel_tuple.len() >= 4, "Length of colour values should be at least 4.");
+        Colour::new_rgba([pixel_tuple[0], pixel_tuple[1], pixel_tuple[2], pixel_tuple[3]])
     }
 
     pub fn r(&self) -> u8 { (self.rgba[0] * 255.0) as u8 }

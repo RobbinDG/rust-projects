@@ -1,8 +1,10 @@
+use std::f64::consts::PI;
 use serde::Deserialize;
 use crate::composition::colour::Colour;
 use crate::rendering::hit::Hit;
 use crate::composition::material::Material;
 use crate::composition::objects::object::Object;
+use crate::composition::objects::uv_mapped::UVMapped;
 use crate::rendering::ray::Ray;
 use crate::vector::Vector;
 
@@ -31,7 +33,7 @@ impl Object for Sphere {
         let det = vd * vd - &v.dot(&v) + self.r * self.r;
 
         if det < 0.0 {
-            return None
+            return None;
         }
 
         let sqrt_det = f64::sqrt(det);
@@ -40,12 +42,23 @@ impl Object for Sphere {
         let t = if t1 <= t2 { t1 } else { t2 };
         let h = ray.at(t);
         let normal = self.normal(&h);
+
+        let n = (&h - &self.c).normalise();
+        let uv = (n[0].atan2(-n[2]) / (2.0 * PI) + 0.5, -n[1] * 0.5 + 0.5);
         Some(Hit {
             loc: h,
             t,
             normal,
             material: self.material(),
             back_side: normal.dot(&ray.d) > 0.0,
+            uv: Some(uv),
         })
+    }
+}
+
+impl UVMapped for Sphere {
+    fn get_uv_coords(&self, hit: &Hit) -> (f64, f64) {
+        let n = (&hit.loc - &self.c).normalise();
+        (n[0].atan2(n[1]) / (2.0 * PI) + 0.5, n[1] * 0.5 + 0.5)
     }
 }

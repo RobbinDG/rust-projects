@@ -12,3 +12,4 @@ pub use colour::Colour;
 pub use material::Material;
 pub use scene::Scene;
 pub use camera::Camera;
+pub use objects::uv_mapped::UVMapped;

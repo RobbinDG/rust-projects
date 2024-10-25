@@ -76,7 +76,8 @@ impl Cube {
                 t,
                 normal,
                 material: self.material.clone(),
-                back_side: normal.dot(&ray.d) > 0.0
+                back_side: normal.dot(&ray.d) > 0.0,
+                uv: None,
             });
         }
         return None;
