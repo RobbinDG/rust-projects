@@ -23,6 +23,7 @@ the project.
 
 - rust
 - serde + serde_json
+- once_cell
 
 ## Progress
 
@@ -128,3 +129,29 @@ phenomenon, and stop the recursive tracing once we encounter it.
 <img src="images/result_refraction.png" alt="result_refraction" width="200px"/>
 <img src="images/result_refraction_2.png" alt="result_refraction_2" width="200px"/>
 
+### Phase 8: Textures
+
+At this point, geometric objects with flat colours start to become slightly boring. To scratch the
+itch to create more intricate scenes, I've added support for textures using UV-mapping. Initially,
+this includes only the sphere, which I've mapped using a Mercator projection. The obvious choice 
+of texture is a globe. Introducing textures adds a small layer of complexity, as textures should 
+only be loaded once; before casting the first ray. This is achieved by using the `once_cell` 
+crate's `Lazy` data structure. This allows ues to create a global definition for the (at this 
+point) only texture and maintain a single copy of it. With that in hand, a small accessor on the 
+`Material` struct needed to be added to determine what the appropriate pixel colour is. This 
+accessor would check if the object is textured (as defined in the scene), and then consult the 
+corresponding UV-map to find the pixel at a hit point.
+
+<img src="images/result_texture.png" alt="result_texture" width="200px"/>
+
+## Future
+
+[25/10/2024] This marks the current state of this project. Although I hope to return to the 
+project in the 
+future, I have no current plans and aim to explore other avenues of Rust first. I have some 
+ideas for future updates, such as:
+- Moving the camera;
+- Subpixel rendering;
+- Anti-aliasing (if aliasing ever becomes an issue);
+- Meshes;
+- GPU/cuda support.
