@@ -1,16 +1,22 @@
 use client::ServerConnection;
 use std::io;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::TcpStream;
+use backend::{ServerRequest, ServerResponse};
 
 fn main() {
     let mut stream = TcpStream::connect("localhost:1234").unwrap();
 
     match prompt_main() {
         1 => {
-            stream.write("Test message".as_bytes()).unwrap();
-            let conn = ServerConnection {};
-            println!("{:?}", conn.available_queues());
+            stream.write(ServerRequest::ListQueues.as_payload().as_bytes()).unwrap();
+            println!("sent");
+            let mut buf = [0; 16];
+            stream.read(&mut buf).unwrap();
+            let response = ServerResponse::parse(&buf);
+            println!("Response {:?}", response);
+            // let conn = ServerConnection {};
+            // println!("{:?}", conn.available_queues());
         }
         _ => {},
     };
