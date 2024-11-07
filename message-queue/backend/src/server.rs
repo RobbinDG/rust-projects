@@ -13,7 +13,7 @@ impl DisconnectedServer {
     }
 
     pub fn connect(&self) -> Result<ConnectedServer, io::Error> {
-        let mut stream = TcpStream::connect("localhost:1234")?;
+        let stream = TcpStream::connect("localhost:1234")?;
         Ok(ConnectedServer {
             stream
         })

@@ -1,5 +1,23 @@
+use std::io::Error;
+use std::str::Utf8Error;
 use std::str;
-// use crate::request::ServerRequest::{CheckQueue, CreateQueue, ListQueues, PutMessage};
+
+pub enum RequestError {
+    IO(Error),
+    Parsing(Utf8Error),
+}
+
+impl From<Error> for RequestError {
+    fn from(value: Error) -> Self {
+        RequestError::IO(value)
+    }
+}
+
+impl From<Utf8Error> for RequestError {
+    fn from(value: Utf8Error) -> Self {
+        RequestError::Parsing(value)
+    }
+}
 
 #[derive(Debug)]
 pub enum ServerRequest {
