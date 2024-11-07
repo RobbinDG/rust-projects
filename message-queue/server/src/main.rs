@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::str;
+use backend::status_code::Status;
 
 pub struct Server {
     queues: HashMap<String, MessageQueue>,
@@ -64,31 +65,31 @@ fn execute_request(server: &mut Server, _socket: &mut TcpStream) -> Result<(), R
         }
         Ok(ServerRequest::CheckQueue(name)) => {
             if server.queues().contains(&&name) {
-                ServerResponse::from_str("exists")
+                ServerResponse::from_status(Status::Exists)
             } else {
-                ServerResponse::from_str("not_found")
+                ServerResponse::from_status(Status::Failed)
             }
         }
         Ok(ServerRequest::CreateQueue(name)) => {
             if server.queues.contains_key(&name) {
-                ServerResponse::from_str("already_exists")
+                ServerResponse::from_status(Status::Exists)
             } else {
                 server.queues.insert(name, MessageQueue::new_empty());
-                ServerResponse::from_str("created")
+                ServerResponse::from_status(Status::Created)
             }
         }
         Ok(ServerRequest::PutMessage(queue_name, message)) => {
             // TODO check queue exists
             if let Some(queue) = server.queues.get_mut(&queue_name) {
                 queue.put(Message::new(message));
-                ServerResponse::from_str("sent")
+                ServerResponse::from_status(Status::Sent)
             } else {
-                ServerResponse::from_str("not_found")
+                ServerResponse::from_status(Status::NotFound)
             }
         }
         Err(e) => {
             println!("{:?}", e);
-            ServerResponse::from_str("not_understood")
+            ServerResponse::from_status(Status::UnknownCommand)
         }
     };
     _socket.write(response.as_payload().as_bytes())?;

@@ -1,5 +1,6 @@
 use std::str;
 use std::str::{FromStr, Utf8Error};
+use crate::status_code::Status;
 
 #[derive(Debug)]
 pub struct ServerResponse {
@@ -9,6 +10,10 @@ pub struct ServerResponse {
 impl ServerResponse {
     pub fn from_str(message: &str) -> Self {
         ServerResponse { payload: String::from_str(message).unwrap() }
+    }
+
+    pub fn from_status(status: Status) -> Self {
+        Self::from_str(<&str>::from(status))
     }
 
     pub fn parse(response: &[u8]) -> Result<Self, Utf8Error> {
