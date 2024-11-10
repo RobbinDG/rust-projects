@@ -2,13 +2,13 @@ mod interface;
 mod connected_interface;
 mod disconnected_interface;
 
-use backend::DisconnectedServer;
+use backend::DisconnectedClient;
 use std::io;
 use crate::disconnected_interface::DisconnectedInterface;
 use crate::interface::Interface;
 
 fn main() {
-    let server = DisconnectedServer::new("localhost:1234");
+    let server = DisconnectedClient::new("localhost:1234");
     let mut interface: Box<dyn Interface> = Box::new(DisconnectedInterface::new(server));
 
     loop {

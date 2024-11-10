@@ -1,5 +1,5 @@
 use std::io;
-use backend::ConnectedServer;
+use backend::ConnectedClient;
 use backend::request::ServerRequest;
 use crate::disconnected_interface::DisconnectedInterface;
 use crate::interface::Interface;
@@ -20,12 +20,12 @@ fn prompt_string_input(prompt: &str) -> String {
 }
 
 pub struct ConnectedInterface {
-    server: ConnectedServer<&'static str>,
+    server: ConnectedClient<&'static str>,
     selected_queue: Option<String>,
 }
 
 impl ConnectedInterface {
-    pub fn new(server: ConnectedServer<&'static str>) -> Self {
+    pub fn new(server: ConnectedClient<&'static str>) -> Self {
         Self {
             server,
             selected_queue: None,

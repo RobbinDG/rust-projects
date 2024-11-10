@@ -1,13 +1,13 @@
-use backend::DisconnectedServer;
+use backend::DisconnectedClient;
 use crate::connected_interface::ConnectedInterface;
 use crate::interface::Interface;
 
 pub struct DisconnectedInterface {
-    server: DisconnectedServer<&'static str>,
+    server: DisconnectedClient<&'static str>,
 }
 
 impl DisconnectedInterface {
-    pub fn new(server: DisconnectedServer<&'static str>) -> Self {
+    pub fn new(server: DisconnectedClient<&'static str>) -> Self {
         Self { server }
     }
 }
