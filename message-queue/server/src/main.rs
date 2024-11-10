@@ -39,8 +39,11 @@ fn main() {
                             RequestError::Parsing(err) => {
                                 println!("{:?}", err);
                             }
+                            RequestError::Internal(err) => {
+                                println!("Internal Error: {:?}", err);
+                            }
                         }
-                        break
+                        break;
                     }
                 }
             }
