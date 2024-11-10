@@ -1,7 +1,7 @@
-use std::str;
-use std::str::{FromStr, Utf8Error};
-use serde::{Deserialize, Serialize};
 use crate::status_code::Status;
+use serde::{Deserialize, Serialize};
+use std::str;
+use std::str::FromStr;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerResponse {
@@ -15,18 +15,5 @@ impl ServerResponse {
 
     pub fn from_status(status: Status) -> Self {
         Self::from_str(<&str>::from(status))
-    }
-
-    pub fn parse(response: &[u8]) -> Result<Self, Utf8Error> {
-        let header = "res:";
-        let resp_str = str::from_utf8(response)?;
-        Ok(Self {
-            payload: resp_str[header.len()..].trim_matches('\0').to_string(),
-        })
-    }
-
-    pub fn as_payload(&self) -> String {
-        let header = "res:";
-        header.to_string() + &self.payload
     }
 }
