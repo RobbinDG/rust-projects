@@ -59,10 +59,12 @@ impl<T: ToSocketAddrs + Clone> DisconnectedServer<T> {
 
 impl<T: ToSocketAddrs + Clone> ConnectedServer<T> {
     pub fn send_request(&mut self, request: ServerRequest) -> Result<ServerResponse, RequestError> {
-        self.stream.write(request.as_payload().as_bytes())?;
+        let payload = postcard::to_allocvec(&request).unwrap();
+        self.stream.write_all(&payload)?;
         let mut buf = [0; 32];
         self.stream.read(&mut buf)?;
-        let response = ServerResponse::parse(&buf)?;
+        self.stream.flush()?;
+        let response: ServerResponse = postcard::from_bytes(&buf).unwrap();
         Ok(response)
     }
 

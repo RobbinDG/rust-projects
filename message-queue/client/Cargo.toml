@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 backend = { path = "../backend" }
+serde = { version = "1.0.214", default-features = false }

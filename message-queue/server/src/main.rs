@@ -2,11 +2,12 @@ use backend::message::Message;
 use backend::message_queue::MessageQueue;
 use backend::request::{RequestError, ServerRequest};
 use backend::response::ServerResponse;
+use backend::status_code::Status;
+use postcard::to_allocvec;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::str;
-use backend::status_code::Status;
 
 pub struct Server {
     queues: HashMap<String, MessageQueue>,
@@ -55,9 +56,8 @@ fn main() {
 fn execute_request(server: &mut Server, _socket: &mut TcpStream) -> Result<(), RequestError> {
     let mut buf = [0; 32];
     _socket.read(&mut buf)?;
-    let request_str = str::from_utf8(&buf)?.trim_matches('\0');
-    let request = ServerRequest::parse(request_str);
-    println!("Received {:?}", request_str);
+    let request: Result<ServerRequest, postcard::Error> = postcard::from_bytes(&buf);
+    println!("Received {:?}", request);
 
     _socket.flush()?;
     let response: ServerResponse = match request {
@@ -95,7 +95,8 @@ fn execute_request(server: &mut Server, _socket: &mut TcpStream) -> Result<(), R
             ServerResponse::from_status(Status::UnknownCommand)
         }
     };
-    _socket.write(response.as_payload().as_bytes())?;
+    let payload = to_allocvec(&response).unwrap();
+    _socket.write_all(&payload)?;
     println!("written");
     Ok(())
 }

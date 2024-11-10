@@ -1,6 +1,7 @@
 use std::io::Error;
 use std::str;
 use std::str::Utf8Error;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub enum RequestError {
@@ -27,7 +28,7 @@ impl From<String> for RequestError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ServerRequest {
     ListQueues,
     CheckQueue(String),

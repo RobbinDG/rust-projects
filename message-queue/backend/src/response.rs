@@ -1,8 +1,9 @@
 use std::str;
 use std::str::{FromStr, Utf8Error};
+use serde::{Deserialize, Serialize};
 use crate::status_code::Status;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ServerResponse {
     pub payload: String,
 }
