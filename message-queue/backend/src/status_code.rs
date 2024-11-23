@@ -6,6 +6,7 @@ pub enum Status {
     Failed,
     NotFound,
     UnknownCommand,
+    Error,
 }
 
 impl From<Status> for &str {
@@ -17,6 +18,7 @@ impl From<Status> for &str {
             Status::NotFound => "not_found",
             Status::Exists => "exists",
             Status::UnknownCommand => "unknown_command",
+            Status::Error => "error",
         }
     }
 }
