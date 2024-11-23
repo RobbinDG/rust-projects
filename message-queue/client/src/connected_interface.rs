@@ -39,7 +39,7 @@ impl Interface for ConnectedInterface {
         println!(" [2] Select queue");
         println!(" [3] X Send message");
         println!(" [4] Create queue");
-        println!(" [5] Create echo listener");
+        println!(" [5] Listen to queue");
         println!(" [0] Disconnect");
     }
 
@@ -70,9 +70,19 @@ impl Interface for ConnectedInterface {
                 Box::new(ConnectedInterface { server: self.server, selected_queue: self.selected_queue })
             }
             4 => {
-                let name = prompt_string_input("Name your new queue?");
+                let name = prompt_string_input("Name your new queue...");
                 let response = self.server.send_request(ServerRequest::CreateQueue(name)).unwrap();
                 println!("Response {:?}", response);
+                Box::new(ConnectedInterface { server: self.server, selected_queue: self.selected_queue })
+            }
+            5 => {
+                if let Some(queue) = &self.selected_queue {
+                    let message = prompt_string_input("Started listening...");
+                    let response = self.server.send_request(ServerRequest::PutMessage(queue.clone(), message)).unwrap();
+                    println!("Response {:?}", response);
+                } else {
+                    println!("No queue selected.");
+                }
                 Box::new(ConnectedInterface { server: self.server, selected_queue: self.selected_queue })
             }
             0 => {
