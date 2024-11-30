@@ -33,7 +33,7 @@ impl ConnectionWorker {
         }, tx)
     }
 
-    fn init(&mut self) -> Result<(), io::Error> {
+    fn init(&mut self) -> io::Result<()> {
         self.stream.set_read_timeout(Some(Duration::from_secs(1)))?;
         self.stream.set_write_timeout(Some(Duration::from_secs(1)))
     }
@@ -46,6 +46,7 @@ impl ConnectionWorker {
     }
 
     pub fn run(mut self) -> (TcpStream, TerminationReason) {
+        println!("worker started");
         if let Err(_) = self.init() { return (self.stream, TerminationReason::Disconnect)}
 
         loop {
@@ -56,8 +57,12 @@ impl ConnectionWorker {
                         // According to the docs: `Interrupted` means `read` should be retried.
                         ErrorKind::Interrupted => continue,
                         ErrorKind::TimedOut => continue,
+                        ErrorKind::WouldBlock => continue,
                         // Any other error is due to external circumstances.
-                        _ => return (self.stream, TerminationReason::Disconnect),
+                        _ => {
+                            println!("disconnect or something {}", err.kind());
+                            return (self.stream, TerminationReason::Disconnect)
+                        },
                     }
                 }
             };
@@ -99,6 +104,7 @@ impl ConnectionWorker {
                     // TODO I'm not sure whether this is the right course of
                     //  action on a write timeout. We could also drop the connection.
                     ErrorKind::TimedOut => continue,
+                    ErrorKind::WouldBlock => continue,
                     _ => return (self.stream, TerminationReason::Disconnect),
                 }
             }

@@ -1,25 +1,26 @@
+use crate::connection_worker::{ConnectionWorker, TerminationReason};
 use crate::request_handler::RequestHandler;
+use crate::QueueManager;
 use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::{io, thread};
-use std::sync::mpsc::Sender;
-use crate::connection_worker::{ConnectionWorker, TerminationReason};
+use std::thread;
 
 pub struct ConnectionManager
 {
     listener: TcpListener,
-    // queue_manager: Arc<Mutex<QueueManager>>,
+    queue_manager: Arc<Mutex<QueueManager>>,
     request_handler: Arc<Mutex<RequestHandler>>,
     connections: Vec<(SocketAddr, Option<JoinHandle<(TcpStream, TerminationReason)>>, Sender<()>)>,
 }
 
 impl ConnectionManager
 {
-    pub fn new(listener: TcpListener, request_handler: RequestHandler) -> Self {
+    pub fn new(listener: TcpListener, queue_manager: Arc<Mutex<QueueManager>>, request_handler: RequestHandler) -> Self {
         Self {
             listener,
-            // queue_manager: Arc::new(Mutex::new(queue_manager)),
+            queue_manager,
             request_handler: Arc::new(Mutex::new(request_handler)),
             connections: Vec::default(),
         }
@@ -50,8 +51,16 @@ impl ConnectionManager
         for (addr, handle_opt, _) in &mut self.connections {
             let handle = handle_opt.take().unwrap();
             if handle.is_finished() {
-                println!("{} Disconnected", addr);
-                handle.join().unwrap();
+                let (stream, termination) = handle.join().unwrap();
+                match termination {
+                    TerminationReason::Disconnect => println!("{} Disconnected", addr),
+                    TerminationReason::PromoteSender(queue) => {
+                        self.queue_manager.lock().unwrap().connect_sender(&queue, stream);
+                    }
+                    TerminationReason::PromoteReceiver(queue) => {
+                        self.queue_manager.lock().unwrap().connect_sender(&queue, stream);
+                    }
+                }
             } else {
                 let _ = handle_opt.insert(handle);
             }

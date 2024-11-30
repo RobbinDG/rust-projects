@@ -3,11 +3,16 @@ mod request_handler;
 mod connection_worker;
 
 use crate::connection_manager::ConnectionManager;
+use backend::message::Message;
 use backend::message_queue::MessageQueue;
+use postcard::to_allocvec;
 use request_handler::RequestHandler;
 use std::collections::HashMap;
+use std::{io, thread};
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 pub struct QueueManager {
     queues: HashMap<String, (Vec<TcpStream>, MessageQueue, Vec<TcpStream>)>,
@@ -28,7 +33,37 @@ impl QueueManager {
     }
 
     pub fn process_queues(&mut self) {
-        for (name, (senders, queue, receivers)) in self.queues.iter() {}
+        println!("Checking queues");
+        for (_, (senders, queue, receivers)) in self.queues.iter_mut() {
+            for sender in senders {
+                match Self::pull_message_from_stream(sender) {
+                    Ok(message) => {
+                        println!("{:?}", message);
+                        queue.put(message)
+                    }
+                    Err(_) => { continue; }
+                }
+            }
+
+            if let Some(recipient) = receivers.get_mut(0) {
+                Self::empty_queue_to_stream(queue, recipient);
+            }
+        }
+    }
+
+    fn empty_queue_to_stream(queue: &mut MessageQueue, recipient: &mut TcpStream) {
+        while let Some(message) = queue.pop() {
+            let payload = to_allocvec(&message).unwrap();
+            recipient.write_all(&payload).unwrap();
+        }
+    }
+
+    fn pull_message_from_stream(sender: &mut TcpStream) -> Result<Message, io::Error> {
+        let mut buf = [0; 32];
+        sender.read(&mut buf)?;
+        sender.flush()?;
+        let message: Message = postcard::from_bytes(&buf).unwrap();
+        Ok(message)
     }
 
     pub fn connect_sender(&mut self, queue_name: &String, stream: TcpStream) {
@@ -45,22 +80,30 @@ impl QueueManager {
 }
 
 pub struct Server {
-    // queue_manager: QueueManager,
+    queue_manager: Arc<Mutex<QueueManager>>,
     connection_manager: ConnectionManager,
 }
 
 impl Server {
     pub fn new(tcp_listener: TcpListener) -> Self {
         let queue_manager = Arc::new(Mutex::new(QueueManager { queues: HashMap::default() }));
-        let request_handler = RequestHandler::new(queue_manager);
-        let connection_manager = ConnectionManager::new(tcp_listener, request_handler);
+        let request_handler = RequestHandler::new(queue_manager.clone());
+        let connection_manager = ConnectionManager::new(tcp_listener, queue_manager.clone(), request_handler);
         Self {
-            // queue_manager,
+            queue_manager,
             connection_manager,
         }
     }
 
     pub fn run(self) {
+        thread::spawn(move || {
+            loop {
+                {
+                    self.queue_manager.lock().unwrap().process_queues();
+                }
+                thread::sleep(Duration::from_secs(1));
+            }
+        });
         self.connection_manager.start()
     }
 }

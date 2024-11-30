@@ -1,3 +1,4 @@
+use crate::message::Message;
 use crate::request::{RequestError, ServerRequest};
 use crate::response::ServerResponse;
 use std::io;
@@ -58,9 +59,19 @@ impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
 
 
 impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
-    pub fn send_request(&mut self, request: ServerRequest) -> Result<ServerResponse, RequestError> {
+    pub fn transfer_request(&mut self, request: ServerRequest) -> Result<ServerResponse, RequestError> {
         let payload = postcard::to_allocvec(&request).unwrap();
+        self.transfer_bytes(payload)
+    }
+
+    pub fn send_message(&mut self, message: Message) -> Result<(), RequestError> {
+        let payload = postcard::to_allocvec(&message).unwrap();
         self.stream.write_all(&payload)?;
+        Ok(())
+    }
+
+    pub fn transfer_bytes(&mut self, bytes: Vec<u8>) -> Result<ServerResponse, RequestError> {
+        self.stream.write_all(&bytes)?;
         let mut buf = [0; 32];
         self.stream.read(&mut buf)?;
         self.stream.flush()?;

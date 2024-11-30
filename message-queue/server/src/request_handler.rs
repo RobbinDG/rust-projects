@@ -44,10 +44,11 @@ impl RequestHandler {
                 }
             }
             ServerRequest::CreateQueue(name) => {
-                if self.queue_manager.lock()?.queue_exists(&name) {
+                let mut qm = self.queue_manager.lock()?;
+                if qm.queue_exists(&name) {
                     Ok(ResponseType::Response(ServerResponse::from_status(Status::Exists)))
                 } else {
-                    self.queue_manager.lock()?.create(name);
+                    qm.create(name);
                     Ok(ResponseType::Response(ServerResponse::from_status(Status::Created)))
                 }
             }
