@@ -70,6 +70,14 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
         Ok(())
     }
 
+    pub fn receive_message(&mut self) -> Result<Message, RequestError> {
+        let mut buf = [0; 32];
+        self.stream.read(&mut buf)?;
+        self.stream.flush()?;
+        let response: Message = postcard::from_bytes(&buf).unwrap();
+        Ok(response)
+    }
+
     pub fn transfer_bytes(&mut self, bytes: Vec<u8>) -> Result<ServerResponse, RequestError> {
         self.stream.write_all(&bytes)?;
         let mut buf = [0; 32];

@@ -67,6 +67,7 @@ impl QueueManager {
     }
 
     pub fn connect_sender(&mut self, queue_name: &String, stream: TcpStream) {
+        println!("connecting");
         if let Some((senders, _, _)) = self.queues.get_mut(queue_name) {
             senders.push(stream);
         }
@@ -96,15 +97,19 @@ impl Server {
     }
 
     pub fn run(self) {
+        let mut cm = Arc::new(self.connection_manager);
+        let cm1 = cm.clone();
         thread::spawn(move || {
             loop {
                 {
                     self.queue_manager.lock().unwrap().process_queues();
                 }
+                cm1.check_and_join_disconnects();
+
                 thread::sleep(Duration::from_secs(1));
             }
         });
-        self.connection_manager.start()
+        cm.start()
     }
 }
 

@@ -81,6 +81,7 @@ impl Interface for ConnectedInterface {
                     println!("Started listening...");
                     let response = self.server.transfer_request(ServerRequest::MakeReceiver(queue.clone())).unwrap();
                     println!("Response {:?}", response);
+                    self.receive_messages();
                 } else {
                     println!("No queue selected.");
                 }
@@ -99,6 +100,13 @@ impl ConnectedInterface {
         loop {
             let message_str = prompt_string_input("Write message");
             self.server.send_message(Message::new(message_str)).unwrap();
+        }
+    }
+
+    fn receive_messages(&mut self) {
+        loop {
+            let message = self.server.receive_message().unwrap();
+            println!("{:?}", message);
         }
     }
 }

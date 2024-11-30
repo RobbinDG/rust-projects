@@ -12,7 +12,7 @@ pub struct ConnectionManager
     listener: TcpListener,
     queue_manager: Arc<Mutex<QueueManager>>,
     request_handler: Arc<Mutex<RequestHandler>>,
-    connections: Vec<(SocketAddr, Option<JoinHandle<(TcpStream, TerminationReason)>>, Sender<()>)>,
+    connections: Mutex<Vec<(SocketAddr, Option<JoinHandle<(TcpStream, TerminationReason)>>, Sender<()>)>>,
 }
 
 impl ConnectionManager
@@ -22,11 +22,11 @@ impl ConnectionManager
             listener,
             queue_manager,
             request_handler: Arc::new(Mutex::new(request_handler)),
-            connections: Vec::default(),
+            connections: Mutex::new(Vec::default()),
         }
     }
 
-    pub fn start(mut self) {
+    pub fn start(&self) {
         loop {
             match self.listener.accept() {
                 Ok((stream, addr)) => {
@@ -34,7 +34,7 @@ impl ConnectionManager
                     let handler = self.request_handler.clone();
                     let (worker, interrupt) = ConnectionWorker::new(handler, stream);
                     let handle = thread::spawn(move || { worker.run() });
-                    self.connections.push((addr, Some(handle), interrupt));
+                    self.connections.lock().unwrap().push((addr, Some(handle), interrupt));
                     println!("connected");
                 }
                 Err(e) => {
@@ -47,8 +47,8 @@ impl ConnectionManager
         }
     }
 
-    fn check_and_join_disconnects(&mut self) {
-        for (addr, handle_opt, _) in &mut self.connections {
+    pub fn check_and_join_disconnects(&self) {
+        for (addr, handle_opt, _) in &mut self.connections.lock().unwrap().iter_mut() {
             let handle = handle_opt.take().unwrap();
             if handle.is_finished() {
                 let (stream, termination) = handle.join().unwrap();
@@ -58,20 +58,20 @@ impl ConnectionManager
                         self.queue_manager.lock().unwrap().connect_sender(&queue, stream);
                     }
                     TerminationReason::PromoteReceiver(queue) => {
-                        self.queue_manager.lock().unwrap().connect_sender(&queue, stream);
+                        self.queue_manager.lock().unwrap().connect_receiver(&queue, stream);
                     }
                 }
             } else {
                 let _ = handle_opt.insert(handle);
             }
         }
-        self.connections.retain(|(_, h, _)| h.is_some());
+        self.connections.lock().unwrap().retain(|(_, h, _)| h.is_some());
     }
 }
 
 impl Drop for ConnectionManager {
     fn drop(&mut self) {
-        for (_, handle, interrupt) in &mut self.connections {
+        for (_, handle, interrupt) in &mut self.connections.lock().unwrap().iter_mut() {
             // TODO handle errors
             interrupt.send(()).unwrap();
             handle.take().unwrap().join().unwrap();  // Drop using "option dance"
