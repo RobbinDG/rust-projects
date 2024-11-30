@@ -3,4 +3,5 @@ members = [
     "backend",
     "server",
     "client",
+    "admin",
 ]

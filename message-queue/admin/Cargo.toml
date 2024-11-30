@@ -1,0 +1,9 @@
+[package]
+name = "admin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+backend = { path = "../backend" }
+serde = { version = "1.0.214", default-features = false }
+iced = "0.13.1"
