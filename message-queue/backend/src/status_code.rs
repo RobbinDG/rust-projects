@@ -3,6 +3,7 @@ pub enum Status {
     Created,
     Exists,
     Sent,
+    Configured,
     Failed,
     NotFound,
     UnknownCommand,
@@ -19,6 +20,7 @@ impl From<Status> for &str {
             Status::Exists => "exists",
             Status::UnknownCommand => "unknown_command",
             Status::Error => "error",
+            Status::Configured => "configured",
         }
     }
 }

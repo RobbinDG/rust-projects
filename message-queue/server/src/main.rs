@@ -3,14 +3,14 @@ mod request_handler;
 mod connection_worker;
 
 use crate::connection_manager::ConnectionManager;
-use backend::message::Message;
 use backend::message_queue::MessageQueue;
-use std::collections::HashMap;
-use std::net::TcpListener;
 use request_handler::RequestHandler;
+use std::collections::HashMap;
+use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
 
 pub struct QueueManager {
-    queues: HashMap<String, MessageQueue>,
+    queues: HashMap<String, (Vec<TcpStream>, MessageQueue, Vec<TcpStream>)>,
 }
 
 impl QueueManager {
@@ -24,15 +24,23 @@ impl QueueManager {
     }
 
     pub fn create(&mut self, name: String) {
-        self.queues.insert(name, MessageQueue::new_empty());
+        self.queues.insert(name, (Vec::default(), MessageQueue::new_empty(), Vec::default()));
     }
 
-    pub fn push(&mut self, queue_name: &String, message: String) -> bool {
-        if let Some(queue) = self.queues.get_mut(queue_name) {
-            queue.put(Message::new(message));
-            return true;
+    pub fn process_queues(&mut self) {
+        for (name, (senders, queue, receivers)) in self.queues.iter() {}
+    }
+
+    pub fn connect_sender(&mut self, queue_name: &String, stream: TcpStream) {
+        if let Some((senders, _, _)) = self.queues.get_mut(queue_name) {
+            senders.push(stream);
         }
-        false
+    }
+
+    pub fn connect_receiver(&mut self, queue_name: &String, stream: TcpStream) {
+        if let Some((_, _, recipients)) = self.queues.get_mut(queue_name) {
+            recipients.push(stream);
+        }
     }
 }
 
@@ -43,7 +51,7 @@ pub struct Server {
 
 impl Server {
     pub fn new(tcp_listener: TcpListener) -> Self {
-        let queue_manager = QueueManager { queues: HashMap::default() };
+        let queue_manager = Arc::new(Mutex::new(QueueManager { queues: HashMap::default() }));
         let request_handler = RequestHandler::new(queue_manager);
         let connection_manager = ConnectionManager::new(tcp_listener, request_handler);
         Self {

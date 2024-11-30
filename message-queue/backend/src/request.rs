@@ -33,5 +33,6 @@ pub enum ServerRequest {
     ListQueues,
     CheckQueue(String),
     CreateQueue(String),
-    PutMessage(String, String),
+    MakeSender(String),
+    MakeReceiver(String),
 }

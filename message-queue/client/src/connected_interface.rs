@@ -77,8 +77,8 @@ impl Interface for ConnectedInterface {
             }
             5 => {
                 if let Some(queue) = &self.selected_queue {
-                    let message = prompt_string_input("Started listening...");
-                    let response = self.server.send_request(ServerRequest::PutMessage(queue.clone(), message)).unwrap();
+                    println!("Started listening...");
+                    let response = self.server.send_request(ServerRequest::MakeReceiver(queue.clone())).unwrap();
                     println!("Response {:?}", response);
                 } else {
                     println!("No queue selected.");

@@ -1,4 +1,4 @@
-use crate::request_handler::RequestHandler;
+use crate::request_handler::{RequestHandler, ResponseType};
 use backend::request::ServerRequest;
 use backend::response::ServerResponse;
 use backend::status_code::Status;
@@ -10,6 +10,13 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+
+pub enum TerminationReason {
+    Disconnect,
+    PromoteSender(String),
+    PromoteReceiver(String),
+}
+
 pub struct ConnectionWorker {
     handler: Arc<Mutex<RequestHandler>>,
     stream: TcpStream,
@@ -19,7 +26,11 @@ pub struct ConnectionWorker {
 impl ConnectionWorker {
     pub fn new(handler: Arc<Mutex<RequestHandler>>, stream: TcpStream) -> (Self, Sender<()>) {
         let (tx, rx) = channel();
-        (Self { handler, stream, interrupt_channel: rx }, tx)
+        (Self {
+            handler,
+            stream,
+            interrupt_channel: rx,
+        }, tx)
     }
 
     fn init(&mut self) -> Result<(), io::Error> {
@@ -34,8 +45,8 @@ impl ConnectionWorker {
         Ok(buf)
     }
 
-    pub fn run(mut self) -> io::Error {
-        if let Err(e) = self.init() { return e; }
+    pub fn run(mut self) -> (TcpStream, TerminationReason) {
+        if let Err(_) = self.init() { return (self.stream, TerminationReason::Disconnect)}
 
         loop {
             let buf = match self.read() {
@@ -46,7 +57,7 @@ impl ConnectionWorker {
                         ErrorKind::Interrupted => continue,
                         ErrorKind::TimedOut => continue,
                         // Any other error is due to external circumstances.
-                        _ => return err,
+                        _ => return (self.stream, TerminationReason::Disconnect),
                     }
                 }
             };
@@ -61,24 +72,41 @@ impl ConnectionWorker {
                         .and_then(|mut x|
                             x.handle_request(r)
                                 .map_err(|_| ServerResponse::from_status(Status::Error))
-                        ).unwrap_or_else(|err| err)
+                        ).unwrap_or_else(|err| ResponseType::Response(err))
                 }
                 Err(e) => {
                     println!("{:?}", e);
-                    ServerResponse::from_status(Status::UnknownCommand)
+                    ResponseType::Response(ServerResponse::from_status(Status::UnknownCommand))
                 }
             };
 
-            let payload = to_allocvec(&response).unwrap();
+            let mut terminate: Option<TerminationReason> = None;
+            let response_msg = match response {
+                ResponseType::Response(r) => r,
+                ResponseType::PromoteSender(r, q) => {
+                    terminate = Some(TerminationReason::PromoteSender(q));
+                    r
+                }
+                ResponseType::PromoteReceiver(r, q) => {
+                    terminate = Some(TerminationReason::PromoteReceiver(q));
+                    r
+                }
+            };
+
+            let payload = to_allocvec(&response_msg).unwrap();
             if let Err(err) = self.stream.write_all(&payload) {
                 match err.kind() {
                     // TODO I'm not sure whether this is the right course of
                     //  action on a write timeout. We could also drop the connection.
                     ErrorKind::TimedOut => continue,
-                    _ => return err,
+                    _ => return (self.stream, TerminationReason::Disconnect),
                 }
             }
             println!("written");
+
+            if let Some(termination) = terminate {
+                return (self.stream, termination);
+            }
         }
     }
 }

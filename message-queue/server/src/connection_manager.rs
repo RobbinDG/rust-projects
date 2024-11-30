@@ -1,17 +1,17 @@
 use crate::request_handler::RequestHandler;
-use std::net::{SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::{io, thread};
 use std::sync::mpsc::Sender;
-use crate::connection_worker::ConnectionWorker;
+use crate::connection_worker::{ConnectionWorker, TerminationReason};
 
 pub struct ConnectionManager
 {
     listener: TcpListener,
     // queue_manager: Arc<Mutex<QueueManager>>,
     request_handler: Arc<Mutex<RequestHandler>>,
-    connections: Vec<(SocketAddr, Option<JoinHandle<io::Error>>, Sender<()>)>,
+    connections: Vec<(SocketAddr, Option<JoinHandle<(TcpStream, TerminationReason)>>, Sender<()>)>,
 }
 
 impl ConnectionManager
@@ -32,7 +32,7 @@ impl ConnectionManager
                     println!("{addr}");
                     let handler = self.request_handler.clone();
                     let (worker, interrupt) = ConnectionWorker::new(handler, stream);
-                    let handle: JoinHandle<io::Error> = thread::spawn(move || { worker.run() });
+                    let handle = thread::spawn(move || { worker.run() });
                     self.connections.push((addr, Some(handle), interrupt));
                     println!("connected");
                 }
