@@ -1,10 +1,9 @@
 use crate::message::Message;
 use crate::request::{RequestError, ServerRequest};
 use crate::response::ServerResponse;
-use std::io;
-use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
 use crate::stream_io::StreamIO;
+use std::io;
+use std::net::{TcpStream, ToSocketAddrs};
 
 pub struct ConnectionConfig<T>
 where
@@ -23,7 +22,7 @@ where
     T: ToSocketAddrs + Clone,
 {
     config: ConnectionConfig<T>,
-    stream: StreamIO<>,
+    stream: StreamIO,
 }
 
 pub struct ConnectionError<T>
@@ -34,13 +33,10 @@ where
     pub server: DisconnectedClient<T>,
 }
 
-
 impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
     pub fn new(addr: T) -> DisconnectedClient<T> {
         DisconnectedClient {
-            config: ConnectionConfig {
-                address: addr,
-            },
+            config: ConnectionConfig { address: addr },
         }
     }
 
@@ -53,16 +49,18 @@ impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
             Err(e) => Err(ConnectionError {
                 error_body: e,
                 server: self,
-            })
+            }),
         }
     }
 }
 
-
 impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
-    pub fn transfer_request(&mut self, request: ServerRequest) -> Result<ServerResponse, RequestError> {
-        let payload = postcard::to_allocvec(&request).unwrap();
-        self.transfer_bytes(payload)
+    pub fn transfer_request(
+        &mut self,
+        request: ServerRequest,
+    ) -> Result<ServerResponse, RequestError> {
+        self.stream.send_message(request)?;
+        Ok(self.stream.pull_message_from_stream()?)
     }
 
     pub fn send_message(&mut self, message: Message) -> Result<(), RequestError> {
@@ -70,11 +68,6 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
     }
 
     pub fn receive_message(&mut self) -> Result<Message, RequestError> {
-        Ok(self.stream.pull_message_from_stream()?)
-    }
-
-    pub fn transfer_bytes(&mut self, bytes: Vec<u8>) -> Result<ServerResponse, RequestError> {
-        self.stream.send_message(bytes)?;
         Ok(self.stream.pull_message_from_stream()?)
     }
 
