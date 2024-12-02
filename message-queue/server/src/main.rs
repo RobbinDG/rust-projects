@@ -5,17 +5,17 @@ mod connection_worker;
 use crate::connection_manager::ConnectionManager;
 use backend::message::Message;
 use backend::message_queue::MessageQueue;
-use postcard::to_allocvec;
+use backend::stream_io::StreamIO;
 use request_handler::RequestHandler;
 use std::collections::HashMap;
-use std::{io, thread};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use std::{io, thread};
 
 pub struct QueueManager {
-    queues: HashMap<String, (Vec<TcpStream>, MessageQueue, Vec<TcpStream>)>,
+    queues: HashMap<String, (Vec<StreamIO>, MessageQueue, Vec<StreamIO>)>,
 }
 
 impl QueueManager {
@@ -36,7 +36,7 @@ impl QueueManager {
         println!("Checking queues");
         for (_, (senders, queue, receivers)) in self.queues.iter_mut() {
             for sender in senders {
-                match Self::pull_message_from_stream(sender) {
+                match sender.pull_message_from_stream() {
                     Ok(message) => {
                         println!("{:?}", message);
                         queue.put(message)
@@ -51,10 +51,9 @@ impl QueueManager {
         }
     }
 
-    fn empty_queue_to_stream(queue: &mut MessageQueue, recipient: &mut TcpStream) {
+    fn empty_queue_to_stream(queue: &mut MessageQueue, recipient: &mut StreamIO) {
         while let Some(message) = queue.pop() {
-            let payload = to_allocvec(&message).unwrap();
-            recipient.write_all(&payload).unwrap();
+            recipient.send_message(message).unwrap()
         }
     }
 
@@ -69,13 +68,13 @@ impl QueueManager {
     pub fn connect_sender(&mut self, queue_name: &String, stream: TcpStream) {
         println!("connecting");
         if let Some((senders, _, _)) = self.queues.get_mut(queue_name) {
-            senders.push(stream);
+            senders.push(StreamIO::new(stream));
         }
     }
 
     pub fn connect_receiver(&mut self, queue_name: &String, stream: TcpStream) {
         if let Some((_, _, recipients)) = self.queues.get_mut(queue_name) {
-            recipients.push(stream);
+            recipients.push(StreamIO::new(stream));
         }
     }
 }

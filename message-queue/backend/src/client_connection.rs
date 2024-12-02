@@ -4,6 +4,7 @@ use crate::response::ServerResponse;
 use std::io;
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use crate::stream_io::StreamIO;
 
 pub struct ConnectionConfig<T>
 where
@@ -22,7 +23,7 @@ where
     T: ToSocketAddrs + Clone,
 {
     config: ConnectionConfig<T>,
-    stream: TcpStream,
+    stream: StreamIO<>,
 }
 
 pub struct ConnectionError<T>
@@ -47,7 +48,7 @@ impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
         match TcpStream::connect(&self.config.address) {
             Ok(stream) => Ok(ConnectedClient {
                 config: self.config,
-                stream,
+                stream: StreamIO::new(stream),
             }),
             Err(e) => Err(ConnectionError {
                 error_body: e,
@@ -65,26 +66,16 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
     }
 
     pub fn send_message(&mut self, message: Message) -> Result<(), RequestError> {
-        let payload = postcard::to_allocvec(&message).unwrap();
-        self.stream.write_all(&payload)?;
-        Ok(())
+        Ok(self.stream.send_message(message)?)
     }
 
     pub fn receive_message(&mut self) -> Result<Message, RequestError> {
-        let mut buf = [0; 32];
-        self.stream.read(&mut buf)?;
-        self.stream.flush()?;
-        let response: Message = postcard::from_bytes(&buf).unwrap();
-        Ok(response)
+        Ok(self.stream.pull_message_from_stream()?)
     }
 
     pub fn transfer_bytes(&mut self, bytes: Vec<u8>) -> Result<ServerResponse, RequestError> {
-        self.stream.write_all(&bytes)?;
-        let mut buf = [0; 32];
-        self.stream.read(&mut buf)?;
-        self.stream.flush()?;
-        let response: ServerResponse = postcard::from_bytes(&buf).unwrap();
-        Ok(response)
+        self.stream.send_message(bytes)?;
+        Ok(self.stream.pull_message_from_stream()?)
     }
 
     pub fn disconnect(self) -> DisconnectedClient<T> {
