@@ -1,7 +1,7 @@
+use crate::queue_manager::QueueManager;
 use crate::request_handler::{RequestHandler, ResponseType};
-use backend::request::ServerRequest;
-use backend::response::ServerResponse;
-use backend::status_code::Status;
+use backend::request::{RequestError, ServerRequest};
+use backend::setup_request::SetupRequest;
 use postcard::to_allocvec;
 use std::io;
 use std::io::{ErrorKind, Read, Write};
@@ -10,44 +10,132 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-
 pub enum TerminationReason {
     Disconnect,
+    PromoteAdmin,
     PromoteSender(String),
     PromoteReceiver(String),
 }
 
-pub struct ConnectionWorker {
-    handler: Arc<Mutex<RequestHandler>>,
-    stream: TcpStream,
-    interrupt_channel: Receiver<()>,
+impl TerminationReason {
+    pub fn as_response(&self) -> String {
+        match self {
+            TerminationReason::Disconnect => "Disconnecting".to_string(),
+            TerminationReason::PromoteAdmin => "Setting up admin connection".to_string(),
+            TerminationReason::PromoteSender(q) => format!("Setting up sender connection for queue {q}"),
+            TerminationReason::PromoteReceiver(q) => format!("Setting up receiver connection for queue {q}"),
+        }
+    }
 }
 
-impl ConnectionWorker {
-    pub fn new(handler: Arc<Mutex<RequestHandler>>, stream: TcpStream) -> (Self, Sender<()>) {
-        let (tx, rx) = channel();
-        (Self {
-            handler,
-            stream,
-            interrupt_channel: rx,
-        }, tx)
-    }
+trait StreamWorker {
+    fn get_stream(&mut self) -> &mut TcpStream;
 
     fn init(&mut self) -> io::Result<()> {
-        self.stream.set_read_timeout(Some(Duration::from_secs(1)))?;
-        self.stream.set_write_timeout(Some(Duration::from_secs(1)))
+        self.get_stream().set_read_timeout(Some(Duration::from_secs(1)))?;
+        self.get_stream().set_write_timeout(Some(Duration::from_secs(1)))
     }
 
     fn read(&mut self) -> io::Result<[u8; 32]> {
         let mut buf = [0; 32];
-        self.stream.read(&mut buf)?;
-        self.stream.flush()?;
+        self.get_stream().read(&mut buf)?;
+        self.get_stream().flush()?;
         Ok(buf)
+    }
+}
+
+pub struct SetupWorker {
+    stream: TcpStream,
+    interrupt: Receiver<()>
+}
+
+impl StreamWorker for SetupWorker {
+    fn get_stream(&mut self) -> &mut TcpStream {
+        &mut self.stream
+    }
+}
+
+impl SetupWorker {
+    pub fn new(stream: TcpStream) -> (Self, Sender<()>) {
+        let (tx, rx) = channel();
+        (Self {
+            stream,
+            interrupt: rx,
+        }, tx)
     }
 
     pub fn run(mut self) -> (TcpStream, TerminationReason) {
         println!("worker started");
         if let Err(_) = self.init() { return (self.stream, TerminationReason::Disconnect)}
+
+        let buf = match self.read() {
+            Ok(buf) => buf,
+            Err(err) => {
+                return match err.kind() {
+                    // According to the docs: `Interrupted` means `read` should be retried.
+                    ErrorKind::Interrupted | ErrorKind::TimedOut | ErrorKind::WouldBlock =>
+                        (self.stream, TerminationReason::Disconnect),
+                    // Any other error is due to external circumstances.
+                    _ => {
+                        println!("disconnect or something {}", err.kind());
+                        (self.stream, TerminationReason::Disconnect)
+                    },
+                }
+            }
+        };
+
+        let request: Result<SetupRequest, postcard::Error> = postcard::from_bytes(&buf);
+        println!("Received {:?}", request);
+
+        let promotion = match request {
+            Ok(r) => {
+                match r {
+                    SetupRequest::Admin => TerminationReason::PromoteAdmin,
+                    SetupRequest::Sender(q) => TerminationReason::PromoteSender(q),
+                    SetupRequest::Receiver(q) => TerminationReason::PromoteReceiver(q),
+                }
+            }
+            Err(e) => {
+                println!("{:?}", e);
+                TerminationReason::Disconnect
+            }
+        };
+
+        let payload = to_allocvec(&promotion.as_response()).unwrap();
+        if let Err(_) = self.stream.write_all(&payload) {
+            return (self.stream, TerminationReason::Disconnect);
+        }
+        println!("written");
+
+        (self.stream, promotion)
+    }
+}
+
+pub struct AdminWorker {
+    queue_manager: Arc<Mutex<QueueManager>>,
+    stream: TcpStream,
+    interrupt_channel: Receiver<()>,
+}
+
+impl StreamWorker for AdminWorker {
+    fn get_stream(&mut self) -> &mut TcpStream {
+        &mut self.stream
+    }
+}
+
+impl AdminWorker {
+    pub fn new(queue_manager: Arc<Mutex<QueueManager>>, stream: TcpStream) -> (Self, Sender<()>) {
+        let (tx, rx) = channel();
+        (Self {
+            queue_manager,
+            stream,
+            interrupt_channel: rx,
+        }, tx)
+    }
+
+    pub fn run(mut self) -> TcpStream {
+        println!("worker started");
+        if let Err(_) = self.init() { return self.stream }
 
         loop {
             let buf = match self.read() {
@@ -61,58 +149,37 @@ impl ConnectionWorker {
                         // Any other error is due to external circumstances.
                         _ => {
                             println!("disconnect or something {}", err.kind());
-                            return (self.stream, TerminationReason::Disconnect)
+                            return self.stream
                         },
                     }
                 }
             };
 
             let request: Result<ServerRequest, postcard::Error> = postcard::from_bytes(&buf);
-            println!("Received {:?}", request);
+            let a = request
+                .map_err(|e| RequestError::Internal(e.to_string()))
+                .and_then(|r| self.handle_request(r))
+                .map_err(|e| e.to_string());
 
-            let response = match request {
-                Ok(r) => {
-                    self.handler.lock()
-                        .map_err(|_| ServerResponse::from_status(Status::Error))
-                        .and_then(|mut x|
-                            x.handle_request(r)
-                                .map_err(|_| ServerResponse::from_status(Status::Error))
-                        ).unwrap_or_else(|err| ResponseType::Response(err))
-                }
-                Err(e) => {
-                    println!("{:?}", e);
-                    ResponseType::Response(ServerResponse::from_status(Status::UnknownCommand))
-                }
-            };
-
-            let mut terminate: Option<TerminationReason> = None;
-            let response_msg = match response {
-                ResponseType::Response(r) => r,
-                ResponseType::PromoteSender(r, q) => {
-                    terminate = Some(TerminationReason::PromoteSender(q));
-                    r
-                }
-                ResponseType::PromoteReceiver(r, q) => {
-                    terminate = Some(TerminationReason::PromoteReceiver(q));
-                    r
-                }
-            };
-
-            let payload = to_allocvec(&response_msg).unwrap();
+            let payload = to_allocvec(&a).unwrap();
             if let Err(err) = self.stream.write_all(&payload) {
                 match err.kind() {
                     // TODO I'm not sure whether this is the right course of
                     //  action on a write timeout. We could also drop the connection.
                     ErrorKind::TimedOut => continue,
                     ErrorKind::WouldBlock => continue,
-                    _ => return (self.stream, TerminationReason::Disconnect),
+                    _ => return self.stream,
                 }
             }
             println!("written");
-
-            if let Some(termination) = terminate {
-                return (self.stream, termination);
-            }
         }
+    }
+
+    fn handle_request(&mut self, req: ServerRequest) -> Result<Vec<u8>, RequestError> {
+        Ok(match req {
+            ServerRequest::ListQueues(r) => to_allocvec(&r.handle_request(self.queue_manager.clone())?),
+            ServerRequest::CheckQueue(r) => to_allocvec(&r.handle_request(self.queue_manager.clone())?),
+            ServerRequest::CreateQueue(r) => to_allocvec(&r.handle_request(self.queue_manager.clone())?),
+        }?)
     }
 }

@@ -1,3 +1,4 @@
+use crate::status_code::Status;
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 use std::str;
@@ -28,11 +29,92 @@ impl From<String> for RequestError {
     }
 }
 
+impl From<postcard::Error> for RequestError {
+    fn from(value: postcard::Error) -> Self {
+        RequestError::Internal(value.to_string())
+    }
+}
+
+impl RequestError {
+    pub fn to_string(&self) -> String {
+        match self {
+            RequestError::IO(e) => format!("IO error: {}", e.to_string()),
+            RequestError::Parsing(e) => format!("IO error: {}", e.to_string()),
+            RequestError::Internal(e) => format!("IO error: {}", e.to_string()),
+        }
+    }
+}
+
+pub trait RequestType {
+    type Response: Serialize + for<'de> Deserialize<'de> + Sized;
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum SetModeResponse {
+    Disconnect,
+    Admin,
+    Sender(String),
+    Receiver(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ListQueues {}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckQueue {
+    pub queue_name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateQueue {
+    pub queue_name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MakeAdmin {}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MakeSender {
+    pub destination_queue: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MakeReceiver {
+    pub origin_queue: String,
+}
+
+pub enum ServerResponse {
+    QueueList(String),
+    Success,
+}
+
+impl RequestType for ListQueues {
+    type Response = Vec<(String, usize, usize, usize)>;
+}
+
+impl RequestType for CheckQueue {
+    type Response = Status;
+}
+
+impl RequestType for CreateQueue {
+    type Response = Status;
+}
+
+impl RequestType for MakeAdmin {
+    type Response = SetModeResponse;
+}
+
+impl RequestType for MakeSender {
+    type Response = SetModeResponse;
+}
+
+impl RequestType for MakeReceiver {
+    type Response = SetModeResponse;
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ServerRequest {
-    ListQueues,
-    CheckQueue(String),
-    CreateQueue(String),
-    MakeSender(String),
-    MakeReceiver(String),
+    ListQueues(ListQueues),
+    CheckQueue(CheckQueue),
+    CreateQueue(CreateQueue),
 }

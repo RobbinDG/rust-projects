@@ -5,6 +5,7 @@ pub mod request;
 pub mod response;
 pub mod status_code;
 pub mod stream_io;
+pub mod setup_request;
 
 pub use client_connection::{ConnectedClient, DisconnectedClient};
 

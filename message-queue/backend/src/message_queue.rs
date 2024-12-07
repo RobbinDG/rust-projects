@@ -9,17 +9,15 @@ impl MessageQueue {
         MessageQueue { messages: Vec::default() }
     }
 
-    pub fn put(&mut self, message: Message) {
-        self.messages.push(message);
-    }
-}
-
-impl MessageQueue {
     pub fn push(&mut self, message: Message) {
-        self.messages.push(message)
+        self.messages.push(message);
     }
 
     pub fn pop(&mut self) -> Option<Message> {
         self.messages.pop()
+    }
+
+    pub fn message_count(&self) -> usize {
+        self.messages.len()
     }
 }

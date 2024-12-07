@@ -1,9 +1,11 @@
-use crate::QueueManager;
-use backend::request::{RequestError, ServerRequest};
+use crate::queue_manager::QueueManager;
+use backend::request::{
+    CheckQueue, CreateQueue, ListQueues, MakeReceiver, MakeSender, RequestError, RequestType,
+    SetModeResponse,
+};
 use backend::response::ServerResponse;
 use backend::status_code::Status;
-use std::str;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex};
 
 pub enum ResponseType {
     Response(ServerResponse),
@@ -11,53 +13,71 @@ pub enum ResponseType {
     PromoteReceiver(ServerResponse, String),
 }
 
-pub struct RequestHandler {
-    queue_manager: Arc<Mutex<QueueManager>>,
+pub trait RequestHandler: RequestType {
+    /// TODO does this need to take a reference or can it consume the request? This avoids
+    ///  cloning
+    fn handle_request(
+        &self,
+        queue_manager: Arc<Mutex<QueueManager>>,
+    ) -> Result<Self::Response, RequestError>;
 }
 
+impl RequestHandler for ListQueues {
+    fn handle_request(
+        &self,
+        queue_manager: Arc<Mutex<QueueManager>>,
+    ) -> Result<Self::Response, RequestError> {
+        let queues_data = queue_manager
+            .lock()
+            .map_err(|err| RequestError::Internal("poison".to_string()))?
+            .queues();
+        println!("{:?}", queues_data);
+        Ok(queues_data)
+    }
+}
 
-impl RequestHandler {
-    pub fn new(queue_manager: Arc<Mutex<QueueManager>>) -> Self {
-        Self {
-            queue_manager,
+impl RequestHandler for CheckQueue {
+    fn handle_request(
+        &self,
+        queue_manager: Arc<Mutex<QueueManager>>,
+    ) -> Result<Self::Response, RequestError> {
+        if queue_manager
+            .lock()
+            .map_err(|err| RequestError::Internal("poison".to_string()))?
+            .queue_exists(&self.queue_name)
+        {
+            Ok(Status::Exists)
+        } else {
+            Ok(Status::Failed)
         }
     }
+}
 
-    pub fn handle_request(&mut self, request: ServerRequest) -> Result<ResponseType, RequestError> {
-        self.exec(request).map_err(|err| RequestError::Internal("Poison".to_string()))
-    }
-
-    fn exec(&mut self, request: ServerRequest) -> Result<ResponseType, PoisonError<MutexGuard<QueueManager>>> {
-        match request {
-            ServerRequest::ListQueues => {
-                let queues_str: String = self.queue_manager.lock()?.queues().iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<&str>>().join(" ,");
-                println!("{:?}", queues_str);
-                Ok(ResponseType::Response(ServerResponse::from_str(queues_str.as_str())))
-            }
-            ServerRequest::CheckQueue(name) => {
-                if self.queue_manager.lock()?.queue_exists(&name) {
-                    Ok(ResponseType::Response(ServerResponse::from_status(Status::Exists)))
-                } else {
-                    Ok(ResponseType::Response(ServerResponse::from_status(Status::Failed)))
-                }
-            }
-            ServerRequest::CreateQueue(name) => {
-                let mut qm = self.queue_manager.lock()?;
-                if qm.queue_exists(&name) {
-                    Ok(ResponseType::Response(ServerResponse::from_status(Status::Exists)))
-                } else {
-                    qm.create(name);
-                    Ok(ResponseType::Response(ServerResponse::from_status(Status::Created)))
-                }
-            }
-            ServerRequest::MakeSender(queue_name) => {
-                Ok(ResponseType::PromoteSender(ServerResponse::from_status(Status::Configured), queue_name))
-            }
-            ServerRequest::MakeReceiver(queue_name) => {
-                Ok(ResponseType::PromoteReceiver(ServerResponse::from_status(Status::Configured), queue_name))
-            }
+impl RequestHandler for CreateQueue {
+    fn handle_request(
+        &self,
+        queue_manager: Arc<Mutex<QueueManager>>,
+    ) -> Result<Self::Response, RequestError> {
+        let mut qm = queue_manager
+            .lock()
+            .map_err(|err| RequestError::Internal("poison".to_string()))?;
+        if qm.queue_exists(&self.queue_name) {
+            Ok(Status::Exists)
+        } else {
+            qm.create(self.queue_name.clone());
+            Ok(Status::Created)
         }
+    }
+}
+
+impl RequestHandler for MakeSender {
+    fn handle_request(&self, _: Arc<Mutex<QueueManager>>) -> Result<Self::Response, RequestError> {
+        Ok(SetModeResponse::Sender(self.destination_queue.clone()))
+    }
+}
+
+impl RequestHandler for MakeReceiver {
+    fn handle_request(&self, _: Arc<Mutex<QueueManager>>) -> Result<Self::Response, RequestError> {
+        Ok(SetModeResponse::Receiver(self.origin_queue.clone()))
     }
 }
