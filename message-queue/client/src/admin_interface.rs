@@ -28,7 +28,7 @@ impl Interface for AdminInterface {
     fn on_selection(mut self: Box<Self>, choice: u32) -> Box<dyn Interface> {
         match choice {
             1 => {
-                let response = self.server.transfer_request(ListQueues {}).unwrap();
+                let response = self.server.transfer_admin_request(ListQueues {}).unwrap();
                 println!("Response {:?}", response);
                 Box::new(AdminInterface {
                     server: self.server,
@@ -39,7 +39,7 @@ impl Interface for AdminInterface {
                 let selection = crate::connected_interface::prompt_string_input("Which queue do you want select?");
                 let response = self
                     .server
-                    .transfer_request(CheckQueue {
+                    .transfer_admin_request(CheckQueue {
                         queue_name: selection.clone(),
                     })
                     .unwrap();
@@ -57,7 +57,7 @@ impl Interface for AdminInterface {
                 let name = crate::connected_interface::prompt_string_input("Name your new queue...");
                 let response = self
                     .server
-                    .transfer_request(CreateQueue { queue_name: name })
+                    .transfer_admin_request(CreateQueue { queue_name: name })
                     .unwrap();
                 println!("Response {:?}", response);
                 Box::new(AdminInterface {

@@ -11,6 +11,7 @@ pub struct StreamIO {
 pub enum StreamIOError {
     Stream(io::Error),
     Codec(postcard::Error),
+    Request(String),
 }
 
 impl From<io::Error> for StreamIOError {
@@ -27,9 +28,7 @@ impl From<postcard::Error> for StreamIOError {
 
 impl StreamIO {
     pub fn new(stream: TcpStream) -> Self {
-        Self {
-            stream,
-        }
+        Self { stream }
     }
 
     pub fn send_message<T>(&mut self, message: T) -> Result<(), StreamIOError>
@@ -47,5 +46,16 @@ impl StreamIO {
         self.stream.read(&mut buf)?;
         self.stream.flush()?;
         Ok(postcard::from_bytes(&buf)?)
+    }
+
+    pub fn pull_admin_response<T>(&mut self) -> Result<T, StreamIOError>
+    where
+        T: Serialize + for<'a> Deserialize<'a>,
+    {
+        let response: Result<Vec<u8>, String> = self.pull_message_from_stream()?;
+        match response {
+            Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
+            Err(e) => Err(StreamIOError::Request(e)),
+        }
     }
 }

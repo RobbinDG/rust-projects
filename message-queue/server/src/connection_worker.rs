@@ -159,6 +159,7 @@ impl AdminWorker {
                 .and_then(|r| self.handle_request(r))
                 .map_err(|e| e.to_string());
 
+            println!("to send {:?}", a);
             let payload = to_allocvec(&a).unwrap();
             if let Err(err) = self.stream.write_all(&payload) {
                 match err.kind() {

@@ -118,3 +118,23 @@ pub enum ServerRequest {
     CheckQueue(CheckQueue),
     CreateQueue(CreateQueue),
 }
+
+impl From<ListQueues> for ServerRequest {
+    fn from(value: ListQueues) -> Self {
+        ServerRequest::ListQueues(value)
+    }
+}
+impl From<CheckQueue> for ServerRequest {
+    fn from(value: CheckQueue) -> Self {
+        ServerRequest::CheckQueue(value)
+    }
+}
+impl From<CreateQueue> for ServerRequest {
+    fn from(value: CreateQueue) -> Self {
+        ServerRequest::CreateQueue(value)
+    }
+}
+
+impl RequestType for ServerRequest {
+    type Response = Vec<u8>;
+}

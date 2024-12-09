@@ -1,5 +1,6 @@
+use std::fmt::Debug;
 use crate::message::Message;
-use crate::request::RequestType;
+use crate::request::{RequestType, ServerRequest};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -61,6 +62,15 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
     {
         self.stream.send_message(request)?;
         Ok(self.stream.pull_message_from_stream()?)
+    }
+
+    pub fn transfer_admin_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
+    where
+        R: RequestType + Serialize + for<'a> Deserialize<'a>,
+        ServerRequest: From<R>,
+    {
+        self.stream.send_message(ServerRequest::from(request))?;
+        self.stream.pull_admin_response()
     }
 
     pub fn send_message(&mut self, message: Message) -> Result<(), StreamIOError> {
