@@ -47,13 +47,16 @@ impl Interface for ConnectedInterface {
     fn on_selection(mut self: Box<Self>, choice: u32) -> Box<dyn Interface> {
         match choice {
             1 => {
-                let response = self
-                    .server
-                    .transfer_request(SetupRequest::Admin)
-                    .unwrap();
-                println!("Response {:?}", response);
-                if let SetModeResponse::Admin = response {
-                    return Box::new(AdminInterface::new(self.server, self.selected_queue));
+                match self.server.transfer_request(SetupRequest::Admin) {
+                    Ok(response) => {
+                        println!("Response {:?}", response);
+                        if let SetModeResponse::Admin = response {
+                            return Box::new(AdminInterface::new(self.server, self.selected_queue));
+                        }
+                    }
+                    Err(err) => {
+                        println!("Error during request {:?}", err)
+                    }
                 }
                 Box::new(ConnectedInterface {
                     server: self.server,

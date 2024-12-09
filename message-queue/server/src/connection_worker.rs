@@ -1,6 +1,6 @@
 use crate::queue_manager::QueueManager;
 use crate::request_handler::RequestHandler;
-use backend::request::{RequestError, ServerRequest};
+use backend::request::{RequestError, ServerRequest, SetModeResponse};
 use backend::setup_request::SetupRequest;
 use postcard::to_allocvec;
 use std::io;
@@ -9,29 +9,6 @@ use std::net::TcpStream;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-#[derive(Debug)]
-pub enum TerminationReason {
-    Disconnect,
-    PromoteAdmin,
-    PromoteSender(String),
-    PromoteReceiver(String),
-}
-
-impl TerminationReason {
-    pub fn as_response(&self) -> String {
-        match self {
-            TerminationReason::Disconnect => "Disconnecting".to_string(),
-            TerminationReason::PromoteAdmin => "Setting up admin connection".to_string(),
-            TerminationReason::PromoteSender(q) => {
-                format!("Setting up sender connection for queue {q}")
-            }
-            TerminationReason::PromoteReceiver(q) => {
-                format!("Setting up receiver connection for queue {q}")
-            }
-        }
-    }
-}
 
 trait StreamWorker {
     fn get_stream(&mut self) -> &mut TcpStream;
@@ -75,10 +52,10 @@ impl SetupWorker {
         )
     }
 
-    pub fn run(mut self) -> (TcpStream, TerminationReason) {
+    pub fn run(mut self) -> (TcpStream, SetModeResponse) {
         println!("worker started");
         if let Err(_) = self.init(None) {
-            return (self.stream, TerminationReason::Disconnect);
+            return (self.stream, SetModeResponse::Disconnect);
         }
 
         self.get_stream().flush().unwrap();
@@ -89,12 +66,12 @@ impl SetupWorker {
                 return match err.kind() {
                     // According to the docs: `Interrupted` means `read` should be retried.
                     ErrorKind::Interrupted | ErrorKind::TimedOut | ErrorKind::WouldBlock => {
-                        (self.stream, TerminationReason::Disconnect)
+                        (self.stream, SetModeResponse::Disconnect)
                     }
                     // Any other error is due to external circumstances.
                     _ => {
                         println!("disconnect or something {}", err.kind());
-                        (self.stream, TerminationReason::Disconnect)
+                        (self.stream, SetModeResponse::Disconnect)
                     }
                 };
             }
@@ -107,19 +84,19 @@ impl SetupWorker {
 
         let promotion = match request {
             Ok(r) => match r {
-                SetupRequest::Admin => TerminationReason::PromoteAdmin,
-                SetupRequest::Sender(q) => TerminationReason::PromoteSender(q),
-                SetupRequest::Receiver(q) => TerminationReason::PromoteReceiver(q),
+                SetupRequest::Admin => SetModeResponse::Admin,
+                SetupRequest::Sender(q) => SetModeResponse::Sender(q),
+                SetupRequest::Receiver(q) => SetModeResponse::Receiver(q),
             },
             Err(e) => {
                 println!("{:?}", e);
-                TerminationReason::Disconnect
+                SetModeResponse::Disconnect
             }
         };
 
-        let payload = to_allocvec(&promotion.as_response()).unwrap();
+        let payload = to_allocvec(&promotion).unwrap();
         if let Err(_) = self.stream.write_all(&payload) {
-            return (self.stream, TerminationReason::Disconnect);
+            return (self.stream, SetModeResponse::Disconnect);
         }
         println!("written");
 

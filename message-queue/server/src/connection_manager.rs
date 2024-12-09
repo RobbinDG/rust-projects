@@ -1,5 +1,6 @@
-use crate::connection_worker::{AdminWorker, SetupWorker, TerminationReason};
+use crate::connection_worker::{AdminWorker, SetupWorker};
 use crate::queue_manager::QueueManager;
+use backend::request::SetModeResponse;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -10,7 +11,7 @@ pub struct ConnectionManager
 {
     listener: TcpListener,
     queue_manager: Arc<Mutex<QueueManager>>,
-    setup_connections: Mutex<Vec<(SocketAddr, Option<JoinHandle<(TcpStream, TerminationReason)>>, Sender<()>)>>,
+    setup_connections: Mutex<Vec<(SocketAddr, Option<JoinHandle<(TcpStream, SetModeResponse)>>, Sender<()>)>>,
     admin_connections: Mutex<Vec<(SocketAddr, Option<JoinHandle<TcpStream>>, Sender<()>)>>,
 }
 
@@ -52,14 +53,14 @@ impl ConnectionManager
                 let (stream, termination) = handle.join().unwrap();
                 println!("{:?}", termination);
                 match termination {
-                    TerminationReason::Disconnect => println!("{} Disconnected", addr),
-                    TerminationReason::PromoteSender(queue) => {
+                    SetModeResponse::Disconnect => println!("{} Disconnected", addr),
+                    SetModeResponse::Sender(queue) => {
                         self.queue_manager.lock().unwrap().connect_sender(&queue, stream);
                     }
-                    TerminationReason::PromoteReceiver(queue) => {
+                    SetModeResponse::Receiver(queue) => {
                         self.queue_manager.lock().unwrap().connect_receiver(&queue, stream);
                     }
-                    TerminationReason::PromoteAdmin => {
+                    SetModeResponse::Admin => {
                         let (admin_worker, interrupt) = AdminWorker::new(self.queue_manager.clone(), stream);
                         let admin_handle = thread::spawn(move || {
                             admin_worker.run()
