@@ -1,6 +1,6 @@
 use crate::message::Message;
-use crate::request::{RequestError, RequestType};
-use crate::stream_io::StreamIO;
+use crate::request::RequestType;
+use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -55,15 +55,7 @@ impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
 }
 
 impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
-    // pub fn transfer_request(
-    //     &mut self,
-    //     request: ServerRequest,
-    // ) -> Result<ServerResponse, RequestError> {
-    //     self.stream.send_message(request)?;
-    //     Ok(self.stream.pull_message_from_stream()?)
-    // }
-
-    pub fn transfer_request<R>(&mut self, request: R) -> Result<R::Response, RequestError>
+    pub fn transfer_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
     where
         R: RequestType + Serialize + for<'a> Deserialize<'a>,
     {
@@ -71,11 +63,11 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
         Ok(self.stream.pull_message_from_stream()?)
     }
 
-    pub fn send_message(&mut self, message: Message) -> Result<(), RequestError> {
+    pub fn send_message(&mut self, message: Message) -> Result<(), StreamIOError> {
         Ok(self.stream.send_message(message)?)
     }
 
-    pub fn receive_message(&mut self) -> Result<Message, RequestError> {
+    pub fn receive_message(&mut self) -> Result<Message, StreamIOError> {
         Ok(self.stream.pull_message_from_stream()?)
     }
 

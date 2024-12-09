@@ -1,4 +1,3 @@
-use crate::request::RequestError;
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::{Read, Write};
@@ -8,6 +7,24 @@ pub struct StreamIO {
     stream: TcpStream,
 }
 
+#[derive(Debug)]
+pub enum StreamIOError {
+    Stream(io::Error),
+    Codec(postcard::Error),
+}
+
+impl From<io::Error> for StreamIOError {
+    fn from(value: io::Error) -> Self {
+        StreamIOError::Stream(value)
+    }
+}
+
+impl From<postcard::Error> for StreamIOError {
+    fn from(err: postcard::Error) -> Self {
+        StreamIOError::Codec(err)
+    }
+}
+
 impl StreamIO {
     pub fn new(stream: TcpStream) -> Self {
         Self {
@@ -15,23 +32,20 @@ impl StreamIO {
         }
     }
 
-    pub fn send_message<T>(&mut self, message: T) -> Result<(), RequestError>
+    pub fn send_message<T>(&mut self, message: T) -> Result<(), StreamIOError>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        let payload = postcard::to_allocvec(&message).unwrap();
-        self.stream.write_all(&payload)?;
-        Ok(())
+        Ok(self.stream.write_all(&postcard::to_allocvec(&message)?)?)
     }
 
-    pub fn pull_message_from_stream<T>(&mut self) -> Result<T, io::Error>
+    pub fn pull_message_from_stream<T>(&mut self) -> Result<T, StreamIOError>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
         let mut buf = [0; 32];
         self.stream.read(&mut buf)?;
         self.stream.flush()?;
-        let message: T = postcard::from_bytes(&buf).unwrap();
-        Ok(message)
+        Ok(postcard::from_bytes(&buf)?)
     }
 }

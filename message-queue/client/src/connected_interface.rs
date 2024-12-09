@@ -1,14 +1,13 @@
+use crate::admin_interface::AdminInterface;
 use crate::disconnected_interface::DisconnectedInterface;
 use crate::interface::Interface;
 use backend::message::Message;
-use backend::request::{
-    CheckQueue, CreateQueue, ListQueues, MakeReceiver, MakeSender,
-};
+use backend::request::SetModeResponse;
+use backend::setup_request::SetupRequest;
 use backend::ConnectedClient;
 use std::io;
-use backend::status_code::Status;
 
-fn prompt_string_input(prompt: &str) -> String {
+pub fn prompt_string_input(prompt: &str) -> String {
     loop {
         let mut buffer = String::new();
 
@@ -38,9 +37,8 @@ impl ConnectedInterface {
 
 impl Interface for ConnectedInterface {
     fn print_options(&self) {
-        println!(" [1] List queues");
+        println!(" [1] Make Admin");
         println!(" [2] Select queue");
-        println!(" [3] Create queue");
         println!(" [4] Send messages");
         println!(" [5] Listen to queue");
         println!(" [0] Disconnect");
@@ -49,8 +47,14 @@ impl Interface for ConnectedInterface {
     fn on_selection(mut self: Box<Self>, choice: u32) -> Box<dyn Interface> {
         match choice {
             1 => {
-                let response = self.server.transfer_request(ListQueues {}).unwrap();
+                let response = self
+                    .server
+                    .transfer_request(SetupRequest::Admin)
+                    .unwrap();
                 println!("Response {:?}", response);
+                if let SetModeResponse::Admin = response {
+                    return Box::new(AdminInterface::new(self.server, self.selected_queue));
+                }
                 Box::new(ConnectedInterface {
                     server: self.server,
                     selected_queue: self.selected_queue,
@@ -58,43 +62,20 @@ impl Interface for ConnectedInterface {
             }
             2 => {
                 let selection = prompt_string_input("Which queue do you want select?");
-                let response = self
-                    .server
-                    .transfer_request(CheckQueue {
-                        queue_name: selection.clone(),
-                    })
-                    .unwrap();
-                if let Status::Exists = response {
-                    // TODO replace with proper status code check
-                    self.selected_queue = Some(selection);
-                }
-                println!("Response {:?}", response);
                 Box::new(ConnectedInterface {
                     server: self.server,
-                    selected_queue: self.selected_queue,
-                })
-            }
-            3 => {
-                let name = prompt_string_input("Name your new queue...");
-                let response = self
-                    .server
-                    .transfer_request(CreateQueue { queue_name: name })
-                    .unwrap();
-                println!("Response {:?}", response);
-                Box::new(ConnectedInterface {
-                    server: self.server,
-                    selected_queue: self.selected_queue,
+                    selected_queue: Some(selection),
                 })
             }
             4 => {
                 if let Some(queue) = &self.selected_queue {
                     let response = self
                         .server
-                        .transfer_request(MakeSender {
-                            destination_queue: queue.clone(),
-                        })
-                        .unwrap();
-                    println!("Response {:?}", response);
+                        .transfer_request(SetupRequest::Sender(queue.clone()));
+                    match response {
+                        Ok(r) => println!("Response {:?}", r),
+                        Err(e) => println!("Error {:?}", e),
+                    }
                     self.send_messages();
                 } else {
                     println!("No queue selected.");
@@ -109,9 +90,7 @@ impl Interface for ConnectedInterface {
                     println!("Started listening...");
                     let response = self
                         .server
-                        .transfer_request(MakeReceiver {
-                            origin_queue: queue.clone(),
-                        })
+                        .transfer_request(SetupRequest::Receiver(queue.clone()))
                         .unwrap();
                     println!("Response {:?}", response);
                     self.receive_messages();

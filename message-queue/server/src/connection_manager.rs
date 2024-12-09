@@ -50,6 +50,7 @@ impl ConnectionManager
             let handle = handle_opt.take().unwrap();
             if handle.is_finished() {
                 let (stream, termination) = handle.join().unwrap();
+                println!("{:?}", termination);
                 match termination {
                     TerminationReason::Disconnect => println!("{} Disconnected", addr),
                     TerminationReason::PromoteSender(queue) => {
