@@ -1,8 +1,8 @@
-use std::ops::Add;
-use backend::request::ServerRequest;
+use backend::request::{CreateQueue, ListQueues};
 use backend::{ConnectedClient, DisconnectedClient};
 use iced::widget::{button, column, row, text, text_input, Column};
-
+use std::ops::Add;
+use backend::setup_request::SetupRequest;
 
 struct QueueView {
     connected_client: Option<ConnectedClient<String>>,
@@ -33,7 +33,8 @@ impl QueueView {
     pub fn connect(&mut self) {
         if let Some(client) = self.disconnected_client.take() {
             match client.connect() {
-                Ok(c) => {
+                Ok(mut c) => {
+                    c.transfer_request(SetupRequest::Admin).unwrap();
                     self.connected_client = Some(c);
                 }
                 Err(e) => {
@@ -57,7 +58,7 @@ impl QueueView {
                     .on_input(UIMessage::NewQueueName),
                 button("Create").on_press(UIMessage::CreateQueue),
                 button("Refresh").on_press(UIMessage::Refresh),
-                ],
+            ],
         ]
     }
 
@@ -66,9 +67,9 @@ impl QueueView {
             UIMessage::Refresh => {
                 self.connect();
                 if let Some(client) = &mut self.connected_client {
-                    if let Ok(response) = client.transfer_request(ServerRequest::ListQueues) {
+                    if let Ok(response) = client.transfer_admin_request(ListQueues {}) {
                         self.queues.clear();
-                        for queue in response.payload.split(',') {
+                        for (queue, _, _, _) in response {
                             self.queues.push(queue.to_string());
                         }
                     }
@@ -80,7 +81,11 @@ impl QueueView {
             UIMessage::CreateQueue => {
                 self.connect();
                 if let Some(client) = &mut self.connected_client {
-                    client.transfer_request(ServerRequest::CreateQueue(self.new_queue_text.clone())).unwrap();
+                    client
+                        .transfer_admin_request(CreateQueue {
+                            queue_name: self.new_queue_text.clone(),
+                        })
+                        .unwrap();
                 }
             }
         }
@@ -88,5 +93,9 @@ impl QueueView {
 }
 
 fn main() -> iced::Result {
-    iced::run("Message Queue Admin Panel", QueueView::update, QueueView::view)
+    iced::run(
+        "Message Queue Admin Panel",
+        QueueView::update,
+        QueueView::view,
+    )
 }
