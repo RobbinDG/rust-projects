@@ -1,4 +1,4 @@
-use crate::connection_worker::{AdminWorker, SetupWorker};
+use crate::setup_worker::SetupWorker;
 use crate::queue_manager::QueueManager;
 use backend::request::SetModeResponse;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -6,6 +6,7 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::{io, thread};
+use crate::admin_worker::AdminWorker;
 
 pub struct ConnectionManager {
     listener: TcpListener,

@@ -1,7 +1,9 @@
 mod connection_manager;
-mod connection_worker;
+mod setup_worker;
 mod request_handler;
 mod queue_manager;
+mod stream_worker;
+mod admin_worker;
 
 use crate::connection_manager::ConnectionManager;
 use std::io::{Read, Write};
