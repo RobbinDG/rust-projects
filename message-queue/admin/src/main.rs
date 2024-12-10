@@ -1,13 +1,13 @@
 use backend::request::{CreateQueue, ListQueues};
+use backend::setup_request::SetupRequest;
 use backend::{ConnectedClient, DisconnectedClient};
 use iced::widget::{button, column, row, text, text_input, Column};
-use std::ops::Add;
-use backend::setup_request::SetupRequest;
+use iced::Alignment;
 
 struct QueueView {
     connected_client: Option<ConnectedClient<String>>,
     disconnected_client: Option<DisconnectedClient<String>>,
-    queues: Vec<String>,
+    queues: Vec<(String, usize, usize, usize)>,
     new_queue_text: String,
 }
 
@@ -46,9 +46,25 @@ impl QueueView {
     }
 
     pub fn view(&self) -> Column<UIMessage> {
-        let mut column = column![];
-        for queue in &self.queues {
-            column = column.push(text(queue.clone().add("\n")));
+        let mut column = column![row![
+            text("Queue").width(200).align_x(Alignment::Center),
+            text("Senders").width(100).align_x(Alignment::Center),
+            text("Receivers").width(100).align_x(Alignment::Center),
+            text("Message").width(100).align_x(Alignment::Center)
+        ],];
+        if self.queues.len() <= 0 {
+            column = column.push(text("Nothing to see...")
+                .width(500)
+                .align_x(Alignment::Center));
+        } else {
+            for (queue, senders, receivers, messages) in &self.queues {
+                column = column.push(row![
+                    text(queue).width(200),
+                    text(senders).width(100),
+                    text(receivers).width(100),
+                    text(messages).width(100),
+                ]);
+            }
         }
 
         column![
@@ -69,8 +85,8 @@ impl QueueView {
                 if let Some(client) = &mut self.connected_client {
                     if let Ok(response) = client.transfer_admin_request(ListQueues {}) {
                         self.queues.clear();
-                        for (queue, _, _, _) in response {
-                            self.queues.push(queue.to_string());
+                        for queue_data in response {
+                            self.queues.push(queue_data);
                         }
                     }
                 }
