@@ -34,7 +34,7 @@ impl Server {
             {
                 self.queue_manager.lock().unwrap().process_queues();
             }
-            cm1.check_and_join_disconnects();
+            cm1.check_and_join_disconnects().unwrap();
 
             thread::sleep(Duration::from_secs(1));
         });

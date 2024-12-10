@@ -1,8 +1,5 @@
 use crate::queue_manager::QueueManager;
-use backend::request::{
-    CheckQueue, CreateQueue, ListQueues, MakeReceiver, MakeSender, RequestError, RequestType,
-    SetModeResponse,
-};
+use backend::request::{CheckQueue, CreateQueue, ListQueues, RequestError, RequestType};
 use backend::response::ServerResponse;
 use backend::status_code::Status;
 use std::sync::{Arc, Mutex};
@@ -17,14 +14,14 @@ pub trait RequestHandler: RequestType {
     /// TODO does this need to take a reference or can it consume the request? This avoids
     ///  cloning
     fn handle_request(
-        &self,
+        self,
         queue_manager: Arc<Mutex<QueueManager>>,
     ) -> Result<Self::Response, RequestError>;
 }
 
 impl RequestHandler for ListQueues {
     fn handle_request(
-        &self,
+        self,
         queue_manager: Arc<Mutex<QueueManager>>,
     ) -> Result<Self::Response, RequestError> {
         let queues_data = queue_manager
@@ -38,13 +35,14 @@ impl RequestHandler for ListQueues {
 
 impl RequestHandler for CheckQueue {
     fn handle_request(
-        &self,
+        self,
         queue_manager: Arc<Mutex<QueueManager>>,
     ) -> Result<Self::Response, RequestError> {
+        let sanitised_name = self.queue_name.replace("\n", "");
         if queue_manager
             .lock()
             .map_err(|err| RequestError::Internal("poison".to_string()))?
-            .queue_exists(&self.queue_name)
+            .queue_exists(&sanitised_name)
         {
             Ok(Status::Exists)
         } else {
@@ -55,29 +53,19 @@ impl RequestHandler for CheckQueue {
 
 impl RequestHandler for CreateQueue {
     fn handle_request(
-        &self,
+        self,
         queue_manager: Arc<Mutex<QueueManager>>,
     ) -> Result<Self::Response, RequestError> {
         let mut qm = queue_manager
             .lock()
             .map_err(|err| RequestError::Internal("poison".to_string()))?;
-        if qm.queue_exists(&self.queue_name) {
+
+        let sanitised_name = self.queue_name.replace("\n", "");
+        if qm.queue_exists(&sanitised_name) {
             Ok(Status::Exists)
         } else {
-            qm.create(self.queue_name.clone());
+            qm.create(sanitised_name);
             Ok(Status::Created)
         }
-    }
-}
-
-impl RequestHandler for MakeSender {
-    fn handle_request(&self, _: Arc<Mutex<QueueManager>>) -> Result<Self::Response, RequestError> {
-        Ok(SetModeResponse::Sender(self.destination_queue.clone()))
-    }
-}
-
-impl RequestHandler for MakeReceiver {
-    fn handle_request(&self, _: Arc<Mutex<QueueManager>>) -> Result<Self::Response, RequestError> {
-        Ok(SetModeResponse::Receiver(self.origin_queue.clone()))
     }
 }

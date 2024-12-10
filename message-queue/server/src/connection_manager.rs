@@ -4,7 +4,7 @@ use backend::request::SetModeResponse;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{io, thread};
 use std::thread::JoinHandle;
 
 pub struct ConnectionManager
@@ -42,11 +42,11 @@ impl ConnectionManager
                 }
             };
 
-            self.check_and_join_disconnects();
+            self.check_and_join_disconnects().unwrap();
         }
     }
 
-    pub fn check_and_join_disconnects(&self) {
+    pub fn check_and_join_disconnects(&self) -> io::Result<()> {
         for (addr, handle_opt, _) in &mut self.setup_connections.lock().unwrap().iter_mut() {
             let handle = handle_opt.take().unwrap();
             if handle.is_finished() {
@@ -55,7 +55,7 @@ impl ConnectionManager
                 match termination {
                     SetModeResponse::Disconnect => println!("{} Disconnected", addr),
                     SetModeResponse::Sender(queue) => {
-                        self.queue_manager.lock().unwrap().connect_sender(&queue, stream);
+                        self.queue_manager.lock().unwrap().connect_sender(&queue, stream)?;
                     }
                     SetModeResponse::Receiver(queue) => {
                         self.queue_manager.lock().unwrap().connect_receiver(&queue, stream);
@@ -73,6 +73,7 @@ impl ConnectionManager
             }
         }
         self.setup_connections.lock().unwrap().retain(|(_, h, _)| h.is_some());
+        Ok(())
     }
 }
 

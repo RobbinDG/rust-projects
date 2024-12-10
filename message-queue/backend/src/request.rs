@@ -70,19 +70,6 @@ pub struct CreateQueue {
     pub queue_name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct MakeAdmin {}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct MakeSender {
-    pub destination_queue: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct MakeReceiver {
-    pub origin_queue: String,
-}
-
 pub enum ServerResponse {
     QueueList(String),
     Success,
@@ -98,18 +85,6 @@ impl RequestType for CheckQueue {
 
 impl RequestType for CreateQueue {
     type Response = Status;
-}
-
-impl RequestType for MakeAdmin {
-    type Response = SetModeResponse;
-}
-
-impl RequestType for MakeSender {
-    type Response = SetModeResponse;
-}
-
-impl RequestType for MakeReceiver {
-    type Response = SetModeResponse;
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -56,6 +56,7 @@ impl QueueManager {
 
     fn empty_queue_to_stream(queue: &mut MessageQueue, recipient: &mut StreamIO) {
         while let Some(message) = queue.pop() {
+            println!("sending... {:?}", message);
             recipient.send_message(message).unwrap()
         }
     }
@@ -68,11 +69,13 @@ impl QueueManager {
         Ok(message)
     }
 
-    pub fn connect_sender(&mut self, queue_name: &String, stream: TcpStream) {
+    pub fn connect_sender(&mut self, queue_name: &String, stream: TcpStream) -> io::Result<()> {
         println!("connecting");
+        stream.set_nonblocking(true)?;
         if let Some((senders, _, _)) = self.queues.get_mut(queue_name) {
-            senders.push(StreamIO::new(stream));
+            senders.push(StreamIO::new(stream))
         }
+        Ok(())
     }
 
     pub fn connect_receiver(&mut self, queue_name: &String, stream: TcpStream) {

@@ -20,11 +20,8 @@ trait StreamWorker {
 
     fn read(&mut self) -> io::Result<[u8; 32]> {
         let mut buf = [0; 32];
-        println!("a");
         self.get_stream().read(&mut buf)?;
-        println!("b");
         self.get_stream().flush()?;
-        println!("c");
         Ok(buf)
     }
 }
@@ -85,8 +82,8 @@ impl SetupWorker {
         let promotion = match request {
             Ok(r) => match r {
                 SetupRequest::Admin => SetModeResponse::Admin,
-                SetupRequest::Sender(q) => SetModeResponse::Sender(q),
-                SetupRequest::Receiver(q) => SetModeResponse::Receiver(q),
+                SetupRequest::Sender(q) => SetModeResponse::Sender(q.replace("\n", "")),
+                SetupRequest::Receiver(q) => SetModeResponse::Receiver(q.replace("\n", "")),
             },
             Err(e) => {
                 println!("{:?}", e);
