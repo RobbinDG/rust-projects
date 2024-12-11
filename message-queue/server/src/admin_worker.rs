@@ -90,6 +90,9 @@ impl AdminWorker {
             AdminRequest::CreateQueue(r) => {
                 to_allocvec(&r.handle_request(self.queue_manager.clone())?)
             }
+            AdminRequest::DeleteQueue(r) => {
+                to_allocvec(&r.handle_request(self.queue_manager.clone())?)
+            }
         }?)
     }
 }

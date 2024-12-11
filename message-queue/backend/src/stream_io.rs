@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::io;
-use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::io::{ErrorKind, Read, Write};
+use std::net::{Shutdown, TcpStream};
 
 pub struct StreamIO {
     stream: TcpStream,
@@ -31,7 +31,8 @@ impl From<postcard::Error> for StreamIOError {
 
 /// A wrapper around `std::net::TcpStream` that provides helper methods for strongly
 /// typed encoded messages and exposes error handling for when packets are not received
-/// or incorrectly formatted.
+/// or incorrectly formatted. Connections will automatically be shutdown once the stream
+/// goes out of scope.
 impl StreamIO {
     pub fn new(stream: TcpStream) -> Self {
         Self { stream }
@@ -70,6 +71,23 @@ impl StreamIO {
         match response {
             Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
             Err(e) => Err(StreamIOError::Request(e)),
+        }
+    }
+}
+
+impl Drop for StreamIO {
+    fn drop(&mut self) {
+        if let Err(e) = self.stream.shutdown(Shutdown::Both) {
+            match e.kind() {
+                ErrorKind::BrokenPipe
+                | ErrorKind::ConnectionAborted
+                | ErrorKind::ConnectionRefused
+                | ErrorKind::ConnectionReset
+                | ErrorKind::NotConnected => {
+                    return
+                }
+                _ => Err(e).unwrap(),
+            }
         }
     }
 }

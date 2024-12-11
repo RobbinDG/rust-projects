@@ -70,6 +70,11 @@ pub struct CreateQueue {
     pub queue_name: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DeleteQueue {
+    pub queue_name: String,
+}
+
 pub enum ServerResponse {
     QueueList(String),
     Success,
@@ -87,11 +92,16 @@ impl RequestType for CreateQueue {
     type Response = Status;
 }
 
+impl RequestType for DeleteQueue {
+    type Response = Status;
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AdminRequest {
     ListQueues(ListQueues),
     CheckQueue(CheckQueue),
     CreateQueue(CreateQueue),
+    DeleteQueue(DeleteQueue),
 }
 
 impl From<ListQueues> for AdminRequest {
@@ -99,14 +109,22 @@ impl From<ListQueues> for AdminRequest {
         AdminRequest::ListQueues(value)
     }
 }
+
 impl From<CheckQueue> for AdminRequest {
     fn from(value: CheckQueue) -> Self {
         AdminRequest::CheckQueue(value)
     }
 }
+
 impl From<CreateQueue> for AdminRequest {
     fn from(value: CreateQueue) -> Self {
         AdminRequest::CreateQueue(value)
+    }
+}
+
+impl From<DeleteQueue> for AdminRequest {
+    fn from(value: DeleteQueue) -> Self {
+        AdminRequest::DeleteQueue(value)
     }
 }
 

@@ -33,6 +33,17 @@ impl QueueManager {
         );
     }
 
+    /// Deletes a queue and all remaining messages. If successful, returns all senders
+    /// and receivers on this queue. If the result is not handled, the streams go out of scope
+    /// and connections will be closed.
+    pub fn delete(&mut self, name: &String) -> Option<(Vec<StreamIO>, Vec<StreamIO>)> {
+        println!("Deleting queue {}", name);
+        if let Some((senders, _, receivers)) = self.queues.remove(name) {
+            return Some((senders, receivers));
+        }
+        None
+    }
+
     pub fn process_queues(&mut self) {
         println!("Checking queues");
         for (_, (senders, queue, receivers)) in self.queues.iter_mut() {

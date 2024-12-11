@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Status {
     Created,
+    Removed,
     Exists,
     Sent,
     Configured,
@@ -16,6 +17,7 @@ impl From<Status> for &str {
     fn from(value: Status) -> Self {
         match value {
             Status::Created => "created",
+            Status::Removed => "removed",
             Status::Sent => "sent",
             Status::Failed => "failed",
             Status::NotFound => "not_found",

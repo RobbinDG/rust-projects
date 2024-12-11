@@ -1,5 +1,5 @@
 use crate::queue_manager::QueueManager;
-use backend::request::{CheckQueue, CreateQueue, ListQueues, RequestError, RequestType};
+use backend::request::{CheckQueue, CreateQueue, DeleteQueue, ListQueues, RequestError, RequestType};
 use backend::response::ServerResponse;
 use backend::status_code::Status;
 use std::sync::{Arc, Mutex};
@@ -66,6 +66,21 @@ impl RequestHandler for CreateQueue {
         } else {
             qm.create(sanitised_name);
             Ok(Status::Created)
+        }
+    }
+}
+
+impl RequestHandler for DeleteQueue {
+    fn handle_request(self, queue_manager: Arc<Mutex<QueueManager>>) -> Result<Self::Response, RequestError> {
+        let mut qm = queue_manager
+            .lock()
+            .map_err(|err| RequestError::Internal("poison".to_string()))?;
+
+        let sanitised_name = self.queue_name.replace("\n", "");
+        if qm.delete(&sanitised_name).is_some() {
+            Ok(Status::Removed)
+        } else {
+            Ok(Status::NotFound)
         }
     }
 }
