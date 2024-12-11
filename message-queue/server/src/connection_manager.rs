@@ -88,6 +88,10 @@ impl ConnectionManager {
                 let _ = handle_opt.insert(handle);
             }
         }
+        self.setup_connections
+            .lock()
+            .unwrap()
+            .retain(|(_, h, _)| h.is_some());
         for (addr, handle_opt, _) in &mut self.admin_connections.lock().unwrap().iter_mut() {
             let handle = handle_opt.take().unwrap();
             if handle.is_finished() {
@@ -97,7 +101,7 @@ impl ConnectionManager {
                 let _ = handle_opt.insert(handle);
             }
         }
-        self.setup_connections
+        self.admin_connections
             .lock()
             .unwrap()
             .retain(|(_, h, _)| h.is_some());

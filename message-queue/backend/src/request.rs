@@ -88,28 +88,28 @@ impl RequestType for CreateQueue {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum ServerRequest {
+pub enum AdminRequest {
     ListQueues(ListQueues),
     CheckQueue(CheckQueue),
     CreateQueue(CreateQueue),
 }
 
-impl From<ListQueues> for ServerRequest {
+impl From<ListQueues> for AdminRequest {
     fn from(value: ListQueues) -> Self {
-        ServerRequest::ListQueues(value)
+        AdminRequest::ListQueues(value)
     }
 }
-impl From<CheckQueue> for ServerRequest {
+impl From<CheckQueue> for AdminRequest {
     fn from(value: CheckQueue) -> Self {
-        ServerRequest::CheckQueue(value)
+        AdminRequest::CheckQueue(value)
     }
 }
-impl From<CreateQueue> for ServerRequest {
+impl From<CreateQueue> for AdminRequest {
     fn from(value: CreateQueue) -> Self {
-        ServerRequest::CreateQueue(value)
+        AdminRequest::CreateQueue(value)
     }
 }
 
-impl RequestType for ServerRequest {
+impl RequestType for AdminRequest {
     type Response = Vec<u8>;
 }

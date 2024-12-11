@@ -118,13 +118,13 @@ impl ConnectedInterface {
     fn send_messages(&mut self) {
         loop {
             let message_str = prompt_string_input("Write message");
-            self.server.send_message(Message::new(message_str)).unwrap();
+            self.server.push_message(Message::new(message_str)).unwrap();
         }
     }
 
     fn receive_messages(&mut self) {
         loop {
-            let message = self.server.receive_message().unwrap();
+            let message: Message = self.server.pull_message().unwrap();
             println!("{:?}", message);
         }
     }

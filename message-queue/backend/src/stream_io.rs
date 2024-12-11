@@ -9,8 +9,11 @@ pub struct StreamIO {
 
 #[derive(Debug)]
 pub enum StreamIOError {
+    /// For errors related to the transfer of packets.
     Stream(io::Error),
+    /// For errors with serialisation of messages.
     Codec(postcard::Error),
+    /// For errors during the processing of the request.
     Request(String),
 }
 
@@ -26,19 +29,26 @@ impl From<postcard::Error> for StreamIOError {
     }
 }
 
+/// A wrapper around `std::net::TcpStream` that provides helper methods for strongly
+/// typed encoded messages and exposes error handling for when packets are not received
+/// or incorrectly formatted.
 impl StreamIO {
     pub fn new(stream: TcpStream) -> Self {
         Self { stream }
     }
 
-    pub fn send_message<T>(&mut self, message: T) -> Result<(), StreamIOError>
+    /// Write a struct to the stream, after first encoding it. The struct must
+    /// be serialisable and deserialisable by `serde`.
+    pub fn write<T>(&mut self, message: T) -> Result<(), StreamIOError>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
         Ok(self.stream.write_all(&postcard::to_allocvec(&message)?)?)
     }
 
-    pub fn pull_message_from_stream<T>(&mut self) -> Result<T, StreamIOError>
+    /// Read a struct from the stream, after first decoding it. The struct must
+    /// be serialisable and deserialisable by `serde`.
+    pub fn read<T>(&mut self) -> Result<T, StreamIOError>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
@@ -48,11 +58,15 @@ impl StreamIO {
         Ok(postcard::from_bytes(&buf)?)
     }
 
-    pub fn pull_admin_response<T>(&mut self) -> Result<T, StreamIOError>
+    /// Read a `Result` containing the desired struct as `Ok` and a `crate::stream_io::StreamIOError` as `Err`
+    /// from the stream. This assumes that the `Ok` value is encoded prior to being wrapped
+    /// in the `Result`, and therefore is doubly encoded. The struct must be serialisable
+    /// and deserialisable by `serde`.
+    pub fn read_encoded_result<T>(&mut self) -> Result<T, StreamIOError>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        let response: Result<Vec<u8>, String> = self.pull_message_from_stream()?;
+        let response: Result<Vec<u8>, String> = self.read()?;
         match response {
             Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
             Err(e) => Err(StreamIOError::Request(e)),

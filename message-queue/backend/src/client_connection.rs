@@ -1,8 +1,7 @@
-use std::fmt::Debug;
-use crate::message::Message;
-use crate::request::{RequestType, ServerRequest};
+use crate::request::{AdminRequest, RequestType};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::io;
 use std::net::{TcpStream, ToSocketAddrs};
 
@@ -24,6 +23,7 @@ where
 {
     config: ConnectionConfig<T>,
     stream: StreamIO,
+    pipe_broken: bool,
 }
 
 pub struct ConnectionError<T>
@@ -46,6 +46,7 @@ impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
             Ok(stream) => Ok(ConnectedClient {
                 config: self.config,
                 stream: StreamIO::new(stream),
+                pipe_broken: false,
             }),
             Err(e) => Err(ConnectionError {
                 error_body: e,
@@ -60,25 +61,63 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
     where
         R: RequestType + Serialize + for<'a> Deserialize<'a>,
     {
-        self.stream.send_message(request)?;
-        Ok(self.stream.pull_message_from_stream()?)
+        self.push_message(request)?;
+        self.pull_message()
     }
 
     pub fn transfer_admin_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
     where
         R: RequestType + Serialize + for<'a> Deserialize<'a>,
-        ServerRequest: From<R>,
+        AdminRequest: From<R>,
     {
-        self.stream.send_message(ServerRequest::from(request))?;
-        self.stream.pull_admin_response()
+        self.push_message(AdminRequest::from(request))?;
+        self.pull_admin_request()
     }
 
-    pub fn send_message(&mut self, message: Message) -> Result<(), StreamIOError> {
-        Ok(self.stream.send_message(message)?)
+    pub fn push_message<R>(&mut self, message: R) -> Result<(), StreamIOError>
+    where
+        R: Serialize + for<'a> Deserialize<'a>,
+    {
+        let result = self.stream.write(message);
+
+        if let Err(StreamIOError::Stream(e)) = &result {
+            if e.kind() == io::ErrorKind::BrokenPipe {
+                self.pipe_broken = true;
+            }
+        }
+        result
     }
 
-    pub fn receive_message(&mut self) -> Result<Message, StreamIOError> {
-        Ok(self.stream.pull_message_from_stream()?)
+    pub fn pull_message<R>(&mut self) -> Result<R, StreamIOError>
+    where
+        R: Serialize + for<'a> Deserialize<'a>,
+    {
+        let result = self.stream.read();
+
+        if let Err(StreamIOError::Stream(e)) = &result {
+            if e.kind() == io::ErrorKind::BrokenPipe {
+                self.pipe_broken = true;
+            }
+        }
+        result
+    }
+
+    pub fn pull_admin_request<R>(&mut self) -> Result<R, StreamIOError>
+    where
+        R: Serialize + for<'a> Deserialize<'a>,
+    {
+        let result = self.stream.read_encoded_result();
+
+        if let Err(StreamIOError::Stream(e)) = &result {
+            if e.kind() == io::ErrorKind::BrokenPipe {
+                self.pipe_broken = true;
+            }
+        }
+        result
+    }
+
+    pub fn broken_pipe(&self) -> bool {
+        self.pipe_broken
     }
 
     pub fn disconnect(self) -> DisconnectedClient<T> {

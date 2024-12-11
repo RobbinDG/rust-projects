@@ -37,7 +37,7 @@ impl QueueManager {
         println!("Checking queues");
         for (_, (senders, queue, receivers)) in self.queues.iter_mut() {
             for sender in senders {
-                match sender.pull_message_from_stream() {
+                match sender.read() {
                     Ok(message) => {
                         println!("{:?}", message);
                         queue.push(message)
@@ -57,7 +57,7 @@ impl QueueManager {
     fn empty_queue_to_stream(queue: &mut MessageQueue, recipient: &mut StreamIO) {
         while let Some(message) = queue.pop() {
             println!("sending... {:?}", message);
-            recipient.send_message(message).unwrap()
+            recipient.write(message).unwrap()
         }
     }
 

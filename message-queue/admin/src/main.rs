@@ -9,7 +9,6 @@ struct QueueView {
     connector: ServerConnector,
     queues: Vec<(String, usize, usize, usize)>,
     new_queue_text: String,
-    connected: bool,
 }
 
 impl Default for QueueView {
@@ -18,7 +17,6 @@ impl Default for QueueView {
             connector: ServerConnector::new(),
             queues: Vec::default(),
             new_queue_text: String::new(),
-            connected: false,
         }
     }
 }
@@ -31,21 +29,6 @@ enum UIMessage {
 }
 
 impl QueueView {
-    // pub fn connect(&mut self) {
-    //     if let Some(client) = self.disconnected_client.take() {
-    //         match client.connect() {
-    //             Ok(mut c) => {
-    //                 c.transfer_request(SetupRequest::Admin).unwrap();
-    //                 self.connected_client = Some(c);
-    //             }
-    //             Err(e) => {
-    //                 self.connected_client = None;
-    //                 self.disconnected_client = Some(e.server);
-    //             }
-    //         }
-    //     }
-    // }
-
     pub fn view(&self) -> Column<UIMessage> {
         let mut column = column![row![
             text("Queue").width(200).align_x(Alignment::Center),
@@ -53,6 +36,7 @@ impl QueueView {
             text("Receivers").width(100).align_x(Alignment::Center),
             text("Message").width(100).align_x(Alignment::Center)
         ],];
+        println!("{:?}", self.queues);
         if self.queues.len() <= 0 {
             column = column.push(
                 text("Nothing to see...")
@@ -79,40 +63,36 @@ impl QueueView {
                 button("Refresh").on_press(UIMessage::Refresh),
             ],
         ];
-        if !self.connected {
+        if !self.connector.connected() {
             cols = cols.push(text("Couldn't connect to server."));
         }
         cols
     }
 
     pub fn update(&mut self, message: UIMessage) {
-        self.connected = true;
         match message {
-            UIMessage::Refresh => match self.connector.client() {
-                Ok(client) => {
+            UIMessage::Refresh => {
+                if let Ok(client) = self.connector.client() {
                     if let Ok(response) = client.transfer_admin_request(ListQueues {}) {
+                        println!("ok {:?}", response);
                         self.queues.clear();
                         for queue_data in response {
                             self.queues.push(queue_data);
                         }
                     } else {
-                        self.connected = false;
+                        println!("err");
                     }
                 }
-                Err(_) => self.connected = false,
-            },
+            }
             UIMessage::NewQueueName(s) => {
                 self.new_queue_text = s;
             }
-            UIMessage::CreateQueue => match self.connector.client() {
-                Ok(client) => {
-                    if let Err(_) = client.transfer_admin_request(CreateQueue {
-                        queue_name: self.new_queue_text.clone(),
-                    }) {
-                        self.connected = false;
-                    }
+            UIMessage::CreateQueue => if let Ok(client) = self.connector.client() {
+                if let Err(_) = client.transfer_admin_request(CreateQueue {
+                    queue_name: self.new_queue_text.clone(),
+                }) {
+
                 }
-                Err(_) => self.connected = false,
             },
         }
     }

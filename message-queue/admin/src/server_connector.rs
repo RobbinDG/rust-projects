@@ -30,7 +30,17 @@ impl ServerConnector {
                     }
                 }
                 Client::Connected(connected) => {
-                    Client::Connected(connected)
+                    if connected.broken_pipe() {
+                        let disconnected = connected.disconnect();
+                        match disconnected.connect() {
+                            Ok(c) => Client::Connected(c),
+                            Err(e) => {
+                                Client::Disconnected(e.server)
+                            }
+                        }
+                    } else {
+                        Client::Connected(connected)
+                    }
                 }
             });
             if let Client::Connected(connected) = inserted {
@@ -38,5 +48,12 @@ impl ServerConnector {
             }
         }
         Err("Couldn't connect".to_string())
+    }
+
+    pub fn connected(&self) -> bool {
+        if let Some(Client::Connected(_)) = self.client {
+            return true;
+        }
+        false
     }
 }

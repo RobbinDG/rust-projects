@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 use std::io::{ErrorKind, Write};
-use backend::request::{RequestError, ServerRequest};
+use backend::request::{RequestError, AdminRequest};
 use postcard::to_allocvec;
 use crate::queue_manager::QueueManager;
 use crate::request_handler::RequestHandler;
@@ -58,7 +58,7 @@ impl AdminWorker {
                 }
             };
 
-            let request: Result<ServerRequest, postcard::Error> = postcard::from_bytes(&buf);
+            let request: Result<AdminRequest, postcard::Error> = postcard::from_bytes(&buf);
             let a = request
                 .map_err(|e| RequestError::Internal(e.to_string()))
                 .and_then(|r| self.handle_request(r))
@@ -79,15 +79,15 @@ impl AdminWorker {
         }
     }
 
-    fn handle_request(&mut self, req: ServerRequest) -> Result<Vec<u8>, RequestError> {
+    fn handle_request(&mut self, req: AdminRequest) -> Result<Vec<u8>, RequestError> {
         Ok(match req {
-            ServerRequest::ListQueues(r) => {
+            AdminRequest::ListQueues(r) => {
                 to_allocvec(&r.handle_request(self.queue_manager.clone())?)
             }
-            ServerRequest::CheckQueue(r) => {
+            AdminRequest::CheckQueue(r) => {
                 to_allocvec(&r.handle_request(self.queue_manager.clone())?)
             }
-            ServerRequest::CreateQueue(r) => {
+            AdminRequest::CreateQueue(r) => {
                 to_allocvec(&r.handle_request(self.queue_manager.clone())?)
             }
         }?)
