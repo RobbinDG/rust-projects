@@ -1,7 +1,8 @@
 use crate::queue_manager::QueueManager;
-use backend::request::{CheckQueue, CreateQueue, DeleteQueue, ListQueues, RequestError, RequestType};
-use backend::response::ServerResponse;
-use backend::status_code::Status;
+use backend::protocol::request::{
+    CheckQueue, CreateQueue, DeleteQueue, ListQueues, RequestError, RequestType,
+};
+use backend::protocol::{ServerResponse, Status};
 use std::sync::{Arc, Mutex};
 
 pub enum ResponseType {
@@ -71,7 +72,10 @@ impl RequestHandler for CreateQueue {
 }
 
 impl RequestHandler for DeleteQueue {
-    fn handle_request(self, queue_manager: Arc<Mutex<QueueManager>>) -> Result<Self::Response, RequestError> {
+    fn handle_request(
+        self,
+        queue_manager: Arc<Mutex<QueueManager>>,
+    ) -> Result<Self::Response, RequestError> {
         let mut qm = queue_manager
             .lock()
             .map_err(|err| RequestError::Internal("poison".to_string()))?;

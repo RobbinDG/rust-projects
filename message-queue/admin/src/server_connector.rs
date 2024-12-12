@@ -1,7 +1,5 @@
+use backend::protocol::{SetupRequest, SetupResponse};
 use backend::{ConnectedClient, DisconnectedClient};
-use backend::request::SetModeResponse;
-use backend::setup_request::SetupRequest;
-use backend::stream_io::StreamIOError;
 
 enum Client {
     Connected(ConnectedClient<String>),
@@ -24,17 +22,13 @@ impl ServerConnector {
     pub fn client(&mut self) -> Result<&mut ConnectedClient<String>, String> {
         if let Some(client) = self.client.take() {
             let inserted = self.client.insert(match client {
-                Client::Disconnected(c) => {
-                    Self::attempt_connect(c)
-                }
+                Client::Disconnected(c) => Self::attempt_connect(c),
                 Client::Connected(connected) => {
                     if connected.broken_pipe() {
                         let disconnected = connected.disconnect();
                         match disconnected.connect() {
                             Ok(c) => Client::Connected(c),
-                            Err(e) => {
-                                Client::Disconnected(e.server)
-                            }
+                            Err(e) => Client::Disconnected(e.server),
                         }
                     } else {
                         Client::Connected(connected)
@@ -42,7 +36,7 @@ impl ServerConnector {
                 }
             });
             if let Client::Connected(connected) = inserted {
-                return Ok(connected)
+                return Ok(connected);
             }
         }
         Err("Couldn't connect".to_string())
@@ -50,11 +44,9 @@ impl ServerConnector {
 
     fn attempt_connect(c: DisconnectedClient<String>) -> Client {
         match c.connect() {
-            Ok(mut connected) => {
-                match connected.transfer_request(SetupRequest::Admin) {
-                    Ok(SetModeResponse::Admin) => Client::Connected(connected),
-                    _ => Client::Disconnected(connected.disconnect()),
-                }
+            Ok(mut connected) => match connected.transfer_request(SetupRequest::Admin) {
+                Ok(SetupResponse::Admin) => Client::Connected(connected),
+                _ => Client::Disconnected(connected.disconnect()),
             },
             Err(err) => Client::Disconnected(err.server),
         }

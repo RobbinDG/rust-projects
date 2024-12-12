@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 use std::io::{ErrorKind, Write};
-use backend::request::{RequestError, AdminRequest};
+use backend::protocol::request::{RequestError, AdminRequest};
 use postcard::to_allocvec;
 use crate::queue_manager::QueueManager;
 use crate::request_handler::RequestHandler;

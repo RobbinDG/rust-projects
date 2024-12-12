@@ -1,9 +1,8 @@
 use crate::admin_interface::AdminInterface;
 use crate::disconnected_interface::DisconnectedInterface;
 use crate::interface::Interface;
-use backend::message::Message;
-use backend::request::SetModeResponse;
-use backend::setup_request::SetupRequest;
+use backend::protocol::Message;
+use backend::protocol::{SetupRequest, SetupResponse};
 use backend::ConnectedClient;
 use std::io;
 
@@ -50,7 +49,7 @@ impl Interface for ConnectedInterface {
                 match self.server.transfer_request(SetupRequest::Admin) {
                     Ok(response) => {
                         println!("Response {:?}", response);
-                        if let SetModeResponse::Admin = response {
+                        if let SetupResponse::Admin = response {
                             return Box::new(AdminInterface::new(self.server, self.selected_queue));
                         }
                     }

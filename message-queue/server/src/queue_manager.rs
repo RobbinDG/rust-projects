@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use backend::message_queue::MessageQueue;
+use crate::message_queue::MessageQueue;
 use backend::stream_io::StreamIO;
 use std::net::TcpStream;
-use backend::message::Message;
+use backend::protocol::Message;
 use std::io;
 use std::io::{Read, Write};
 

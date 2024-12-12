@@ -1,4 +1,4 @@
-use crate::status_code::Status;
+use crate::protocol::status_code::Status;
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 use std::str;
@@ -47,14 +47,6 @@ impl RequestError {
 
 pub trait RequestType {
     type Response: Serialize + for<'de> Deserialize<'de> + Sized;
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum SetModeResponse {
-    Disconnect,
-    Admin,
-    Sender(String),
-    Receiver(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

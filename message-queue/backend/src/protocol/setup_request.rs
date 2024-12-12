@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use crate::request::{RequestType, SetModeResponse};
+use crate::protocol::request::RequestType;
+use crate::protocol::SetupResponse;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SetupRequest {
@@ -9,5 +10,5 @@ pub enum SetupRequest {
 }
 
 impl RequestType for SetupRequest {
-    type Response = SetModeResponse;
+    type Response = SetupResponse;
 }

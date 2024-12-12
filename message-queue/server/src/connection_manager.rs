@@ -1,12 +1,12 @@
-use crate::setup_worker::SetupWorker;
+use crate::admin_worker::AdminWorker;
 use crate::queue_manager::QueueManager;
-use backend::request::SetModeResponse;
+use crate::setup_worker::SetupWorker;
+use backend::protocol::SetupResponse;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::{io, thread};
-use crate::admin_worker::AdminWorker;
 
 pub struct ConnectionManager {
     listener: TcpListener,
@@ -14,7 +14,7 @@ pub struct ConnectionManager {
     setup_connections: Mutex<
         Vec<(
             SocketAddr,
-            Option<JoinHandle<(TcpStream, SetModeResponse)>>,
+            Option<JoinHandle<(TcpStream, SetupResponse)>>,
             Sender<()>,
         )>,
     >,
@@ -60,20 +60,20 @@ impl ConnectionManager {
             if handle.is_finished() {
                 let (stream, termination) = handle.join().unwrap();
                 match termination {
-                    SetModeResponse::Disconnect => println!("{} Disconnected", addr),
-                    SetModeResponse::Sender(queue) => {
+                    SetupResponse::Disconnect => println!("{} Disconnected", addr),
+                    SetupResponse::Sender(queue) => {
                         self.queue_manager
                             .lock()
                             .unwrap()
                             .connect_sender(&queue, stream)?;
                     }
-                    SetModeResponse::Receiver(queue) => {
+                    SetupResponse::Receiver(queue) => {
                         self.queue_manager
                             .lock()
                             .unwrap()
                             .connect_receiver(&queue, stream);
                     }
-                    SetModeResponse::Admin => {
+                    SetupResponse::Admin => {
                         let (admin_worker, interrupt) =
                             AdminWorker::new(self.queue_manager.clone(), stream);
                         let admin_handle = thread::spawn(move || admin_worker.run());

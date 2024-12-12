@@ -1,4 +1,4 @@
-use crate::request::{AdminRequest, RequestType};
+use crate::protocol::request::{AdminRequest, RequestType};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

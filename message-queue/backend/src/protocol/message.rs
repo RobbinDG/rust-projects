@@ -1,4 +1,4 @@
-use crate::request::RequestType;
+use crate::protocol::request::RequestType;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]

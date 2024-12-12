@@ -4,6 +4,7 @@ mod request_handler;
 mod queue_manager;
 mod stream_worker;
 mod admin_worker;
+pub mod message_queue;
 
 use crate::connection_manager::ConnectionManager;
 use std::io::{Read, Write};

@@ -1,4 +1,4 @@
-use crate::status_code::Status;
+use crate::protocol::status_code::Status;
 use serde::{Deserialize, Serialize};
 use std::str;
 use std::str::FromStr;

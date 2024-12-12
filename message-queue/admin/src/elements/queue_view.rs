@@ -1,7 +1,7 @@
 use crate::elements::UIMessage;
 use crate::elements::QueueTable;
 use crate::server_connector::ServerConnector;
-use backend::request::{CreateQueue, DeleteQueue, ListQueues};
+use backend::protocol::request::{CreateQueue, DeleteQueue, ListQueues};
 use iced::widget::{button, column, row, text, text_input, Column};
 
 pub struct QueueView {

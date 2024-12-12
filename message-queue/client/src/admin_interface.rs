@@ -1,7 +1,7 @@
 use crate::disconnected_interface::DisconnectedInterface;
 use crate::interface::Interface;
-use backend::request::{CheckQueue, CreateQueue, ListQueues};
-use backend::status_code::Status;
+use backend::protocol::request::{CheckQueue, CreateQueue, ListQueues};
+use backend::protocol::Status;
 use backend::ConnectedClient;
 
 pub struct AdminInterface {

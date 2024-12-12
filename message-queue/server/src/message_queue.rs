@@ -1,4 +1,4 @@
-use crate::message::Message;
+use backend::protocol::Message;
 
 pub struct MessageQueue {
     messages: Vec<Message>,
