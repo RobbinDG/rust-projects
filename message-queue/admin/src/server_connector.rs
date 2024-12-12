@@ -1,4 +1,7 @@
 use backend::{ConnectedClient, DisconnectedClient};
+use backend::request::SetModeResponse;
+use backend::setup_request::SetupRequest;
+use backend::stream_io::StreamIOError;
 
 enum Client {
     Connected(ConnectedClient<String>),
@@ -22,12 +25,7 @@ impl ServerConnector {
         if let Some(client) = self.client.take() {
             let inserted = self.client.insert(match client {
                 Client::Disconnected(c) => {
-                    match c.connect() {
-                        Ok(connected) => {
-                            Client::Connected(connected)
-                        },
-                        Err(err) => Client::Disconnected(err.server),
-                    }
+                    Self::attempt_connect(c)
                 }
                 Client::Connected(connected) => {
                     if connected.broken_pipe() {
@@ -48,6 +46,18 @@ impl ServerConnector {
             }
         }
         Err("Couldn't connect".to_string())
+    }
+
+    fn attempt_connect(c: DisconnectedClient<String>) -> Client {
+        match c.connect() {
+            Ok(mut connected) => {
+                match connected.transfer_request(SetupRequest::Admin) {
+                    Ok(SetModeResponse::Admin) => Client::Connected(connected),
+                    _ => Client::Disconnected(connected.disconnect()),
+                }
+            },
+            Err(err) => Client::Disconnected(err.server),
+        }
     }
 
     pub fn connected(&self) -> bool {

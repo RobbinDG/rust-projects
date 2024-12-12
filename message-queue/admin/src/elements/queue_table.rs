@@ -29,7 +29,6 @@ impl QueueTable {
             row.2.to_string(),
             row.3.to_string(),
         ]);
-        println!("content {:?}", self.content);
     }
 
     pub fn view(&self) -> Column<UIMessage> {

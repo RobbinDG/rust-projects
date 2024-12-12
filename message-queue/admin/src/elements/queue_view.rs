@@ -44,14 +44,16 @@ impl QueueView {
         match message {
             UIMessage::Refresh => {
                 if let Ok(client) = self.connector.client() {
-                    if let Ok(response) = client.transfer_admin_request(ListQueues {}) {
-                        println!("ok {:?}", response);
-                        self.queue_table.clear();
-                        for queue_data in response {
-                            self.queue_table.push(queue_data);
+                    match client.transfer_admin_request(ListQueues {}) {
+                        Ok(response) => {
+                            self.queue_table.clear();
+                            for queue_data in response {
+                                self.queue_table.push(queue_data);
+                            }
                         }
-                    } else {
-                        println!("err");
+                        Err(e) => {
+                            println!("err: {e:?}");
+                        }
                     }
                 }
             }
