@@ -1,7 +1,6 @@
 use crate::protocol::request::{AdminRequest, RequestType};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 use std::io;
 use std::net::{TcpStream, ToSocketAddrs};
 

@@ -7,6 +7,10 @@ mod admin_worker;
 pub mod message_queue;
 mod topic_manager;
 mod buffer_processor;
+mod buffer_manager;
+mod topic;
+mod topic_processor;
+mod message_buffer;
 
 use crate::connection_manager::ConnectionManager;
 use std::io::{Read, Write};
@@ -14,7 +18,7 @@ use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::thread;
-use queue_manager::BufferManager;
+use buffer_manager::BufferManager;
 use crate::buffer_processor::MessageQueueProcessor;
 use crate::queue_manager::QueueManager;
 

@@ -1,5 +1,6 @@
-use crate::message_queue::{MessageBuffer, MessageQueue};
+use crate::message_queue::MessageQueue;
 use backend::stream_io::StreamIO;
+use crate::message_buffer::MessageBuffer;
 
 pub trait BufferProcessor<T>
 where
