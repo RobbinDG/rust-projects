@@ -5,6 +5,8 @@ mod queue_manager;
 mod stream_worker;
 mod admin_worker;
 pub mod message_queue;
+mod topic_manager;
+mod buffer_processor;
 
 use crate::connection_manager::ConnectionManager;
 use std::io::{Read, Write};
@@ -12,7 +14,9 @@ use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::thread;
-use queue_manager::QueueManager;
+use queue_manager::BufferManager;
+use crate::buffer_processor::MessageQueueProcessor;
+use crate::queue_manager::QueueManager;
 
 pub struct Server {
     queue_manager: Arc<Mutex<QueueManager>>,
@@ -21,7 +25,7 @@ pub struct Server {
 
 impl Server {
     pub fn new(tcp_listener: TcpListener) -> Self {
-        let queue_manager = Arc::new(Mutex::new(QueueManager::new()));
+        let queue_manager = Arc::new(Mutex::new(QueueManager::new(MessageQueueProcessor {})));
         let connection_manager =
             ConnectionManager::new(tcp_listener, queue_manager.clone());
         Self {
