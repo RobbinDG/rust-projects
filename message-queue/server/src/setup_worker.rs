@@ -61,8 +61,8 @@ impl SetupWorker {
         let promotion = match request {
             Ok(r) => match r {
                 SetupRequest::Admin => SetupResponse::Admin,
-                SetupRequest::Sender(q) => SetupResponse::Sender(q.replace("\n", "")),
-                SetupRequest::Receiver(q) => SetupResponse::Receiver(q.replace("\n", "")),
+                SetupRequest::Sender(q) => SetupResponse::Sender(q),
+                SetupRequest::Receiver(q) => SetupResponse::Receiver(q),
             },
             Err(e) => {
                 println!("{:?}", e);

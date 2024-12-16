@@ -39,11 +39,10 @@ impl RequestHandler for CheckQueue {
         self,
         queue_manager: Arc<Mutex<QueueManager>>,
     ) -> Result<Self::Response, RequestError> {
-        let sanitised_name = self.queue_name.replace("\n", "");
         if queue_manager
             .lock()
             .map_err(|err| RequestError::Internal("poison".to_string()))?
-            .queue_exists(&sanitised_name)
+            .queue_exists(&self.queue_address)
         {
             Ok(Status::Exists)
         } else {
@@ -61,11 +60,10 @@ impl RequestHandler for CreateQueue {
             .lock()
             .map_err(|err| RequestError::Internal("poison".to_string()))?;
 
-        let sanitised_name = self.queue_name.replace("\n", "");
-        if qm.queue_exists(&sanitised_name) {
+        if qm.queue_exists(&self.queue_address) {
             Ok(Status::Exists)
         } else {
-            qm.create(sanitised_name);
+            qm.create(self.queue_address);
             Ok(Status::Created)
         }
     }
@@ -80,8 +78,7 @@ impl RequestHandler for DeleteQueue {
             .lock()
             .map_err(|err| RequestError::Internal("poison".to_string()))?;
 
-        let sanitised_name = self.queue_name.replace("\n", "");
-        if qm.delete(&sanitised_name).is_some() {
+        if qm.delete(&self.queue_name).is_some() {
             Ok(Status::Removed)
         } else {
             Ok(Status::NotFound)

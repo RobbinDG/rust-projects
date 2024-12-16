@@ -7,10 +7,12 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::{io, thread};
+use crate::topic_manager::TopicManager;
 
 pub struct ConnectionManager {
     listener: TcpListener,
     queue_manager: Arc<Mutex<QueueManager>>,
+    topic_manager: Arc<Mutex<TopicManager>>,
     setup_connections: Mutex<
         Vec<(
             SocketAddr,
@@ -22,10 +24,11 @@ pub struct ConnectionManager {
 }
 
 impl ConnectionManager {
-    pub fn new(listener: TcpListener, queue_manager: Arc<Mutex<QueueManager>>) -> Self {
+    pub fn new(listener: TcpListener, queue_manager: Arc<Mutex<QueueManager>>, topic_manager: Arc<Mutex<TopicManager>>) -> Self {
         Self {
             listener,
             queue_manager,
+            topic_manager,
             setup_connections: Mutex::new(Vec::default()),
             admin_connections: Mutex::new(Vec::default()),
         }

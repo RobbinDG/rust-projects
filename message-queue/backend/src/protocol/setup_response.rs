@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
+use crate::protocol::BufferAddress;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum SetupResponse {
     Disconnect,
     Admin,
-    Sender(String),
-    Receiver(String),
+    Sender(BufferAddress),
+    Receiver(BufferAddress),
 }

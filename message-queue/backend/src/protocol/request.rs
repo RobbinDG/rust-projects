@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Error;
 use std::str;
 use std::str::Utf8Error;
+use crate::protocol::buffer_address::BufferAddress;
 
 #[derive(Debug)]
 pub enum RequestError {
@@ -54,23 +55,19 @@ pub struct ListQueues {}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CheckQueue {
-    pub queue_name: String,
+    pub queue_address: BufferAddress,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateQueue {
-    pub queue_name: String,
+    pub queue_address: BufferAddress,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DeleteQueue {
-    pub queue_name: String,
+    pub queue_name: BufferAddress,
 }
 
-pub enum ServerResponse {
-    QueueList(String),
-    Success,
-}
 
 impl RequestType for ListQueues {
     type Response = Vec<(String, usize, usize, usize)>;

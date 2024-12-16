@@ -1,7 +1,8 @@
-use crate::elements::UIMessage;
 use crate::elements::QueueTable;
+use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
 use backend::protocol::request::{CreateQueue, DeleteQueue, ListQueues};
+use backend::protocol::BufferAddress;
 use iced::widget::{button, column, row, text, text_input, Column};
 
 pub struct QueueView {
@@ -63,13 +64,15 @@ impl QueueView {
             UIMessage::CreateQueue => {
                 if let Ok(client) = self.connector.client() {
                     if let Err(_) = client.transfer_admin_request(CreateQueue {
-                        queue_name: self.new_queue_text.clone(),
+                        queue_address: BufferAddress::new(self.new_queue_text.clone()),
                     }) {}
                 }
             }
             UIMessage::DeleteQueue(s) => {
                 if let Ok(client) = self.connector.client() {
-                    if let Err(_) = client.transfer_admin_request(DeleteQueue { queue_name: s }) {}
+                    if let Err(_) = client.transfer_admin_request(DeleteQueue {
+                        queue_name: BufferAddress::new(s),
+                    }) {}
                 }
             }
         }
