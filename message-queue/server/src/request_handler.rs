@@ -3,8 +3,8 @@ use backend::protocol::request::{
 };
 use backend::protocol::{ServerResponse, Status};
 use std::sync::{Arc, Mutex};
-use crate::buffer_manager2::BufferManager;
-use crate::buffer_manager::BufferInterface;
+use crate::buffer_manager::BufferManager;
+use crate::buffer_interface::BufferInterface;
 
 pub enum ResponseType {
     Response(ServerResponse),

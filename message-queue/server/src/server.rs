@@ -1,10 +1,10 @@
-use crate::buffer_manager2::BufferManager;
+use crate::buffer_manager::BufferManager;
 use crate::connection_manager::ConnectionManager;
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use crate::buffer_manager::BufferInterface;
+use crate::buffer_interface::BufferInterface;
 
 pub struct Server {
     buffer_manager: Arc<Mutex<BufferManager>>,

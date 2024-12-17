@@ -1,4 +1,4 @@
-use crate::buffer_manager2::BufferManager;
+use crate::buffer_manager::BufferManager;
 use crate::request_handler::RequestHandler;
 use crate::stream_worker::StreamWorker;
 use backend::protocol::request::{AdminRequest, RequestError};

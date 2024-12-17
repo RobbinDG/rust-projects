@@ -1,5 +1,5 @@
 mod admin_worker;
-mod buffer_manager;
+mod buffer_type_manager;
 mod buffer_processor;
 mod connection_manager;
 mod message_buffer;
@@ -12,7 +12,8 @@ mod stream_worker;
 mod topic;
 mod topic_manager;
 mod topic_processor;
-mod buffer_manager2;
+mod buffer_manager;
+mod buffer_interface;
 
 use server::Server;
 use std::net::TcpListener;

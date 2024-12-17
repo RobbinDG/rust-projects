@@ -1,4 +1,4 @@
-use crate::buffer_manager::BufferTypeManager;
+use crate::buffer_type_manager::BufferTypeManager;
 use crate::topic::Topic;
 use crate::topic_processor::TopicProcessor;
 

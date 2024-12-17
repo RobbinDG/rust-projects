@@ -1,6 +1,6 @@
 use crate::admin_worker::AdminWorker;
-use crate::buffer_manager::BufferInterface;
-use crate::buffer_manager2::BufferManager;
+use crate::buffer_interface::BufferInterface;
+use crate::buffer_manager::BufferManager;
 use crate::setup_worker::SetupWorker;
 use backend::protocol::SetupResponse;
 use std::net::{SocketAddr, TcpListener, TcpStream};

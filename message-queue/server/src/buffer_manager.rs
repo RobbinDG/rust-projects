@@ -1,103 +1,72 @@
-use crate::buffer_processor::BufferProcessor;
-use crate::message_buffer::MessageBuffer;
+use backend::protocol::{BufferAddress, BufferType};
 use backend::stream_io::StreamIO;
-use std::collections::HashMap;
-use std::io;
 use std::net::TcpStream;
-pub struct BufferTypeManager<T, P>
-where
-    T: MessageBuffer,
-    P: BufferProcessor<T>,
-{
-    buffer_processor: P,
-    queues: HashMap<String, (Vec<StreamIO>, T, Vec<StreamIO>)>,
+use std::io;
+use crate::buffer_interface::BufferInterface;
+use crate::buffer_processor::MessageQueueProcessor;
+use crate::queue_manager::QueueManager;
+use crate::topic_manager::TopicManager;
+use crate::topic_processor::TopicProcessor;
+
+pub struct BufferManager {
+    queues: QueueManager,
+    topics: TopicManager,
 }
 
-pub trait BufferInterface<I> {
-    fn queues(&self) -> Vec<(String, usize, usize, usize)>;
-
-    fn queue_exists(&self, queue: &I) -> bool;
-
-    fn create(&mut self, name: I);
-
-    fn delete(&mut self, name: &I) -> Option<(Vec<StreamIO>, Vec<StreamIO>)>;
-
-    fn connect_sender(&mut self, queue_name: &I, stream: TcpStream) -> io::Result<()>;
-
-    fn connect_receiver(&mut self, queue_name: &I, stream: TcpStream);
-
-    fn process_queues(&mut self);
-}
-
-impl<T, P> BufferTypeManager<T, P>
-where
-    T: MessageBuffer,
-    P: BufferProcessor<T>,
-{
-    pub fn new(buffer_processor: P) -> Self {
+impl BufferManager {
+    pub fn new() -> Self {
         Self {
-            buffer_processor,
-            queues: HashMap::new(),
+            queues: QueueManager::new(MessageQueueProcessor {}),
+            topics: TopicManager::new(TopicProcessor {}),
         }
     }
 }
 
-impl<T, P> BufferInterface<String> for BufferTypeManager<T, P>
-where
-    T: MessageBuffer,
-    P: BufferProcessor<T>,
-{
+impl BufferInterface<BufferAddress> for BufferManager {
     fn queues(&self) -> Vec<(String, usize, usize, usize)> {
-        self.queues
-            .iter()
-            .map(|(k, (i, v, o))| (k.to_string(), i.len(), o.len(), v.message_count()))
-            .collect()
+        let mut result = self.queues.queues();
+        result.extend(self.topics.queues());
+        result
     }
 
-    fn queue_exists(&self, queue: &String) -> bool {
-        self.queues.contains_key(queue)
-    }
-
-    fn create(&mut self, name: String) {
-        self.queues.insert(
-            name,
-            (
-                Vec::default(),
-                self.buffer_processor.create_buffer(),
-                Vec::default(),
-            ),
-        );
-    }
-
-    /// Deletes a queue and all remaining messages. If successful, returns all senders
-    /// and receivers on this queue. If the result is not handled, the streams go out of scope
-    /// and connections will be closed.
-    fn delete(&mut self, name: &String) -> Option<(Vec<StreamIO>, Vec<StreamIO>)> {
-        println!("Deleting queue {:?}", name);
-        if let Some((senders, _, receivers)) = self.queues.remove(name) {
-            return Some((senders, receivers));
+    fn queue_exists(&self, queue: &BufferAddress) -> bool {
+        match queue.buffer_type() {
+            // TODO check if to_string doesn't needlessly copy here
+            BufferType::Queue => self.queues.queue_exists(&queue.to_string()),
+            BufferType::Topic => self.topics.queue_exists(&queue.to_string()),
         }
-        None
     }
 
-    fn connect_sender(&mut self, queue_name: &String, stream: TcpStream) -> io::Result<()> {
-        stream.set_nonblocking(true)?;
-        if let Some((senders, _, _)) = self.queues.get_mut(queue_name) {
-            senders.push(StreamIO::new(stream))
+    fn create(&mut self, queue: BufferAddress) {
+        match queue.buffer_type() {
+            BufferType::Queue => self.queues.create(queue.to_string()),
+            BufferType::Topic => self.topics.create(queue.to_string()),
         }
-        Ok(())
     }
 
-    fn connect_receiver(&mut self, queue_name: &String, stream: TcpStream) {
-        if let Some((_, _, recipients)) = self.queues.get_mut(queue_name) {
-            recipients.push(StreamIO::new(stream));
+    fn delete(&mut self, queue: &BufferAddress) -> Option<(Vec<StreamIO>, Vec<StreamIO>)> {
+        match queue.buffer_type() {
+            BufferType::Queue => self.queues.delete(&queue.to_string()),
+            BufferType::Topic => self.topics.delete(&queue.to_string()),
+        }
+    }
+
+    fn connect_sender(&mut self, queue: &BufferAddress, stream: TcpStream) -> io::Result<()> {
+        match queue.buffer_type() {
+            BufferType::Queue => self.queues.connect_sender(&queue.to_string(), stream),
+            BufferType::Topic => self.topics.connect_sender(&queue.to_string(), stream),
+        }
+    }
+
+    fn connect_receiver(&mut self, queue: &BufferAddress, stream: TcpStream) {
+        match queue.buffer_type() {
+            BufferType::Queue => self.queues.connect_receiver(&queue.to_string(), stream),
+            BufferType::Topic => self.topics.connect_receiver(&queue.to_string(), stream),
         }
     }
 
     fn process_queues(&mut self) {
-        for (_, (senders, queue, receivers)) in self.queues.iter_mut() {
-            self.buffer_processor
-                .process_buffer(senders, receivers, queue);
-        }
+        self.queues.process_queues();
+        self.topics.process_queues();
     }
 }
