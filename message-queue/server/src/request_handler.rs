@@ -1,9 +1,10 @@
-use crate::queue_manager::QueueManager;
 use backend::protocol::request::{
     CheckQueue, CreateQueue, DeleteQueue, ListQueues, RequestError, RequestType,
 };
 use backend::protocol::{ServerResponse, Status};
 use std::sync::{Arc, Mutex};
+use crate::buffer_manager2::BufferManager;
+use crate::buffer_manager::BufferInterface;
 
 pub enum ResponseType {
     Response(ServerResponse),
@@ -16,14 +17,14 @@ pub trait RequestHandler: RequestType {
     ///  cloning
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<QueueManager>>,
+        queue_manager: Arc<Mutex<BufferManager>>,
     ) -> Result<Self::Response, RequestError>;
 }
 
 impl RequestHandler for ListQueues {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<QueueManager>>,
+        queue_manager: Arc<Mutex<BufferManager>>,
     ) -> Result<Self::Response, RequestError> {
         let queues_data = queue_manager
             .lock()
@@ -37,7 +38,7 @@ impl RequestHandler for ListQueues {
 impl RequestHandler for CheckQueue {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<QueueManager>>,
+        queue_manager: Arc<Mutex<BufferManager>>,
     ) -> Result<Self::Response, RequestError> {
         if queue_manager
             .lock()
@@ -54,7 +55,7 @@ impl RequestHandler for CheckQueue {
 impl RequestHandler for CreateQueue {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<QueueManager>>,
+        queue_manager: Arc<Mutex<BufferManager>>,
     ) -> Result<Self::Response, RequestError> {
         let mut qm = queue_manager
             .lock()
@@ -72,7 +73,7 @@ impl RequestHandler for CreateQueue {
 impl RequestHandler for DeleteQueue {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<QueueManager>>,
+        queue_manager: Arc<Mutex<BufferManager>>,
     ) -> Result<Self::Response, RequestError> {
         let mut qm = queue_manager
             .lock()

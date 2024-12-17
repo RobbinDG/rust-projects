@@ -12,4 +12,4 @@ pub use response::ServerResponse;
 pub use status_code::Status;
 pub use setup_request::SetupRequest;
 pub use setup_response::SetupResponse;
-pub use buffer_address::BufferAddress;
+pub use buffer_address::{BufferAddress, BufferType};

@@ -1,5 +1,6 @@
 use crate::admin_worker::AdminWorker;
-use crate::queue_manager::QueueManager;
+use crate::buffer_manager::BufferInterface;
+use crate::buffer_manager2::BufferManager;
 use crate::setup_worker::SetupWorker;
 use backend::protocol::SetupResponse;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -7,12 +8,10 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::{io, thread};
-use crate::topic_manager::TopicManager;
 
 pub struct ConnectionManager {
     listener: TcpListener,
-    queue_manager: Arc<Mutex<QueueManager>>,
-    topic_manager: Arc<Mutex<TopicManager>>,
+    buffer_manager: Arc<Mutex<BufferManager>>,
     setup_connections: Mutex<
         Vec<(
             SocketAddr,
@@ -24,11 +23,10 @@ pub struct ConnectionManager {
 }
 
 impl ConnectionManager {
-    pub fn new(listener: TcpListener, queue_manager: Arc<Mutex<QueueManager>>, topic_manager: Arc<Mutex<TopicManager>>) -> Self {
+    pub fn new(listener: TcpListener, buffer_manager: Arc<Mutex<BufferManager>>) -> Self {
         Self {
             listener,
-            queue_manager,
-            topic_manager,
+            buffer_manager,
             setup_connections: Mutex::new(Vec::default()),
             admin_connections: Mutex::new(Vec::default()),
         }
@@ -65,20 +63,20 @@ impl ConnectionManager {
                 match termination {
                     SetupResponse::Disconnect => println!("{} Disconnected", addr),
                     SetupResponse::Sender(queue) => {
-                        self.queue_manager
+                        self.buffer_manager
                             .lock()
                             .unwrap()
                             .connect_sender(&queue, stream)?;
                     }
                     SetupResponse::Receiver(queue) => {
-                        self.queue_manager
+                        self.buffer_manager
                             .lock()
                             .unwrap()
                             .connect_receiver(&queue, stream);
                     }
                     SetupResponse::Admin => {
                         let (admin_worker, interrupt) =
-                            AdminWorker::new(self.queue_manager.clone(), stream);
+                            AdminWorker::new(self.buffer_manager.clone(), stream);
                         let admin_handle = thread::spawn(move || admin_worker.run());
                         self.admin_connections.lock().unwrap().push((
                             addr.clone(),

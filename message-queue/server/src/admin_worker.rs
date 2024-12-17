@@ -1,4 +1,4 @@
-use crate::queue_manager::QueueManager;
+use crate::buffer_manager2::BufferManager;
 use crate::request_handler::RequestHandler;
 use crate::stream_worker::StreamWorker;
 use backend::protocol::request::{AdminRequest, RequestError};
@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub struct AdminWorker {
-    queue_manager: Arc<Mutex<QueueManager>>,
+    queue_manager: Arc<Mutex<BufferManager>>,
     stream: TcpStream,
     interrupt_channel: Receiver<()>,
 }
@@ -22,7 +22,7 @@ impl StreamWorker for AdminWorker {
 }
 
 impl AdminWorker {
-    pub fn new(queue_manager: Arc<Mutex<QueueManager>>, stream: TcpStream) -> (Self, Sender<()>) {
+    pub fn new(queue_manager: Arc<Mutex<BufferManager>>, stream: TcpStream) -> (Self, Sender<()>) {
         let (tx, rx) = channel();
         (
             Self {

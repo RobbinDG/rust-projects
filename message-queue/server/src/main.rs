@@ -12,6 +12,7 @@ mod stream_worker;
 mod topic;
 mod topic_manager;
 mod topic_processor;
+mod buffer_manager2;
 
 use server::Server;
 use std::net::TcpListener;

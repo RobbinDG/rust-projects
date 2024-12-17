@@ -2,13 +2,14 @@ use crate::elements::QueueTable;
 use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
 use backend::protocol::request::{CreateQueue, DeleteQueue, ListQueues};
-use backend::protocol::BufferAddress;
-use iced::widget::{button, column, row, text, text_input, Column};
+use backend::protocol::{BufferAddress, BufferType};
+use iced::widget::{button, column, radio, row, text, text_input, Column};
 
 pub struct QueueView {
     connector: ServerConnector,
     queue_table: QueueTable,
     new_queue_text: String,
+    selected_buffer_type: Option<BufferType>,
 }
 
 impl Default for QueueView {
@@ -20,6 +21,7 @@ impl Default for QueueView {
                 [300, 200, 200, 200],
             ),
             new_queue_text: String::new(),
+            selected_buffer_type: Some(BufferType::Queue),
         }
     }
 }
@@ -31,6 +33,18 @@ impl QueueView {
             row![
                 text_input("new queue name", &self.new_queue_text)
                     .on_input(UIMessage::NewQueueName),
+                radio(
+                    "Queue",
+                    BufferType::Queue,
+                    self.selected_buffer_type,
+                    UIMessage::SelectBufferType
+                ),
+                radio(
+                    "Topic",
+                    BufferType::Topic,
+                    self.selected_buffer_type,
+                    UIMessage::SelectBufferType
+                ),
                 button("Create").on_press(UIMessage::CreateQueue),
                 button("Refresh").on_press(UIMessage::Refresh),
             ],
@@ -64,16 +78,25 @@ impl QueueView {
             UIMessage::CreateQueue => {
                 if let Ok(client) = self.connector.client() {
                     if let Err(_) = client.transfer_admin_request(CreateQueue {
-                        queue_address: BufferAddress::new(self.new_queue_text.clone()),
+                        queue_address: match self.selected_buffer_type {
+                            Some(BufferType::Queue) => {
+                                BufferAddress::new_queue(self.new_queue_text.clone())
+                            }
+                            Some(BufferType::Topic) => {
+                                BufferAddress::new_topic(self.new_queue_text.clone())
+                            }
+                            _ => todo!("No buffer selected"),
+                        },
                     }) {}
                 }
             }
             UIMessage::DeleteQueue(s) => {
                 if let Ok(client) = self.connector.client() {
-                    if let Err(_) = client.transfer_admin_request(DeleteQueue {
-                        queue_name: BufferAddress::new(s),
-                    }) {}
+                    if let Err(_) = client.transfer_admin_request(DeleteQueue { queue_name: s }) {}
                 }
+            }
+            UIMessage::SelectBufferType(t) => {
+                self.selected_buffer_type = Some(t);
             }
         }
     }

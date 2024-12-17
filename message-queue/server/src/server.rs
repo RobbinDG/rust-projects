@@ -1,28 +1,23 @@
-use std::sync::{Arc, Mutex};
+use crate::buffer_manager2::BufferManager;
+use crate::connection_manager::ConnectionManager;
 use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use crate::buffer_processor::MessageQueueProcessor;
-use crate::connection_manager::ConnectionManager;
-use crate::queue_manager::QueueManager;
-use crate::topic_manager::TopicManager;
-use crate::topic_processor::TopicProcessor;
+use crate::buffer_manager::BufferInterface;
 
 pub struct Server {
-    queue_manager: Arc<Mutex<QueueManager>>,
-    topic_manager: Arc<Mutex<TopicManager>>,
+    buffer_manager: Arc<Mutex<BufferManager>>,
     connection_manager: ConnectionManager,
 }
 
 impl Server {
     pub fn new(tcp_listener: TcpListener) -> Self {
-        let queue_manager = Arc::new(Mutex::new(QueueManager::new(MessageQueueProcessor {})));
-        let topic_manager = Arc::new(Mutex::new(TopicManager::new(TopicProcessor {})));
+        let buffer_manager = Arc::new(Mutex::new(BufferManager::new()));
         let connection_manager =
-            ConnectionManager::new(tcp_listener, queue_manager.clone(), topic_manager.clone());
+            ConnectionManager::new(tcp_listener, buffer_manager.clone());
         Self {
-            queue_manager,
-            topic_manager,
+            buffer_manager,
             connection_manager,
         }
     }
@@ -32,10 +27,7 @@ impl Server {
         let cm1 = cm.clone();
         thread::spawn(move || loop {
             {
-                self.queue_manager.lock().unwrap().process_queues();
-            }
-            {
-                self.topic_manager.lock().unwrap().process_queues()
+                self.buffer_manager.lock().unwrap().process_queues();
             }
             cm1.check_and_join_disconnects().unwrap();
 

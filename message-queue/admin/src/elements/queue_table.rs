@@ -1,6 +1,7 @@
 use iced::widget::{button, column, row, text, Column, Row};
 use std::iter::zip;
 use iced::Alignment;
+use backend::protocol::BufferAddress;
 use crate::elements::UIMessage;
 
 pub struct QueueTable {
@@ -51,7 +52,7 @@ impl QueueTable {
                 let mut r: Row<UIMessage> =
                     row(zip(self.widths, row_content).map(|(w, c)| text(c).width(w).into()));
                 r = r.push(
-                    button("Delete").on_press(UIMessage::DeleteQueue(row_content[0].clone())),
+                    button("Delete").on_press(UIMessage::DeleteQueue(BufferAddress::new(row_content[0].clone()))),
                 );
                 column = column.push(r);
             }
