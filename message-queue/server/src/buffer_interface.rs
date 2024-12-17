@@ -1,9 +1,10 @@
 use backend::stream_io::StreamIO;
-use std::net::TcpStream;
 use std::io;
+use std::net::TcpStream;
+use backend::protocol::BufferAddress;
 
 pub trait BufferInterface<I> {
-    fn queues(&self) -> Vec<(String, usize, usize, usize)>;
+    fn buffers(&self) -> Vec<(BufferAddress, usize, usize, usize)>;
 
     fn queue_exists(&self, queue: &I) -> bool;
 

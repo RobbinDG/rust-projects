@@ -5,6 +5,7 @@ use backend::stream_io::StreamIO;
 use std::collections::HashMap;
 use std::io;
 use std::net::TcpStream;
+use backend::protocol::BufferAddress;
 
 pub struct BufferTypeManager<T, P>
 where
@@ -33,10 +34,10 @@ where
     T: MessageBuffer,
     P: BufferProcessor<T>,
 {
-    fn queues(&self) -> Vec<(String, usize, usize, usize)> {
+    fn buffers(&self) -> Vec<(BufferAddress, usize, usize, usize)> {
         self.queues
             .iter()
-            .map(|(k, (i, v, o))| (k.to_string(), i.len(), o.len(), v.message_count()))
+            .map(|(k, (i, v, o))| (self.buffer_processor.address_from_string(k.clone()), i.len(), o.len(), v.message_count()))
             .collect()
     }
 

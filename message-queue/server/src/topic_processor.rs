@@ -1,6 +1,6 @@
 use crate::buffer_processor::BufferProcessor;
 use crate::topic::Topic;
-use backend::protocol::Message;
+use backend::protocol::{BufferAddress, Message};
 use backend::stream_io::StreamIO;
 
 pub struct TopicProcessor {}
@@ -10,6 +10,10 @@ impl TopicProcessor {}
 impl BufferProcessor<Topic> for TopicProcessor {
     fn create_buffer(&self) -> Topic {
         Topic {}
+    }
+
+    fn address_from_string(&self, string: String) -> BufferAddress {
+        BufferAddress::new_topic(string)
     }
 
     fn process_buffer(

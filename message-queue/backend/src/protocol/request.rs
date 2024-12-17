@@ -70,7 +70,7 @@ pub struct DeleteQueue {
 
 
 impl RequestType for ListQueues {
-    type Response = Vec<(String, usize, usize, usize)>;
+    type Response = Vec<(BufferAddress, usize, usize, usize)>;
 }
 
 impl RequestType for CheckQueue {

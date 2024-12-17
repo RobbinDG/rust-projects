@@ -29,7 +29,7 @@ impl RequestHandler for ListQueues {
         let queues_data = queue_manager
             .lock()
             .map_err(|err| RequestError::Internal("poison".to_string()))?
-            .queues();
+            .buffers();
         println!("{:?}", queues_data);
         Ok(queues_data)
     }

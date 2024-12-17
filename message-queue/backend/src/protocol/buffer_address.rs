@@ -44,6 +44,7 @@ impl BufferAddress {
             .replace(" ", "_")
             .replace("\n", "")
             .replace("\r", "")
+            .trim_start_matches(TOPIC_PREFIX)
             .to_lowercase()
     }
 

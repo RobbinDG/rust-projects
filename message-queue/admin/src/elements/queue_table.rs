@@ -1,13 +1,13 @@
-use iced::widget::{button, column, row, text, Column, Row};
-use std::iter::zip;
-use iced::Alignment;
-use backend::protocol::BufferAddress;
 use crate::elements::UIMessage;
+use backend::protocol::BufferAddress;
+use iced::widget::{button, column, row, text, Column, Row};
+use iced::Alignment;
+use std::iter::zip;
 
 pub struct QueueTable {
     names: [&'static str; 4],
     widths: [u16; 4],
-    content: Vec<[String; 4]>,
+    content: Vec<(BufferAddress, [String; 3])>,
 }
 
 impl QueueTable {
@@ -23,13 +23,11 @@ impl QueueTable {
         self.content.clear();
     }
 
-    pub fn push(&mut self, row: (String, usize, usize, usize)) {
-        self.content.push([
+    pub fn push(&mut self, row: (BufferAddress, usize, usize, usize)) {
+        self.content.push((
             row.0,
-            row.1.to_string(),
-            row.2.to_string(),
-            row.3.to_string(),
-        ]);
+            [row.1.to_string(), row.2.to_string(), row.3.to_string()],
+        ));
     }
 
     pub fn view(&self) -> Column<UIMessage> {
@@ -49,10 +47,17 @@ impl QueueTable {
             );
         } else {
             for row_content in &self.content {
+                let rows: [String; 4] = std::array::from_fn(|i| {
+                    if i == 0 {
+                        row_content.0.to_string()
+                    } else {
+                        row_content.1[i - 1].clone()
+                    }
+                });
                 let mut r: Row<UIMessage> =
-                    row(zip(self.widths, row_content).map(|(w, c)| text(c).width(w).into()));
+                    row(zip(self.widths, rows).map(|(w, c)| text(c).width(w).into()));
                 r = r.push(
-                    button("Delete").on_press(UIMessage::DeleteQueue(BufferAddress::new(row_content[0].clone()))),
+                    button("Delete").on_press(UIMessage::DeleteQueue(row_content.0.clone())),
                 );
                 column = column.push(r);
             }

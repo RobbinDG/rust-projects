@@ -1,12 +1,12 @@
-use backend::protocol::{BufferAddress, BufferType};
-use backend::stream_io::StreamIO;
-use std::net::TcpStream;
-use std::io;
 use crate::buffer_interface::BufferInterface;
 use crate::buffer_processor::MessageQueueProcessor;
 use crate::queue_manager::QueueManager;
 use crate::topic_manager::TopicManager;
 use crate::topic_processor::TopicProcessor;
+use backend::protocol::{BufferAddress, BufferType};
+use backend::stream_io::StreamIO;
+use std::io;
+use std::net::TcpStream;
 
 pub struct BufferManager {
     queues: QueueManager,
@@ -23,9 +23,9 @@ impl BufferManager {
 }
 
 impl BufferInterface<BufferAddress> for BufferManager {
-    fn queues(&self) -> Vec<(String, usize, usize, usize)> {
-        let mut result = self.queues.queues();
-        result.extend(self.topics.queues());
+    fn buffers(&self) -> Vec<(BufferAddress, usize, usize, usize)> {
+        let mut result = self.queues.buffers();
+        result.extend(self.topics.buffers());
         result
     }
 

@@ -1,3 +1,4 @@
+use backend::protocol::BufferAddress;
 use crate::message_queue::MessageQueue;
 use backend::stream_io::StreamIO;
 use crate::message_buffer::MessageBuffer;
@@ -7,6 +8,8 @@ where
     T: MessageBuffer,
 {
     fn create_buffer(&self) -> T;
+
+    fn address_from_string(&self, string: String) -> BufferAddress;
     fn process_buffer(
         &mut self,
         senders: &mut Vec<StreamIO>,
@@ -20,6 +23,10 @@ pub struct MessageQueueProcessor {}
 impl BufferProcessor<MessageQueue> for MessageQueueProcessor {
     fn create_buffer(&self) -> MessageQueue {
         MessageQueue::new_empty()
+    }
+
+    fn address_from_string(&self, string: String) -> BufferAddress {
+        BufferAddress::new_queue(string)
     }
 
     fn process_buffer(
