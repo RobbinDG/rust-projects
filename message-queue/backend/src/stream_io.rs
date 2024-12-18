@@ -86,10 +86,12 @@ impl StreamIO {
         T: Serialize + for<'a> Deserialize<'a>,
     {
         let response: Result<Vec<u8>, ResponseError> = self.read()?;
-        match response {
-            Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
-            Err(e) => Ok(Err(e)),
-        }
+        Ok(match response {
+            Ok(r) => {
+                Ok(postcard::from_bytes(r.as_slice())?)
+            }
+            Err(err) => Err(err)
+        })
     }
 }
 

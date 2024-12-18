@@ -70,7 +70,6 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
         AdminRequest: From<R>,
     {
         self.push_message(AdminRequest::from(request))?;
-        println!("1");
         self.pull_admin_response()
     }
 
