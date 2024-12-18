@@ -57,46 +57,58 @@ impl QueueView {
 
     pub fn update(&mut self, message: UIMessage) {
         match message {
-            UIMessage::Refresh => {
-                if let Ok(client) = self.connector.client() {
-                    match client.transfer_admin_request(ListQueues {}) {
-                        Ok(response) => {
-                            self.queue_table.clear();
-                            for queue_data in response {
-                                self.queue_table.push(queue_data);
-                            }
-                        }
-                        Err(e) => {
-                            println!("err: {e:?}");
-                        }
-                    }
-                }
-            }
+            UIMessage::Refresh => self.refresh(),
             UIMessage::NewQueueName(s) => {
                 self.new_queue_text = s;
             }
             UIMessage::CreateQueue => {
-                if let Ok(client) = self.connector.client() {
-                    if let Err(_) = client.transfer_admin_request(CreateQueue {
-                        queue_address: match self.selected_buffer_type {
-                            Some(BufferType::Queue) => {
-                                BufferAddress::new_queue(self.new_queue_text.clone())
-                            }
-                            Some(BufferType::Topic) => {
-                                BufferAddress::new_topic(self.new_queue_text.clone())
-                            }
-                            _ => todo!("No buffer selected"),
-                        },
-                    }) {}
-                }
-            }
+                self.create();
+                self.refresh();
+            },
             UIMessage::DeleteQueue(s) => {
-                if let Ok(client) = self.connector.client() {
-                    if let Err(_) = client.transfer_admin_request(DeleteQueue { queue_name: s }) {}
-                }
-            }
+                self.delete(s);
+                self.refresh();
+            },
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
+            }
+        }
+    }
+
+    fn delete(&mut self, s: BufferAddress) {
+        if let Ok(client) = self.connector.client() {
+            if let Err(_) = client.transfer_admin_request(DeleteQueue { queue_name: s }) {}
+        }
+    }
+
+    fn create(&mut self) {
+        if let Ok(client) = self.connector.client() {
+            if let Err(_) = client.transfer_admin_request(CreateQueue {
+                queue_address: match self.selected_buffer_type {
+                    Some(BufferType::Queue) => {
+                        BufferAddress::new_queue(self.new_queue_text.clone())
+                    }
+                    Some(BufferType::Topic) => {
+                        BufferAddress::new_topic(self.new_queue_text.clone())
+                    }
+                    _ => todo!("No buffer selected"),
+                },
+            }) {}
+        }
+    }
+
+    fn refresh(&mut self) {
+        if let Ok(client) = self.connector.client() {
+            match client.transfer_admin_request(ListQueues {}) {
+                Ok(response) => {
+                    self.queue_table.clear();
+                    for queue_data in response {
+                        self.queue_table.push(queue_data);
+                    }
+                }
+                Err(e) => {
+                    println!("err: {e:?}");
+                }
             }
         }
     }
