@@ -5,3 +5,4 @@ members = [
     "client",
     "admin",
 ]
+resolver = "2"

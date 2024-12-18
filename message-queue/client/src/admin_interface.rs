@@ -1,7 +1,7 @@
 use crate::disconnected_interface::DisconnectedInterface;
 use crate::interface::Interface;
 use backend::protocol::request::{CheckQueue, CreateQueue, ListQueues};
-use backend::protocol::Status;
+use backend::protocol::{BufferAddress, Status};
 use backend::ConnectedClient;
 
 pub struct AdminInterface {
@@ -40,7 +40,7 @@ impl Interface for AdminInterface {
                 let response = self
                     .server
                     .transfer_admin_request(CheckQueue {
-                        queue_address: selection.clone(),
+                        queue_address: BufferAddress::new(selection.clone()),
                     })
                     .unwrap();
                 if let Status::Exists = response {
@@ -57,7 +57,7 @@ impl Interface for AdminInterface {
                 let name = crate::connected_interface::prompt_string_input("Name your new queue...");
                 let response = self
                     .server
-                    .transfer_admin_request(CreateQueue { queue_address: name })
+                    .transfer_admin_request(CreateQueue { queue_address: BufferAddress::new(name) })
                     .unwrap();
                 println!("Response {:?}", response);
                 Box::new(AdminInterface {

@@ -1,7 +1,7 @@
 use crate::admin_interface::AdminInterface;
 use crate::disconnected_interface::DisconnectedInterface;
 use crate::interface::Interface;
-use backend::protocol::Message;
+use backend::protocol::{BufferAddress, Message};
 use backend::protocol::{SetupRequest, SetupResponse};
 use backend::ConnectedClient;
 use std::io;
@@ -73,7 +73,7 @@ impl Interface for ConnectedInterface {
                 if let Some(queue) = &self.selected_queue {
                     let response = self
                         .server
-                        .transfer_request(SetupRequest::Sender(queue.clone()));
+                        .transfer_request(SetupRequest::Sender(BufferAddress::new(queue.clone())));
                     match response {
                         Ok(r) => println!("Response {:?}", r),
                         Err(e) => println!("Error {:?}", e),
@@ -92,7 +92,7 @@ impl Interface for ConnectedInterface {
                     println!("Started listening...");
                     let response = self
                         .server
-                        .transfer_request(SetupRequest::Receiver(queue.clone()))
+                        .transfer_request(SetupRequest::Receiver(BufferAddress::new(queue.clone())))
                         .unwrap();
                     println!("Response {:?}", response);
                     self.receive_messages();

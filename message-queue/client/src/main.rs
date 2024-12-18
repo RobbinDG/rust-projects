@@ -1,8 +1,6 @@
 mod interface;
 mod connected_interface;
 mod disconnected_interface;
-mod sender_interface;
-mod receiver_interface;
 mod admin_interface;
 
 use backend::DisconnectedClient;
