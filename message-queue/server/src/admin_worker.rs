@@ -1,13 +1,12 @@
 use crate::buffer_manager::BufferManager;
 use crate::request_handler::RequestHandler;
 use crate::server_error::ServerError;
-use backend::protocol::request::{AdminRequest, RequestError};
-use backend::protocol::{ResponseError, SetupRequest};
+use backend::protocol::request::AdminRequest;
+use backend::protocol::ResponseError;
 use backend::stream_io::{StreamIO, StreamIOError};
 use log::{debug, error, info};
 use postcard::to_allocvec;
-use std::io::{ErrorKind, Write};
-use std::net::TcpStream;
+use std::io::ErrorKind;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -37,7 +36,7 @@ impl AdminWorker {
             return self.stream;
         }
 
-        loop {
+        while self.interrupt_channel.try_recv().is_ok() {
             let request: Result<AdminRequest, ResponseError> = match self.stream.read() {
                 Ok(buf) => Ok(buf),
                 Err(err) => {
@@ -83,6 +82,7 @@ impl AdminWorker {
             }
             debug!("Response sent");
         }
+        self.stream
     }
 
     fn handle_request(&mut self, req: AdminRequest) -> Result<Vec<u8>, ResponseError> {

@@ -6,7 +6,6 @@ use crate::topic_processor::TopicProcessor;
 use backend::protocol::{BufferAddress, BufferType};
 use backend::stream_io::StreamIO;
 use std::io;
-use std::net::TcpStream;
 
 pub struct BufferManager {
     queues: QueueManager,

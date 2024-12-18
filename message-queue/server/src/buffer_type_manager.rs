@@ -3,10 +3,9 @@ use crate::buffer_processor::BufferProcessor;
 use crate::message_buffer::MessageBuffer;
 use backend::protocol::BufferAddress;
 use backend::stream_io::StreamIO;
-use log::{info, warn};
+use log::warn;
 use std::collections::HashMap;
 use std::io;
-use std::net::TcpStream;
 
 pub struct BufferTypeManager<T, P>
 where

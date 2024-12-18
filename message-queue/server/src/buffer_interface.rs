@@ -1,7 +1,6 @@
+use backend::protocol::BufferAddress;
 use backend::stream_io::StreamIO;
 use std::io;
-use std::net::TcpStream;
-use backend::protocol::BufferAddress;
 
 pub trait BufferInterface<I> {
     fn buffers(&self) -> Vec<(BufferAddress, usize, usize, usize)>;

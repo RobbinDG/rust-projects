@@ -2,14 +2,8 @@ use crate::buffer_interface::BufferInterface;
 use crate::buffer_manager::BufferManager;
 use crate::server_error::ServerError;
 use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, ListQueues, RequestType};
-use backend::protocol::{ResponseError, ServerResponse, Status};
+use backend::protocol::{ResponseError, Status};
 use std::sync::{Arc, Mutex};
-
-pub enum ResponseType {
-    Response(ServerResponse),
-    PromoteSender(ServerResponse, String),
-    PromoteReceiver(ServerResponse, String),
-}
 
 pub trait RequestHandler: RequestType {
     /// TODO does this need to take a reference or can it consume the request? This avoids

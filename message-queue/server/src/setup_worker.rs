@@ -1,26 +1,18 @@
 use backend::protocol::{SetupRequest, SetupResponse};
 use backend::stream_io::{StreamIO, StreamIOError};
 use log::{debug, error, info};
-use postcard::to_allocvec;
-use std::io::{ErrorKind, Write};
+use std::io::ErrorKind;
 use std::net::TcpStream;
-use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct SetupWorker {
     stream: StreamIO,
-    interrupt: Receiver<()>,
 }
 
 impl SetupWorker {
-    pub fn new(stream: TcpStream) -> (Self, Sender<()>) {
-        let (tx, rx) = channel();
-        (
-            Self {
-                stream: StreamIO::new(stream),
-                interrupt: rx,
-            },
-            tx,
-        )
+    pub fn new(stream: TcpStream) -> Self {
+        Self {
+            stream: StreamIO::new(stream),
+        }
     }
 
     pub fn run(mut self) -> (StreamIO, SetupResponse) {
