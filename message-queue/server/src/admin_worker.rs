@@ -1,5 +1,6 @@
 use crate::buffer_manager::BufferManager;
 use crate::request_handler::RequestHandler;
+use crate::server_error::ServerError;
 use backend::protocol::request::{AdminRequest, RequestError};
 use backend::protocol::{ResponseError, SetupRequest};
 use backend::stream_io::{StreamIO, StreamIOError};
@@ -16,7 +17,6 @@ pub struct AdminWorker {
     stream: StreamIO,
     interrupt_channel: Receiver<()>,
 }
-
 
 impl AdminWorker {
     pub fn new(queue_manager: Arc<Mutex<BufferManager>>, stream: StreamIO) -> (Self, Sender<()>) {
@@ -61,8 +61,8 @@ impl AdminWorker {
                 }
             };
 
-            let response: Result<Vec<u8>, ResponseError> = request
-                .and_then(|r| self.handle_request(r));
+            let response: Result<Vec<u8>, ResponseError> =
+                request.and_then(|r| self.handle_request(r));
 
             debug!("Sending response {:?}", response);
             if let Err(err) = self.stream.write(&response) {
@@ -86,19 +86,29 @@ impl AdminWorker {
     }
 
     fn handle_request(&mut self, req: AdminRequest) -> Result<Vec<u8>, ResponseError> {
-        Ok(match req {
-            AdminRequest::ListQueues(r) => {
-                to_allocvec(&r.handle_request(self.queue_manager.clone())?)
-            }
-            AdminRequest::CheckQueue(r) => {
-                to_allocvec(&r.handle_request(self.queue_manager.clone())?)
-            }
-            AdminRequest::CreateQueue(r) => {
-                to_allocvec(&r.handle_request(self.queue_manager.clone())?)
-            }
-            AdminRequest::DeleteQueue(r) => {
-                to_allocvec(&r.handle_request(self.queue_manager.clone())?)
-            }
-        }?)
+        self.handle_request2(req).unwrap_or_else(|err| {
+            error!("Execution failed: {:?}", err);
+            Err(ResponseError::ExecFailed)
+        })
+    }
+
+    fn handle_request2(
+        &mut self,
+        req: AdminRequest,
+    ) -> Result<Result<Vec<u8>, ResponseError>, ServerError> {
+        match req {
+            AdminRequest::ListQueues(r) => r
+                .handle_request(self.queue_manager.clone())
+                .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
+            AdminRequest::CheckQueue(r) => r
+                .handle_request(self.queue_manager.clone())
+                .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
+            AdminRequest::CreateQueue(r) => r
+                .handle_request(self.queue_manager.clone())
+                .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
+            AdminRequest::DeleteQueue(r) => r
+                .handle_request(self.queue_manager.clone())
+                .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
+        }
     }
 }

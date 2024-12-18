@@ -1,11 +1,9 @@
-use backend::protocol::request::{
-    CheckQueue, CreateQueue, DeleteQueue, ListQueues, RequestError, RequestType,
-};
-use backend::protocol::{ResponseError, ServerResponse, Status};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use log::info;
-use crate::buffer_manager::BufferManager;
 use crate::buffer_interface::BufferInterface;
+use crate::buffer_manager::BufferManager;
+use crate::server_error::ServerError;
+use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, ListQueues, RequestType};
+use backend::protocol::{ResponseError, ServerResponse, Status};
+use std::sync::{Arc, Mutex};
 
 pub enum ResponseType {
     Response(ServerResponse),
@@ -19,19 +17,15 @@ pub trait RequestHandler: RequestType {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, ResponseError>;
+    ) -> Result<Result<Self::Response, ResponseError>, ServerError>;
 }
 
 impl RequestHandler for ListQueues {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, ResponseError> {
-        let queues_data = queue_manager
-            .lock()?
-            .buffers();
-        info!("{:?}", queues_data);
-        Ok(queues_data)
+    ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
+        Ok(Ok(queue_manager.lock()?.buffers()))
     }
 }
 
@@ -39,15 +33,12 @@ impl RequestHandler for CheckQueue {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, ResponseError> {
-        if queue_manager
-            .lock()?
-            .queue_exists(&self.queue_address)
-        {
+    ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
+        Ok(if queue_manager.lock()?.queue_exists(&self.queue_address) {
             Ok(Status::Exists)
         } else {
             Ok(Status::Failed)
-        }
+        })
     }
 }
 
@@ -55,15 +46,15 @@ impl RequestHandler for CreateQueue {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, ResponseError> {
+    ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
         let mut qm = queue_manager.lock()?;
 
-        if qm.queue_exists(&self.queue_address) {
+        Ok(if qm.queue_exists(&self.queue_address) {
             Ok(Status::Exists)
         } else {
             qm.create(self.queue_address);
             Ok(Status::Created)
-        }
+        })
     }
 }
 
@@ -71,13 +62,13 @@ impl RequestHandler for DeleteQueue {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, ResponseError> {
+    ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
         let mut qm = queue_manager.lock()?;
 
-        if qm.delete(&self.queue_name).is_some() {
+        Ok(if qm.delete(&self.queue_name).is_some() {
             Ok(Status::Removed)
         } else {
             Ok(Status::NotFound)
-        }
+        })
     }
 }

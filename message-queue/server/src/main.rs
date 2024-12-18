@@ -13,6 +13,7 @@ mod topic_manager;
 mod topic_processor;
 mod buffer_manager;
 mod buffer_interface;
+mod server_error;
 
 use server::Server;
 use std::net::TcpListener;

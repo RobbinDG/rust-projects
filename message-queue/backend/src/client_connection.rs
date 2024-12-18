@@ -1,5 +1,4 @@
 use crate::protocol::request::{AdminRequest, RequestError, RequestType};
-use crate::protocol::ResponseError;
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -71,7 +70,8 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
         AdminRequest: From<R>,
     {
         self.push_message(AdminRequest::from(request))?;
-        self.pull_admin_response().map_err(|e| e.into())
+        println!("1");
+        self.pull_admin_response()
     }
 
     pub fn push_message<R>(&mut self, message: R) -> Result<(), StreamIOError>
