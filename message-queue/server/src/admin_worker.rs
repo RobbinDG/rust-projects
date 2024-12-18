@@ -36,7 +36,7 @@ impl AdminWorker {
             return self.stream;
         }
 
-        while self.interrupt_channel.try_recv().is_ok() {
+        while self.interrupt_channel.try_recv().is_err() {
             let request: Result<AdminRequest, ResponseError> = match self.stream.read() {
                 Ok(buf) => Ok(buf),
                 Err(err) => {
