@@ -21,12 +21,12 @@ impl SetupWorker {
             return (self.stream, SetupResponse::Disconnect);
         }
 
-        let request: Result<SetupRequest, String> = match self.stream.read() {
+        let request: SetupRequest = match self.stream.read() {
             Ok(buf) => buf,
             Err(err) => {
-                match err {
+                return match err {
                     StreamIOError::Stream(e) => {
-                        return match e.kind() {
+                        match e.kind() {
                             // According to the docs: `Interrupted` means `read` should be retried.
                             ErrorKind::Interrupted
                             | ErrorKind::TimedOut
@@ -40,25 +40,17 @@ impl SetupWorker {
                     }
                     _ => {
                         error!("Unhandled error: {err:?}");
-                        return (self.stream, SetupResponse::Disconnect);
+                        (self.stream, SetupResponse::Disconnect)
                     }
-                }
+                };
             }
         };
 
+        info!("Promoting to {request:?}");
         let promotion = match request {
-            Ok(r) => {
-                info!("Promoting to {r:?}");
-                match r {
-                    SetupRequest::Admin => SetupResponse::Admin,
-                    SetupRequest::Sender(q) => SetupResponse::Sender(q),
-                    SetupRequest::Receiver(q) => SetupResponse::Receiver(q),
-                }
-            }
-            Err(e) => {
-                error!("{:?}", e);
-                SetupResponse::Disconnect
-            }
+            SetupRequest::Admin => SetupResponse::Admin,
+            SetupRequest::Sender(q) => SetupResponse::Sender(q),
+            SetupRequest::Receiver(q) => SetupResponse::Receiver(q),
         };
 
         debug!("Sending promotion response.");
