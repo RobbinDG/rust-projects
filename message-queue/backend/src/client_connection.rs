@@ -1,4 +1,5 @@
-use crate::protocol::request::{AdminRequest, RequestType};
+use crate::protocol::request::{AdminRequest, RequestError, RequestType};
+use crate::protocol::ResponseError;
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -64,20 +65,20 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
         self.pull_message()
     }
 
-    pub fn transfer_admin_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
+    pub fn transfer_admin_request<R>(&mut self, request: R) -> Result<R::Response, RequestError>
     where
         R: RequestType + Serialize + for<'a> Deserialize<'a>,
         AdminRequest: From<R>,
     {
         self.push_message(AdminRequest::from(request))?;
-        self.pull_admin_request()
+        self.pull_admin_response().map_err(|e| e.into())
     }
 
     pub fn push_message<R>(&mut self, message: R) -> Result<(), StreamIOError>
     where
         R: Serialize + for<'a> Deserialize<'a>,
     {
-        let result = self.stream.write(message);
+        let result = self.stream.write(&message);
 
         if let Err(StreamIOError::Stream(e)) = &result {
             if e.kind() == io::ErrorKind::BrokenPipe {
@@ -101,18 +102,21 @@ impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
         result
     }
 
-    pub fn pull_admin_request<R>(&mut self) -> Result<R, StreamIOError>
+    pub fn pull_admin_response<R>(&mut self) -> Result<R, RequestError>
     where
         R: Serialize + for<'a> Deserialize<'a>,
     {
-        let result = self.stream.read_encoded_result();
-
-        if let Err(StreamIOError::Stream(e)) = &result {
-            if e.kind() == io::ErrorKind::BrokenPipe {
-                self.pipe_broken = true;
+        match self.stream.read_encoded_result() {
+            Ok(response) => Ok(response?),
+            Err(err) => {
+                if let StreamIOError::Stream(e) = &err {
+                    if e.kind() == io::ErrorKind::BrokenPipe {
+                        self.pipe_broken = true;
+                    }
+                }
+                Err(RequestError::IO(err))
             }
         }
-        result
     }
 
     pub fn broken_pipe(&self) -> bool {

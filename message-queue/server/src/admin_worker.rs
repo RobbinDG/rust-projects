@@ -1,7 +1,9 @@
 use crate::buffer_manager::BufferManager;
 use crate::request_handler::RequestHandler;
-use crate::stream_worker::StreamWorker;
 use backend::protocol::request::{AdminRequest, RequestError};
+use backend::protocol::{ResponseError, SetupRequest};
+use backend::stream_io::{StreamIO, StreamIOError};
+use log::{debug, error, info};
 use postcard::to_allocvec;
 use std::io::{ErrorKind, Write};
 use std::net::TcpStream;
@@ -11,18 +13,13 @@ use std::time::Duration;
 
 pub struct AdminWorker {
     queue_manager: Arc<Mutex<BufferManager>>,
-    stream: TcpStream,
+    stream: StreamIO,
     interrupt_channel: Receiver<()>,
 }
 
-impl StreamWorker for AdminWorker {
-    fn get_stream(&mut self) -> &mut TcpStream {
-        &mut self.stream
-    }
-}
 
 impl AdminWorker {
-    pub fn new(queue_manager: Arc<Mutex<BufferManager>>, stream: TcpStream) -> (Self, Sender<()>) {
+    pub fn new(queue_manager: Arc<Mutex<BufferManager>>, stream: StreamIO) -> (Self, Sender<()>) {
         let (tx, rx) = channel();
         (
             Self {
@@ -34,52 +31,61 @@ impl AdminWorker {
         )
     }
 
-    pub fn run(mut self) -> TcpStream {
-        println!("worker started");
-        if let Err(_) = self.init(Some(Duration::from_secs(1))) {
+    pub fn run(mut self) -> StreamIO {
+        info!("Started admin worker");
+        if let Err(_) = self.stream.set_timeout(Some(Duration::from_secs(1))) {
             return self.stream;
         }
 
         loop {
-            let buf = match self.read() {
-                Ok(buf) => buf,
+            let request: Result<AdminRequest, ResponseError> = match self.stream.read() {
+                Ok(buf) => Ok(buf),
                 Err(err) => {
-                    match err.kind() {
-                        // According to the docs: `Interrupted` means `read` should be retried.
-                        ErrorKind::Interrupted => continue,
-                        ErrorKind::TimedOut => continue,
-                        ErrorKind::WouldBlock => continue,
-                        // Any other error is due to external circumstances.
+                    match err {
+                        StreamIOError::Stream(e) => match e.kind() {
+                            // According to the docs: `Interrupted` means `read` should be retried.
+                            ErrorKind::Interrupted => continue,
+                            ErrorKind::TimedOut => continue,
+                            ErrorKind::WouldBlock => continue,
+                            // Any other error is due to external circumstances.
+                            _ => {
+                                error!("Unexpected disconnect: {}", e.kind());
+                                return self.stream;
+                            }
+                        },
                         _ => {
-                            println!("disconnect or something {}", err.kind());
-                            return self.stream;
+                            error!("Unhandled error: {err:?}");
+                            Err(ResponseError::CommunicationFailed)
                         }
                     }
                 }
             };
 
-            let request: Result<AdminRequest, postcard::Error> = postcard::from_bytes(&buf);
-            let a = request
-                .map_err(|e| RequestError::Internal(e.to_string()))
-                .and_then(|r| self.handle_request(r))
-                .map_err(|e| e.to_string());
+            let response: Result<Vec<u8>, ResponseError> = request
+                .and_then(|r| self.handle_request(r));
 
-            println!("to send {:?}", a);
-            let payload = to_allocvec(&a).unwrap();
-            if let Err(err) = self.stream.write_all(&payload) {
-                match err.kind() {
-                    // TODO I'm not sure whether this is the right course of
-                    //  action on a write timeout. We could also drop the connection.
-                    ErrorKind::TimedOut => continue,
-                    ErrorKind::WouldBlock => continue,
-                    _ => return self.stream,
+            debug!("Sending response {:?}", response);
+            if let Err(err) = self.stream.write(&response) {
+                match err {
+                    StreamIOError::Stream(e) => match e.kind() {
+                        ErrorKind::TimedOut => continue,
+                        ErrorKind::WouldBlock => continue,
+                        _ => {
+                            error!("Unexpected disconnect: {}", e.kind());
+                            return self.stream;
+                        }
+                    },
+                    _ => {
+                        error!("Unhandled Error {err:?}");
+                        continue;
+                    }
                 }
             }
-            println!("written");
+            debug!("Response sent");
         }
     }
 
-    fn handle_request(&mut self, req: AdminRequest) -> Result<Vec<u8>, RequestError> {
+    fn handle_request(&mut self, req: AdminRequest) -> Result<Vec<u8>, ResponseError> {
         Ok(match req {
             AdminRequest::ListQueues(r) => {
                 to_allocvec(&r.handle_request(self.queue_manager.clone())?)

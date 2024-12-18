@@ -1,11 +1,12 @@
 use crate::buffer_interface::BufferInterface;
 use crate::buffer_processor::BufferProcessor;
 use crate::message_buffer::MessageBuffer;
+use backend::protocol::BufferAddress;
 use backend::stream_io::StreamIO;
+use log::{info, warn};
 use std::collections::HashMap;
 use std::io;
 use std::net::TcpStream;
-use backend::protocol::BufferAddress;
 
 pub struct BufferTypeManager<T, P>
 where
@@ -60,24 +61,24 @@ where
     /// and receivers on this queue. If the result is not handled, the streams go out of scope
     /// and connections will be closed.
     fn delete(&mut self, name: &String) -> Option<(Vec<StreamIO>, Vec<StreamIO>)> {
-        println!("Deleting queue {:?}", name);
+        warn!("Deleting queue {:?}", name);
         if let Some((senders, _, receivers)) = self.queues.remove(name) {
             return Some((senders, receivers));
         }
         None
     }
 
-    fn connect_sender(&mut self, queue_name: &String, stream: TcpStream) -> io::Result<()> {
+    fn connect_sender(&mut self, queue_name: &String, mut stream: StreamIO) -> io::Result<()> {
         stream.set_nonblocking(true)?;
         if let Some((senders, _, _)) = self.queues.get_mut(queue_name) {
-            senders.push(StreamIO::new(stream))
+            senders.push(stream)
         }
         Ok(())
     }
 
-    fn connect_receiver(&mut self, queue_name: &String, stream: TcpStream) {
+    fn connect_receiver(&mut self, queue_name: &String, stream: StreamIO) {
         if let Some((_, _, recipients)) = self.queues.get_mut(queue_name) {
-            recipients.push(StreamIO::new(stream));
+            recipients.push(stream);
         }
     }
 

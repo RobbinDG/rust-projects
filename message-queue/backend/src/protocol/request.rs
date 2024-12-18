@@ -1,19 +1,27 @@
+use crate::protocol::buffer_address::BufferAddress;
 use crate::protocol::status_code::Status;
+use crate::stream_io::StreamIOError;
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 use std::str;
 use std::str::Utf8Error;
-use crate::protocol::buffer_address::BufferAddress;
+use crate::protocol::response::ResponseError;
 
 #[derive(Debug)]
 pub enum RequestError {
-    IO(Error),
+    IO(StreamIOError),
     Parsing(Utf8Error),
-    Internal(String),
+    Internal(ResponseError),
 }
 
 impl From<Error> for RequestError {
     fn from(value: Error) -> Self {
+        RequestError::from(StreamIOError::Stream(value))
+    }
+}
+
+impl From<StreamIOError> for RequestError {
+    fn from(value: StreamIOError) -> Self {
         RequestError::IO(value)
     }
 }
@@ -24,25 +32,9 @@ impl From<Utf8Error> for RequestError {
     }
 }
 
-impl From<String> for RequestError {
-    fn from(value: String) -> Self {
+impl From<ResponseError> for RequestError {
+    fn from(value: ResponseError) -> Self {
         RequestError::Internal(value)
-    }
-}
-
-impl From<postcard::Error> for RequestError {
-    fn from(value: postcard::Error) -> Self {
-        RequestError::Internal(value.to_string())
-    }
-}
-
-impl RequestError {
-    pub fn to_string(&self) -> String {
-        match self {
-            RequestError::IO(e) => format!("IO error: {}", e.to_string()),
-            RequestError::Parsing(e) => format!("IO error: {}", e.to_string()),
-            RequestError::Internal(e) => format!("IO error: {}", e.to_string()),
-        }
     }
 }
 
@@ -67,7 +59,6 @@ pub struct CreateQueue {
 pub struct DeleteQueue {
     pub queue_name: BufferAddress,
 }
-
 
 impl RequestType for ListQueues {
     type Response = Vec<(BufferAddress, usize, usize, usize)>;

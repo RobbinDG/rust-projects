@@ -51,14 +51,14 @@ impl BufferInterface<BufferAddress> for BufferManager {
         }
     }
 
-    fn connect_sender(&mut self, queue: &BufferAddress, stream: TcpStream) -> io::Result<()> {
+    fn connect_sender(&mut self, queue: &BufferAddress, stream: StreamIO) -> io::Result<()> {
         match queue.buffer_type() {
             BufferType::Queue => self.queues.connect_sender(&queue.to_string(), stream),
             BufferType::Topic => self.topics.connect_sender(&queue.to_string(), stream),
         }
     }
 
-    fn connect_receiver(&mut self, queue: &BufferAddress, stream: TcpStream) {
+    fn connect_receiver(&mut self, queue: &BufferAddress, stream: StreamIO) {
         match queue.buffer_type() {
             BufferType::Queue => self.queues.connect_receiver(&queue.to_string(), stream),
             BufferType::Topic => self.topics.connect_receiver(&queue.to_string(), stream),

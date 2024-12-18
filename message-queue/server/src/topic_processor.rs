@@ -30,7 +30,7 @@ impl BufferProcessor<Topic> for TopicProcessor {
         }
         for receiver in receivers {
             for message in &messages {
-                if let Err(_) = receiver.write(message.clone()) {
+                if let Err(_) = receiver.write(&message.clone()) {
                     continue;
                 }
             }

@@ -8,6 +8,8 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::{io, thread};
+use log::{error, info};
+use backend::stream_io::StreamIO;
 
 pub struct ConnectionManager {
     listener: TcpListener,
@@ -15,11 +17,11 @@ pub struct ConnectionManager {
     setup_connections: Mutex<
         Vec<(
             SocketAddr,
-            Option<JoinHandle<(TcpStream, SetupResponse)>>,
+            Option<JoinHandle<(StreamIO, SetupResponse)>>,
             Sender<()>,
         )>,
     >,
-    admin_connections: Mutex<Vec<(SocketAddr, Option<JoinHandle<TcpStream>>, Sender<()>)>>,
+    admin_connections: Mutex<Vec<(SocketAddr, Option<JoinHandle<StreamIO>>, Sender<()>)>>,
 }
 
 impl ConnectionManager {
@@ -36,17 +38,17 @@ impl ConnectionManager {
         loop {
             match self.listener.accept() {
                 Ok((stream, addr)) => {
-                    println!("{addr}");
+                    info!("{addr}");
                     let (worker, interrupt) = SetupWorker::new(stream);
                     let handle = thread::spawn(move || worker.run());
                     self.setup_connections
                         .lock()
                         .unwrap()
                         .push((addr, Some(handle), interrupt));
-                    println!("connected");
+                    info!("connected");
                 }
                 Err(e) => {
-                    println!("{:?}", e);
+                    error!("{:?}", e);
                     continue;
                 }
             };
@@ -61,7 +63,7 @@ impl ConnectionManager {
             if handle.is_finished() {
                 let (stream, termination) = handle.join().unwrap();
                 match termination {
-                    SetupResponse::Disconnect => println!("{} Disconnected", addr),
+                    SetupResponse::Disconnect => info!("{} Disconnected", addr),
                     SetupResponse::Sender(queue) => {
                         self.buffer_manager
                             .lock()
@@ -97,7 +99,7 @@ impl ConnectionManager {
             let handle = handle_opt.take().unwrap();
             if handle.is_finished() {
                 handle.join().unwrap();
-                println!("{} Disconnected", addr);
+                info!("{} Disconnected", addr);
             } else {
                 let _ = handle_opt.insert(handle);
             }

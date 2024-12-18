@@ -49,7 +49,6 @@ impl BufferAddress {
     }
 
     pub fn to_string(&self) -> String {
-        println!("{self:?}");
         match self.buffer_type {
             BufferType::Queue => self.address.clone(),
             BufferType::Topic => format!("{}{}", TOPIC_PREFIX, self.address),

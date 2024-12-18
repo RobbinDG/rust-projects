@@ -1,3 +1,4 @@
+use log::debug;
 use backend::protocol::BufferAddress;
 use crate::message_queue::MessageQueue;
 use backend::stream_io::StreamIO;
@@ -38,7 +39,7 @@ impl BufferProcessor<MessageQueue> for MessageQueueProcessor {
         for sender in senders {
             match sender.read() {
                 Ok(message) => {
-                    println!("{:?}", message);
+                    debug!("{:?}", message);
                     queue.push(message)
                 }
                 Err(_) => {
@@ -56,8 +57,8 @@ impl BufferProcessor<MessageQueue> for MessageQueueProcessor {
 impl MessageQueueProcessor {
     fn empty_queue_to_stream(queue: &mut MessageQueue, recipient: &mut StreamIO) {
         while let Some(message) = queue.pop() {
-            println!("sending... {:?}", message);
-            recipient.write(message).unwrap()
+            debug!("sending... {:?}", message);
+            recipient.write(&message).unwrap()
         }
     }
 }

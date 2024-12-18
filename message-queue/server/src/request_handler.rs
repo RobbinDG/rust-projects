@@ -1,8 +1,9 @@
 use backend::protocol::request::{
     CheckQueue, CreateQueue, DeleteQueue, ListQueues, RequestError, RequestType,
 };
-use backend::protocol::{ServerResponse, Status};
-use std::sync::{Arc, Mutex};
+use backend::protocol::{ResponseError, ServerResponse, Status};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use log::info;
 use crate::buffer_manager::BufferManager;
 use crate::buffer_interface::BufferInterface;
 
@@ -18,19 +19,18 @@ pub trait RequestHandler: RequestType {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, RequestError>;
+    ) -> Result<Self::Response, ResponseError>;
 }
 
 impl RequestHandler for ListQueues {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, RequestError> {
+    ) -> Result<Self::Response, ResponseError> {
         let queues_data = queue_manager
-            .lock()
-            .map_err(|err| RequestError::Internal("poison".to_string()))?
+            .lock()?
             .buffers();
-        println!("{:?}", queues_data);
+        info!("{:?}", queues_data);
         Ok(queues_data)
     }
 }
@@ -39,10 +39,9 @@ impl RequestHandler for CheckQueue {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, RequestError> {
+    ) -> Result<Self::Response, ResponseError> {
         if queue_manager
-            .lock()
-            .map_err(|err| RequestError::Internal("poison".to_string()))?
+            .lock()?
             .queue_exists(&self.queue_address)
         {
             Ok(Status::Exists)
@@ -56,10 +55,8 @@ impl RequestHandler for CreateQueue {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, RequestError> {
-        let mut qm = queue_manager
-            .lock()
-            .map_err(|err| RequestError::Internal("poison".to_string()))?;
+    ) -> Result<Self::Response, ResponseError> {
+        let mut qm = queue_manager.lock()?;
 
         if qm.queue_exists(&self.queue_address) {
             Ok(Status::Exists)
@@ -74,10 +71,8 @@ impl RequestHandler for DeleteQueue {
     fn handle_request(
         self,
         queue_manager: Arc<Mutex<BufferManager>>,
-    ) -> Result<Self::Response, RequestError> {
-        let mut qm = queue_manager
-            .lock()
-            .map_err(|err| RequestError::Internal("poison".to_string()))?;
+    ) -> Result<Self::Response, ResponseError> {
+        let mut qm = queue_manager.lock()?;
 
         if qm.delete(&self.queue_name).is_some() {
             Ok(Status::Removed)

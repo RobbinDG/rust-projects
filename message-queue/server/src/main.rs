@@ -8,7 +8,6 @@ mod queue_manager;
 mod request_handler;
 mod server;
 mod setup_worker;
-mod stream_worker;
 mod topic;
 mod topic_manager;
 mod topic_processor;
@@ -19,6 +18,7 @@ use server::Server;
 use std::net::TcpListener;
 
 fn main() {
+    env_logger::init();
     let socket_listener = TcpListener::bind("localhost:1234").unwrap();
     let server = Server::new(socket_listener);
     server.run();
