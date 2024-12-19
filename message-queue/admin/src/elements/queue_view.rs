@@ -3,7 +3,10 @@ use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
 use backend::protocol::request::{CreateQueue, DeleteQueue, ListQueues};
 use backend::protocol::{BufferAddress, BufferType};
-use iced::widget::{button, column, radio, row, text, text_input, Column};
+use iced::widget::{
+    button, column, container, radio, row, text, text_input, vertical_space, Column,
+};
+use iced::{Alignment, Length};
 
 pub struct QueueView {
     connector: ServerConnector,
@@ -17,7 +20,7 @@ impl Default for QueueView {
         QueueView {
             connector: ServerConnector::new(),
             queue_table: QueueTable::new(
-                ["Queue", "Senders", "Receivers", "Message"],
+                ["Queue", "Senders", "Receivers", "# Messages"],
                 [300, 200, 200, 200],
             ),
             new_queue_text: String::new(),
@@ -28,11 +31,16 @@ impl Default for QueueView {
 
 impl QueueView {
     pub fn view(&self) -> Column<UIMessage> {
+        let placeholder = format!(
+            "New {} name",
+            match self.selected_buffer_type {
+                Some(BufferType::Topic) => "topic",
+                _ => "queue",
+            }
+        );
         let mut cols = column![
-            self.queue_table.view(),
+            self.queue_table.view().height(500),
             row![
-                text_input("new queue name", &self.new_queue_text)
-                    .on_input(UIMessage::NewQueueName),
                 radio(
                     "Queue",
                     BufferType::Queue,
@@ -45,12 +53,27 @@ impl QueueView {
                     self.selected_buffer_type,
                     UIMessage::SelectBufferType
                 ),
+                text_input(placeholder.as_str(), &self.new_queue_text)
+                    .on_input(UIMessage::NewQueueName),
                 button("Create").on_press(UIMessage::CreateQueue),
                 button("Refresh").on_press(UIMessage::Refresh),
-            ],
+                vertical_space(),
+            ]
+            .spacing(10),
         ];
+        cols = cols.spacing(2).padding(10);
         if !self.connector.connected() {
-            cols = cols.push(text("Couldn't connect to server."));
+            cols = cols.push(
+                container(
+                    text("Couldn't connect to server.")
+                        .width(Length::Fill)
+                        .align_x(Alignment::Center),
+                )
+                .width(Length::Fill)
+                .align_x(Alignment::Center)
+                .padding(10)
+                .style(container::rounded_box),
+            );
         }
         cols
     }
@@ -64,11 +87,11 @@ impl QueueView {
             UIMessage::CreateQueue => {
                 self.create();
                 self.refresh();
-            },
+            }
             UIMessage::DeleteQueue(s) => {
                 self.delete(s);
                 self.refresh();
-            },
+            }
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
             }
