@@ -60,6 +60,7 @@ impl SetupWorker {
         }
 
         debug!("Sent promotion response.");
+        self.stream.reset();
         (self.stream, promotion)
     }
 }

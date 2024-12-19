@@ -1,12 +1,14 @@
+use crate::protocol::ResponseError;
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpStream};
-use std::time::Duration;
-use crate::protocol::ResponseError;
+use std::time::{Duration, SystemTime};
 
 pub struct StreamIO {
     stream: TcpStream,
+    last_read: Option<SystemTime>,
+    last_write: Option<SystemTime>,
 }
 
 #[derive(Debug)]
@@ -44,7 +46,11 @@ impl From<postcard::Error> for StreamIOError {
 /// goes out of scope.
 impl StreamIO {
     pub fn new(stream: TcpStream) -> Self {
-        Self { stream }
+        Self {
+            stream,
+            last_read: None,
+            last_write: None,
+        }
     }
 
     pub fn set_timeout(&mut self, duration: Option<Duration>) -> io::Result<()> {
@@ -62,7 +68,9 @@ impl StreamIO {
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        Ok(self.stream.write_all(&postcard::to_allocvec(message)?)?)
+        let result = Ok(self.stream.write_all(&postcard::to_allocvec(message)?)?);
+        self.last_write = Some(SystemTime::now());
+        result
     }
 
     /// Read a struct from the stream, after first decoding it. The struct must
@@ -74,7 +82,9 @@ impl StreamIO {
         let mut buf = [0; 32];
         self.stream.read(&mut buf)?;
         self.stream.flush()?;
-        Ok(postcard::from_bytes(&buf)?)
+        let result = Ok(postcard::from_bytes(&buf)?);
+        self.last_read = Some(SystemTime::now());
+        result
     }
 
     /// Read a `Result` containing the desired struct as `Ok` and a `crate::stream_io::StreamIOError` as `Err`
@@ -87,11 +97,22 @@ impl StreamIO {
     {
         let response: Result<Vec<u8>, ResponseError> = self.read()?;
         Ok(match response {
-            Ok(r) => {
-                Ok(postcard::from_bytes(r.as_slice())?)
-            }
-            Err(err) => Err(err)
+            Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
+            Err(err) => Err(err),
         })
+    }
+
+    pub fn last_read(&self) -> Option<SystemTime> {
+        self.last_read
+    }
+
+    pub fn last_write(&self) -> Option<SystemTime> {
+        self.last_write
+    }
+
+    pub fn reset(&mut self) {
+        self.last_write = None;
+        self.last_read = None;
     }
 }
 
@@ -103,9 +124,7 @@ impl Drop for StreamIO {
                 | ErrorKind::ConnectionAborted
                 | ErrorKind::ConnectionRefused
                 | ErrorKind::ConnectionReset
-                | ErrorKind::NotConnected => {
-                    return
-                }
+                | ErrorKind::NotConnected => return,
                 _ => Err(e).unwrap(),
             }
         }

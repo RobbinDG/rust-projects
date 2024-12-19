@@ -4,4 +4,9 @@
 - Persist queues.
 - Support other stream types over `StreamIO`.
 - Monitor messages / sec (graph?).
-- Immediate updates after creating/deleting queues in admin panel.
+- Add customisation
+  - TTL
+  - Max capacity
+- Dead lettering
+- Reconnect on disconnect admin panel
+  - Better information on connection state
