@@ -1,3 +1,4 @@
+use crate::elements::connection_interface::ConnectionInterface;
 use crate::elements::QueueTable;
 use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
@@ -9,10 +10,14 @@ use iced::widget::{
 use iced::{Alignment, Length};
 
 pub struct QueueView {
+    // Widget state
     connector: ServerConnector,
     queue_table: QueueTable,
     new_queue_text: String,
     selected_buffer_type: Option<BufferType>,
+
+    // Sub-widgets
+    connection_interface: ConnectionInterface,
 }
 
 impl Default for QueueView {
@@ -25,6 +30,7 @@ impl Default for QueueView {
             ),
             new_queue_text: String::new(),
             selected_buffer_type: Some(BufferType::Queue),
+            connection_interface: ConnectionInterface::new(),
         }
     }
 }
@@ -57,9 +63,10 @@ impl QueueView {
                     .on_input(UIMessage::NewQueueName),
                 button("Create").on_press(UIMessage::CreateQueue),
                 button("Refresh").on_press(UIMessage::Refresh),
-                vertical_space(),
             ]
             .spacing(10),
+            vertical_space(),
+            self.connection_interface.view(),
         ];
         cols = cols.spacing(2).padding(10);
         if !self.connector.connected() {
@@ -95,6 +102,7 @@ impl QueueView {
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
             }
+            UIMessage::ConnectionUpdated(m) => self.connection_interface.update(m, &self.connector),
         }
     }
 
