@@ -5,6 +5,8 @@ use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::time::{Duration, SystemTime};
 
+const BUFFER_SIZE: usize = 1024;
+
 pub struct StreamIO {
     stream: TcpStream,
     last_read: Option<SystemTime>,
@@ -79,7 +81,7 @@ impl StreamIO {
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        let mut buf = [0; 32];
+        let mut buf = [0; BUFFER_SIZE];
         self.stream.read(&mut buf)?;
         self.stream.flush()?;
         let result = Ok(postcard::from_bytes(&buf)?);
