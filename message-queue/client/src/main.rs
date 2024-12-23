@@ -9,7 +9,7 @@ use crate::disconnected_interface::DisconnectedInterface;
 use crate::interface::Interface;
 
 fn main() {
-    let server = DisconnectedClient::new("localhost:1234");
+    let server = DisconnectedClient::new("127.0.0.1:1234");
     let mut interface: Box<dyn Interface> = Box::new(DisconnectedInterface::new(server));
 
     loop {

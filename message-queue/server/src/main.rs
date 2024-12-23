@@ -20,7 +20,7 @@ use std::net::TcpListener;
 
 fn main() {
     env_logger::init();
-    let socket_listener = TcpListener::bind("localhost:1234").unwrap();
+    let socket_listener = TcpListener::bind("127.0.0.1:1234").unwrap();
     let server = Server::new(socket_listener);
     server.run();
 }

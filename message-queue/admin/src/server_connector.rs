@@ -14,7 +14,7 @@ impl ServerConnector {
     pub fn new() -> Self {
         Self {
             client: Some(Client::Disconnected(DisconnectedClient::new(
-                "localhost:1234".to_string(),
+                "127.0.0.1:1234".to_string(),
             ))),
         }
     }

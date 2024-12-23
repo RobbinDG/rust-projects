@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use crate::protocol::request::{AdminRequest, RequestError, RequestType};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
@@ -7,19 +8,19 @@ use std::time::Duration;
 
 pub struct ConnectionConfig<T>
 where
-    T: ToSocketAddrs + Clone,
+    T: ToSocketAddrs + Clone + Debug,
 {
     address: T,
 }
 pub struct DisconnectedClient<T>
 where
-    T: ToSocketAddrs + Clone,
+    T: ToSocketAddrs + Clone + Debug,
 {
     config: ConnectionConfig<T>,
 }
 pub struct ConnectedClient<T>
 where
-    T: ToSocketAddrs + Clone,
+    T: ToSocketAddrs + Clone + Debug,
 {
     config: ConnectionConfig<T>,
     stream: StreamIO,
@@ -28,13 +29,13 @@ where
 
 pub struct ConnectionError<T>
 where
-    T: ToSocketAddrs + Clone,
+    T: ToSocketAddrs + Clone + Debug,
 {
     pub error_body: Option<io::Error>,
     pub server: DisconnectedClient<T>,
 }
 
-impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
+impl<T: ToSocketAddrs + Clone + Debug> DisconnectedClient<T> {
     pub fn new(addr: T) -> DisconnectedClient<T> {
         DisconnectedClient {
             config: ConnectionConfig { address: addr },
@@ -42,11 +43,12 @@ impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
     }
 
     pub fn connect(self) -> Result<ConnectedClient<T>, ConnectionError<T>> {
+        println!("Connecting to {:?}", self.config.address);
         let addr = match self.config.address.to_socket_addrs() {
             Ok(mut addrs) => match addrs.next() {
                 None => return Err(ConnectionError {
                     error_body: None, // TODO give this a proper error type. Occurs when parsing fails.
-                    server: DisconnectedClient::new(self.config.address),
+                    server: self,
                 }),
                 Some(a) => a,
             },
@@ -69,7 +71,7 @@ impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
     }
 }
 
-impl<T: ToSocketAddrs + Clone> ConnectedClient<T> {
+impl<T: ToSocketAddrs + Clone + Debug> ConnectedClient<T> {
     pub fn transfer_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
     where
         R: RequestType + Serialize + for<'a> Deserialize<'a>,
