@@ -102,7 +102,7 @@ impl QueueView {
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
             }
-            UIMessage::ConnectionUpdated(m) => self.connection_interface.update(m, &self.connector),
+            UIMessage::ConnectionUpdated(m) => self.connection_interface.update(m, &mut self.connector),
         }
     }
 

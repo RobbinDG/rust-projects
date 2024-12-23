@@ -42,6 +42,19 @@ impl ServerConnector {
         Err("Couldn't connect".to_string())
     }
 
+    pub fn connect_to(&mut self, addr: String) {
+        if let Some(client) = self.client.take() {
+            if let Client::Connected(c) = client {
+                c.disconnect();
+            }
+        }
+        let new_client = DisconnectedClient::new(addr);
+        let _ = self.client.insert(match new_client.connect() {
+            Ok(c) => Client::Connected(c),
+            Err(e) => Client::Disconnected(e.server),
+        });
+    }
+
     fn attempt_connect(c: DisconnectedClient<String>) -> Client {
         match c.connect() {
             Ok(mut connected) => match connected.transfer_request(SetupRequest::Admin) {

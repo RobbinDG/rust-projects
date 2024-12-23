@@ -3,6 +3,7 @@ use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::{TcpStream, ToSocketAddrs};
+use std::time::Duration;
 
 pub struct ConnectionConfig<T>
 where
@@ -29,7 +30,7 @@ pub struct ConnectionError<T>
 where
     T: ToSocketAddrs + Clone,
 {
-    pub error_body: io::Error,
+    pub error_body: Option<io::Error>,
     pub server: DisconnectedClient<T>,
 }
 
@@ -41,14 +42,27 @@ impl<T: ToSocketAddrs + Clone> DisconnectedClient<T> {
     }
 
     pub fn connect(self) -> Result<ConnectedClient<T>, ConnectionError<T>> {
-        match TcpStream::connect(&self.config.address) {
+        let addr = match self.config.address.to_socket_addrs() {
+            Ok(mut addrs) => match addrs.next() {
+                None => return Err(ConnectionError {
+                    error_body: None, // TODO give this a proper error type. Occurs when parsing fails.
+                    server: DisconnectedClient::new(self.config.address),
+                }),
+                Some(a) => a,
+            },
+            Err(e) => return Err(ConnectionError {
+                error_body: Some(e),
+                server: self,
+            }),
+        };
+        match TcpStream::connect_timeout(&addr, Duration::from_secs(5)) {
             Ok(stream) => Ok(ConnectedClient {
                 config: self.config,
                 stream: StreamIO::new(stream),
                 pipe_broken: false,
             }),
             Err(e) => Err(ConnectionError {
-                error_body: e,
+                error_body: Some(e),
                 server: self,
             }),
         }
