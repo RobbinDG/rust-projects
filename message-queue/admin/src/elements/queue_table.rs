@@ -92,7 +92,7 @@ impl QueueTable {
                         .background(Background::Color(color![0.1, 0.1, 1.0, 0.5]))
                 }),
         ))
-        .on_press(UIMessage::DeleteQueue(row_content.0.clone()))
+        .on_press(UIMessage::InspectBuffer(row_content.0.clone()))
         .into()
     }
 

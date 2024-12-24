@@ -1,9 +1,11 @@
 use crate::elements::inspect_view::{InspectView, InspectViewMessage};
 use crate::elements::{QueueView, UIMessage};
+use backend::protocol::BufferAddress;
 use iced::Element;
 
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
+    InspectBuffer(BufferAddress),
     BufferView(UIMessage),
     Inspector(InspectViewMessage),
 }
@@ -21,7 +23,7 @@ impl From<InspectViewMessage> for AdminViewMessage {
 }
 
 pub struct AdminView {
-    selected_buffer: Option<()>,
+    selected_buffer: Option<BufferAddress>,
 
     buffer_view: QueueView,
     inspect_view: InspectView,
@@ -42,7 +44,12 @@ impl AdminView {
         if self.selected_buffer.is_some() {
             self.inspect_view.view()
         } else {
-            self.buffer_view.view()
+            self.buffer_view.view().map(|message| {
+                match message {
+                    UIMessage::InspectBuffer(t) => AdminViewMessage::InspectBuffer(t),
+                    message => message.into(),
+                }
+            })
         }
     }
 
@@ -50,6 +57,7 @@ impl AdminView {
         match message {
             AdminViewMessage::BufferView(m) => self.buffer_view.update(m),
             AdminViewMessage::Inspector(m) => self.inspect_view.update(m),
+            AdminViewMessage::InspectBuffer(address) => self.selected_buffer = Some(address)
         }
     }
 }

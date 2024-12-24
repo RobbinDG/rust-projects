@@ -108,6 +108,7 @@ impl QueueView {
             UIMessage::ConnectionUpdated(m) => {
                 self.connection_interface.update(m, &mut self.connector)
             }
+            UIMessage::InspectBuffer(_) => {}
         }
     }
 

@@ -8,6 +8,7 @@ pub enum UIMessage {
     CreateQueue,
     DeleteQueue(BufferAddress),
     SelectBufferType(BufferType),
+    InspectBuffer(BufferAddress),
     ConnectionUpdated(ConnectionInterfaceMessage),
 }
 
