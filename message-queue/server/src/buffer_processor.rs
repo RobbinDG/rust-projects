@@ -1,4 +1,4 @@
-use log::debug;
+use log::{debug, error};
 use backend::protocol::BufferAddress;
 use crate::message_queue::MessageQueue;
 use backend::stream_io::StreamIO;
@@ -58,7 +58,9 @@ impl MessageQueueProcessor {
     fn empty_queue_to_stream(queue: &mut MessageQueue, recipient: &mut StreamIO) {
         while let Some(message) = queue.pop() {
             debug!("sending... {:?}", message);
-            recipient.write(&message).unwrap()
+            if let Err(e) = recipient.write(&message) {
+                error!("{:?}", e);
+            }
         }
     }
 }

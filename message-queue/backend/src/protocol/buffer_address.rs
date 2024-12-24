@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-const TOPIC_PREFIX: char = ':';
+const TOPIC_PREFIX: &str = ":";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum BufferType {
@@ -19,9 +19,9 @@ impl BufferAddress {
         address = Self::sanitise_name(address);
 
         if address.starts_with(TOPIC_PREFIX) {
-            Self::new_queue(address[1..].into())
+            Self::new_topic(address[1..].into())
         } else {
-            Self::new_topic(address)
+            Self::new_queue(address)
         }
     }
 
@@ -44,7 +44,6 @@ impl BufferAddress {
             .replace(" ", "_")
             .replace("\n", "")
             .replace("\r", "")
-            .trim_start_matches(TOPIC_PREFIX)
             .to_lowercase()
     }
 

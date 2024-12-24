@@ -7,3 +7,5 @@ resolver = "2"
 [dependencies]
 backend = { path = "../backend" }
 serde = { version = "1.0.214", default-features = false }
+rand = "0.9.0-beta.1"
+lipsum = "0.9.1"

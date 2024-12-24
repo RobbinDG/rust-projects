@@ -4,7 +4,11 @@ use crate::interface::Interface;
 use backend::protocol::{BufferAddress, Message};
 use backend::protocol::{SetupRequest, SetupResponse};
 use backend::ConnectedClient;
+use lipsum::lipsum;
+use rand::prelude::*;
 use std::io;
+use std::thread::sleep;
+use std::time::Duration;
 
 pub fn prompt_string_input(prompt: &str) -> String {
     loop {
@@ -22,14 +26,14 @@ pub fn prompt_string_input(prompt: &str) -> String {
 
 pub struct ConnectedInterface {
     server: ConnectedClient<&'static str>,
-    selected_queue: Option<String>,
+    selected: Option<BufferAddress>,
 }
 
 impl ConnectedInterface {
     pub fn new(server: ConnectedClient<&'static str>) -> Self {
         Self {
             server,
-            selected_queue: None,
+            selected: None,
         }
     }
 }
@@ -38,8 +42,8 @@ impl Interface for ConnectedInterface {
     fn print_options(&self) {
         println!(" [1] Make Admin");
         println!(" [2] Select queue");
-        println!(" [4] Send messages");
-        println!(" [5] Listen to queue");
+        println!(" [3] Send messages");
+        println!(" [4] Listen to queue");
         println!(" [0] Disconnect");
     }
 
@@ -50,7 +54,7 @@ impl Interface for ConnectedInterface {
                     Ok(response) => {
                         println!("Response {:?}", response);
                         if let SetupResponse::Admin = response {
-                            return Box::new(AdminInterface::new(self.server, self.selected_queue));
+                            return Box::new(AdminInterface::new(self.server, self.selected));
                         }
                     }
                     Err(err) => {
@@ -59,21 +63,22 @@ impl Interface for ConnectedInterface {
                 }
                 Box::new(ConnectedInterface {
                     server: self.server,
-                    selected_queue: self.selected_queue,
+                    selected: self.selected,
                 })
             }
             2 => {
                 let selection = prompt_string_input("Which queue do you want select?");
+                println!("{:?}", BufferAddress::new(selection.clone()));
                 Box::new(ConnectedInterface {
                     server: self.server,
-                    selected_queue: Some(selection),
+                    selected: Some(BufferAddress::new(selection)),
                 })
             }
-            4 => {
-                if let Some(queue) = &self.selected_queue {
+            3 => {
+                if let Some(queue) = &self.selected {
                     let response = self
                         .server
-                        .transfer_request(SetupRequest::Sender(BufferAddress::new(queue.clone())));
+                        .transfer_request(SetupRequest::Sender(queue.clone()));
                     match response {
                         Ok(r) => println!("Response {:?}", r),
                         Err(e) => println!("Error {:?}", e),
@@ -84,15 +89,15 @@ impl Interface for ConnectedInterface {
                 }
                 Box::new(ConnectedInterface {
                     server: self.server,
-                    selected_queue: self.selected_queue,
+                    selected: self.selected,
                 })
             }
-            5 => {
-                if let Some(queue) = &self.selected_queue {
+            4 => {
+                if let Some(queue) = &self.selected {
                     println!("Started listening...");
                     let response = self
                         .server
-                        .transfer_request(SetupRequest::Receiver(BufferAddress::new(queue.clone())))
+                        .transfer_request(SetupRequest::Receiver(queue.clone()))
                         .unwrap();
                     println!("Response {:?}", response);
                     self.receive_messages();
@@ -101,13 +106,13 @@ impl Interface for ConnectedInterface {
                 }
                 Box::new(ConnectedInterface {
                     server: self.server,
-                    selected_queue: self.selected_queue,
+                    selected: self.selected,
                 })
             }
             0 => Box::new(DisconnectedInterface::new(self.server.disconnect())),
             _ => Box::new(ConnectedInterface {
                 server: self.server,
-                selected_queue: self.selected_queue,
+                selected: self.selected,
             }),
         }
     }
@@ -116,8 +121,10 @@ impl Interface for ConnectedInterface {
 impl ConnectedInterface {
     fn send_messages(&mut self) {
         loop {
-            let message_str = prompt_string_input("Write message");
-            self.server.push_message(Message::new(message_str)).unwrap();
+            // let message_str = prompt_string_input("Write message");
+            sleep(Duration::from_millis(rand::random_range(1000..3000)));
+            let words = lipsum(5);
+            self.server.push_message(Message::new(words)).unwrap();
         }
     }
 

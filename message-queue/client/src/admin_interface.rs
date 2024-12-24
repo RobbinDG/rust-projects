@@ -6,11 +6,11 @@ use backend::ConnectedClient;
 
 pub struct AdminInterface {
     server: ConnectedClient<&'static str>,
-    selected_queue: Option<String>
+    selected_queue: Option<BufferAddress>
 }
 
 impl AdminInterface {
-    pub fn new(server: ConnectedClient<&'static str>, selected_queue: Option<String>) -> Self {
+    pub fn new(server: ConnectedClient<&'static str>, selected_queue: Option<BufferAddress>) -> Self {
         Self {
             server,
             selected_queue,
@@ -37,15 +37,16 @@ impl Interface for AdminInterface {
             }
             2 => {
                 let selection = crate::connected_interface::prompt_string_input("Which queue do you want select?");
+                let address = BufferAddress::new(selection);
                 let response = self
                     .server
                     .transfer_admin_request(CheckQueue {
-                        queue_address: BufferAddress::new(selection.clone()),
+                        queue_address: address.clone(),
                     })
                     .unwrap();
                 if let Status::Exists = response {
                     // TODO replace with proper status code check
-                    self.selected_queue = Some(selection);
+                    self.selected_queue = Some(address);
                 }
                 println!("Response {:?}", response);
                 Box::new(AdminInterface {
