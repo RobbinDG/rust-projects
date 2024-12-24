@@ -1,7 +1,10 @@
 use crate::elements::UIMessage;
 use backend::protocol::BufferAddress;
-use iced::widget::{button, column, horizontal_rule, row, scrollable, text, Column, Row};
-use iced::{font, Alignment, Length};
+use iced::widget::{
+    button, column, container, horizontal_rule, hover, mouse_area, row, scrollable, text, Column
+    , Row,
+};
+use iced::{color, font, Alignment, Background, Border, Element, Length};
 use std::iter::zip;
 
 pub struct QueueTable {
@@ -47,8 +50,7 @@ impl QueueTable {
                     .into()
             }));
         let divider = horizontal_rule(2);
-        let mut rows_column: Column<UIMessage> = column![]
-            .spacing(2);
+        let mut rows_column: Column<UIMessage> = column![].spacing(2);
         if self.content.len() <= 0 {
             rows_column = rows_column.push(
                 text("Nothing to see...")
@@ -64,7 +66,7 @@ impl QueueTable {
         column![header, divider, scrollable(rows_column).width(Length::Fill)].height(self.height)
     }
 
-    fn make_content_row(&self, row_content: &(BufferAddress, [String; 3])) -> Row<UIMessage> {
+    fn make_content_row(&self, row_content: &(BufferAddress, [String; 3])) -> Element<UIMessage> {
         let rows: [String; 4] = std::array::from_fn(|i| {
             if i == 0 {
                 row_content.0.to_string()
@@ -75,7 +77,23 @@ impl QueueTable {
         let mut r: Row<UIMessage> =
             row(zip(self.widths, rows).map(|(w, c)| text(c).width(w).into()));
         r = r.push(button("Delete").on_press(UIMessage::DeleteQueue(row_content.0.clone())));
-        r
+        mouse_area(hover(
+            r,
+            container("")
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|t| {
+                    container::rounded_box(t)
+                        .border(Border {
+                            color: color![0.1, 0.1, 1.0, 0.8],
+                            width: 2.0,
+                            radius: Default::default(),
+                        })
+                        .background(Background::Color(color![0.1, 0.1, 1.0, 0.5]))
+                }),
+        ))
+        .on_press(UIMessage::DeleteQueue(row_content.0.clone()))
+        .into()
     }
 
     pub fn height<T: Into<Length>>(mut self, height: T) -> Self {
