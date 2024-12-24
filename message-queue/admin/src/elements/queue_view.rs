@@ -4,10 +4,8 @@ use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
 use backend::protocol::request::{CreateQueue, DeleteQueue, ListQueues};
 use backend::protocol::{BufferAddress, BufferType};
-use iced::widget::{
-    button, column, container, radio, row, text, text_input, vertical_space, Column,
-};
-use iced::{Alignment, Length};
+use iced::widget::{button, column, container, radio, row, text, text_input, vertical_space};
+use iced::{Alignment, Element, Length};
 
 pub struct QueueView {
     // Widget state
@@ -36,7 +34,10 @@ impl Default for QueueView {
 }
 
 impl QueueView {
-    pub fn view(&self) -> Column<UIMessage> {
+    pub fn view<'a, Message>(&'a self) -> Element<'a, Message>
+    where
+        Message: From<UIMessage> + Clone + 'a,
+    {
         let placeholder = format!(
             "New {} name",
             match self.selected_buffer_type {
@@ -44,6 +45,7 @@ impl QueueView {
                 _ => "queue",
             }
         );
+
         let mut cols = column![
             self.queue_table.view().height(500),
             row![
@@ -60,7 +62,7 @@ impl QueueView {
                     UIMessage::SelectBufferType
                 ),
                 text_input(placeholder.as_str(), &self.new_queue_text)
-                    .on_input(UIMessage::NewQueueName),
+                    .on_input(|s| UIMessage::NewQueueName(s)),
                 button("Create").on_press(UIMessage::CreateQueue),
                 button("Refresh").on_press(UIMessage::Refresh),
             ]
@@ -82,7 +84,8 @@ impl QueueView {
                 .style(container::rounded_box),
             );
         }
-        cols
+        let element: Element<UIMessage> = cols.into();
+        element.map(Message::from)
     }
 
     pub fn update(&mut self, message: UIMessage) {
@@ -102,7 +105,9 @@ impl QueueView {
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
             }
-            UIMessage::ConnectionUpdated(m) => self.connection_interface.update(m, &mut self.connector),
+            UIMessage::ConnectionUpdated(m) => {
+                self.connection_interface.update(m, &mut self.connector)
+            }
         }
     }
 

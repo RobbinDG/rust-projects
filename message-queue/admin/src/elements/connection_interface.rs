@@ -1,5 +1,6 @@
 use crate::server_connector::ServerConnector;
-use iced::widget::{button, row, text_input, Row};
+use iced::widget::{button, row, text_input};
+use iced::Element;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
@@ -21,21 +22,21 @@ impl ConnectionInterface {
         }
     }
 
-    pub fn view<'a, Message>(&'a self) -> Row<'a, Message>
+    pub fn view<'a, Message>(&'a self) -> Element<'a, Message>
     where
         Message: From<ConnectionInterfaceMessage> + Clone + 'a,
     {
         let mut reconnect_btn = button("Reconnect");
         if self.entered_address_valid {
-            reconnect_btn =
-                reconnect_btn.on_press(Message::from(ConnectionInterfaceMessage::Reconnect));
+            reconnect_btn = reconnect_btn.on_press(ConnectionInterfaceMessage::Reconnect);
         }
-        row![
-            text_input("Address", self.entered_address.as_str()).on_input(move |input: String| {
-                Message::from(ConnectionInterfaceMessage::DesiredAddressChanged(input))
-            }),
+        let element: Element<ConnectionInterfaceMessage> = row![
+            text_input("Address", self.entered_address.as_str())
+                .on_input(ConnectionInterfaceMessage::DesiredAddressChanged),
             reconnect_btn,
         ]
+        .into();
+        element.map(Message::from)
     }
 
     pub fn update(&mut self, message: ConnectionInterfaceMessage, connector: &mut ServerConnector) {

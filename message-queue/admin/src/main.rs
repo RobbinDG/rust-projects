@@ -1,12 +1,11 @@
-use crate::elements::QueueView;
-
 mod server_connector;
+use crate::elements::admin_view::AdminView;
 mod elements;
 
 fn main() -> iced::Result {
     iced::run(
         "Message Queue Admin Panel",
-        QueueView::update,
-        QueueView::view,
+        AdminView::update,
+        AdminView::view,
     )
 }
