@@ -1,34 +1,27 @@
-use crate::elements::connection_interface::ConnectionInterface;
 use crate::elements::QueueTable;
 use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
 use backend::protocol::request::{CreateQueue, DeleteQueue, ListQueues};
 use backend::protocol::{BufferAddress, BufferType};
-use iced::widget::{button, column, container, radio, row, text, text_input, vertical_space};
-use iced::{Alignment, Element, Length};
+use iced::widget::{button, column, radio, row, text_input};
+use iced::Element;
 
 pub struct QueueView {
     // Widget state
-    connector: ServerConnector,
     queue_table: QueueTable,
     new_queue_text: String,
     selected_buffer_type: Option<BufferType>,
-
-    // Sub-widgets
-    connection_interface: ConnectionInterface,
 }
 
 impl Default for QueueView {
     fn default() -> Self {
         QueueView {
-            connector: ServerConnector::new(),
             queue_table: QueueTable::new(
                 ["Queue", "Senders", "Receivers", "# Messages"],
                 [300, 200, 200, 200],
             ),
             new_queue_text: String::new(),
             selected_buffer_type: Some(BufferType::Queue),
-            connection_interface: ConnectionInterface::new(),
         }
     }
 }
@@ -67,59 +60,40 @@ impl QueueView {
                 button("Refresh").on_press(UIMessage::Refresh),
             ]
             .spacing(10),
-            vertical_space(),
-            self.connection_interface.view(),
         ];
-        cols = cols.spacing(2).padding(10);
-        if !self.connector.connected() {
-            cols = cols.push(
-                container(
-                    text("Couldn't connect to server.")
-                        .width(Length::Fill)
-                        .align_x(Alignment::Center),
-                )
-                .width(Length::Fill)
-                .align_x(Alignment::Center)
-                .padding(10)
-                .style(container::rounded_box),
-            );
-        }
         let element: Element<UIMessage> = cols.into();
         element.map(Message::from)
     }
 
-    pub fn update(&mut self, message: UIMessage) {
+    pub fn update(&mut self, message: UIMessage, connector: &mut ServerConnector) {
         match message {
-            UIMessage::Refresh => self.refresh(),
+            UIMessage::Refresh => self.refresh(connector),
             UIMessage::NewQueueName(s) => {
                 self.new_queue_text = s;
             }
             UIMessage::CreateQueue => {
-                self.create();
-                self.refresh();
+                self.create(connector);
+                self.refresh(connector);
             }
             UIMessage::DeleteQueue(s) => {
-                self.delete(s);
-                self.refresh();
+                self.delete(s, connector);
+                self.refresh(connector);
             }
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
-            }
-            UIMessage::ConnectionUpdated(m) => {
-                self.connection_interface.update(m, &mut self.connector)
             }
             UIMessage::InspectBuffer(_) => {}
         }
     }
 
-    fn delete(&mut self, s: BufferAddress) {
-        if let Ok(client) = self.connector.client() {
+    fn delete(&mut self, s: BufferAddress, connector: &mut ServerConnector) {
+        if let Ok(client) = connector.client() {
             if let Err(_) = client.transfer_admin_request(DeleteQueue { queue_name: s }) {}
         }
     }
 
-    fn create(&mut self) {
-        if let Ok(client) = self.connector.client() {
+    fn create(&mut self, connector: &mut ServerConnector) {
+        if let Ok(client) = connector.client() {
             if let Err(_) = client.transfer_admin_request(CreateQueue {
                 queue_address: match self.selected_buffer_type {
                     Some(BufferType::Queue) => {
@@ -134,8 +108,8 @@ impl QueueView {
         }
     }
 
-    fn refresh(&mut self) {
-        if let Ok(client) = self.connector.client() {
+    fn refresh(&mut self, connector: &mut ServerConnector) {
+        if let Ok(client) = connector.client() {
             match client.transfer_admin_request(ListQueues {}) {
                 Ok(response) => {
                     self.queue_table.clear();

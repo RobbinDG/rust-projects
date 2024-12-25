@@ -9,11 +9,4 @@ pub enum UIMessage {
     DeleteQueue(BufferAddress),
     SelectBufferType(BufferType),
     InspectBuffer(BufferAddress),
-    ConnectionUpdated(ConnectionInterfaceMessage),
-}
-
-impl From<ConnectionInterfaceMessage> for UIMessage {
-    fn from(value: ConnectionInterfaceMessage) -> Self {
-        UIMessage::ConnectionUpdated(value)
-    }
 }

@@ -33,6 +33,7 @@ impl BufferAddress {
     }
 
     pub fn new_topic(address: String) -> Self {
+        println!("new topic {}", address);
         Self {
             address: Self::sanitise_name(address),
             buffer_type: BufferType::Topic,

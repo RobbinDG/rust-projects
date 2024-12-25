@@ -14,7 +14,7 @@ impl BufferProcessor<Topic> for TopicProcessor {
     }
 
     fn address_from_string(&self, string: String) -> BufferAddress {
-        BufferAddress::new_topic(string)
+        BufferAddress::new_topic(string[1..].into())
     }
 
     fn process_buffer(
