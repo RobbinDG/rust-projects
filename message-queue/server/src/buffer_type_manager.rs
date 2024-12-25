@@ -60,7 +60,12 @@ where
     /// and receivers on this queue. If the result is not handled, the streams go out of scope
     /// and connections will be closed.
     fn delete(&mut self, name: &String) -> Option<(Vec<StreamIO>, Vec<StreamIO>)> {
-        warn!("Deleting queue {:?}", name);
+        if let Some((_, buf, _)) = self.queues.get(name) {
+            if buf.properties().system_buffer {
+                return None; // TODO a "refused" response would be appropriate in this case.
+            }
+        }
+        warn!("Deleting buffer {:?}", name);
         if let Some((senders, _, receivers)) = self.queues.remove(name) {
             return Some((senders, receivers));
         }

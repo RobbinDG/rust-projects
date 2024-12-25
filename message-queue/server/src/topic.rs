@@ -1,4 +1,4 @@
-use crate::message_buffer::MessageBuffer;
+use crate::message_buffer::{BufferProperties, MessageBuffer};
 use backend::protocol::Message;
 use std::time::{Duration, SystemTime};
 
@@ -50,6 +50,12 @@ impl Topic {
 }
 
 impl MessageBuffer for Topic {
+    fn properties(&self) -> BufferProperties {
+        BufferProperties {
+            system_buffer: false,
+        }
+    }
+
     fn message_count(&self) -> usize {
         self.messages.len()
     }

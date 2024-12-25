@@ -8,14 +8,19 @@ use backend::stream_io::StreamIO;
 use std::io;
 
 pub struct BufferManager {
+    default_dlx: BufferAddress,
     queues: QueueManager,
     topics: TopicManager,
 }
 
 impl BufferManager {
     pub fn new() -> Self {
+        let default_dlx = BufferAddress::new_queue("default_dlx".to_string());
+        let mut qm = QueueManager::new(MessageQueueProcessor {});
+        qm.create(default_dlx.to_string());
         Self {
-            queues: QueueManager::new(MessageQueueProcessor {}),
+            default_dlx,
+            queues: qm,
             topics: TopicManager::new(TopicProcessor {}),
         }
     }
