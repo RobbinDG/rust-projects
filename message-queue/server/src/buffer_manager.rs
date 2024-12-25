@@ -3,7 +3,7 @@ use crate::buffer_processor::MessageQueueProcessor;
 use crate::queue_manager::QueueManager;
 use crate::topic_manager::TopicManager;
 use crate::topic_processor::TopicProcessor;
-use backend::protocol::{BufferAddress, BufferType};
+use backend::protocol::{BufferAddress, BufferProperties, BufferType};
 use backend::stream_io::StreamIO;
 use std::io;
 
@@ -17,7 +17,9 @@ impl BufferManager {
     pub fn new() -> Self {
         let default_dlx = BufferAddress::new_queue("default_dlx".to_string());
         let mut qm = QueueManager::new(MessageQueueProcessor {});
-        qm.create(default_dlx.to_string());
+        qm.create(default_dlx.to_string(), BufferProperties {
+            system_buffer: true,
+        });
         Self {
             default_dlx,
             queues: qm,
@@ -41,10 +43,17 @@ impl BufferInterface<BufferAddress> for BufferManager {
         }
     }
 
-    fn create(&mut self, queue: BufferAddress) {
+    fn buffer_properties(&self, buffer: &BufferAddress) -> Option<BufferProperties> {
+        match buffer.buffer_type() {
+            BufferType::Queue => self.queues.buffer_properties(&buffer.to_string()),
+            BufferType::Topic => self.topics.buffer_properties(&buffer.to_string()),
+        }
+    }
+
+    fn create(&mut self, queue: BufferAddress, properties: BufferProperties) {
         match queue.buffer_type() {
-            BufferType::Queue => self.queues.create(queue.to_string()),
-            BufferType::Topic => self.topics.create(queue.to_string()),
+            BufferType::Queue => self.queues.create(queue.to_string(), properties),
+            BufferType::Topic => self.topics.create(queue.to_string(), properties),
         }
     }
 

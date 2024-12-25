@@ -1,13 +1,15 @@
-use crate::message_buffer::{BufferProperties, MessageBuffer};
+use backend::protocol::{BufferProperties, MessageBuffer};
 use backend::protocol::Message;
 
 pub struct MessageQueue {
+    properties: BufferProperties,
     messages: Vec<Message>,
 }
 
 impl MessageQueue {
-    pub fn new_empty() -> MessageQueue {
+    pub fn new_empty(properties: BufferProperties) -> MessageQueue {
         MessageQueue {
+            properties,
             messages: Vec::default(),
         }
     }
@@ -23,9 +25,7 @@ impl MessageQueue {
 
 impl MessageBuffer for MessageQueue {
     fn properties(&self) -> BufferProperties {
-        BufferProperties {
-            system_buffer: true,
-        }
+        self.properties.clone()
     }
 
     fn message_count(&self) -> usize {

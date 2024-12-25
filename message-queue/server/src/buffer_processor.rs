@@ -1,14 +1,14 @@
 use log::{debug, error};
-use backend::protocol::BufferAddress;
+use backend::protocol::{BufferAddress, BufferProperties};
 use crate::message_queue::MessageQueue;
 use backend::stream_io::StreamIO;
-use crate::message_buffer::MessageBuffer;
+use backend::protocol::MessageBuffer;
 
 pub trait BufferProcessor<T>
 where
     T: MessageBuffer,
 {
-    fn create_buffer(&self) -> T;
+    fn create_buffer(&self, properties: BufferProperties) -> T;
 
     fn address_from_string(&self, string: String) -> BufferAddress;
     fn process_buffer(
@@ -22,8 +22,8 @@ where
 pub struct MessageQueueProcessor {}
 
 impl BufferProcessor<MessageQueue> for MessageQueueProcessor {
-    fn create_buffer(&self) -> MessageQueue {
-        MessageQueue::new_empty()
+    fn create_buffer(&self, properties: BufferProperties) -> MessageQueue {
+        MessageQueue::new_empty(properties)
     }
 
     fn address_from_string(&self, string: String) -> BufferAddress {

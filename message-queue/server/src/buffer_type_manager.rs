@@ -1,6 +1,6 @@
 use crate::buffer_interface::BufferInterface;
 use crate::buffer_processor::BufferProcessor;
-use crate::message_buffer::MessageBuffer;
+use backend::protocol::{BufferProperties, MessageBuffer};
 use backend::protocol::BufferAddress;
 use backend::stream_io::StreamIO;
 use log::warn;
@@ -45,12 +45,16 @@ where
         self.queues.contains_key(queue)
     }
 
-    fn create(&mut self, name: String) {
+    fn buffer_properties(&self, buffer: &String) -> Option<BufferProperties> {
+        self.queues.get(buffer).map(|(_, t, _)| t.properties())
+    }
+
+    fn create(&mut self, name: String, properties: BufferProperties) {
         self.queues.insert(
             name,
             (
                 Vec::default(),
-                self.buffer_processor.create_buffer(),
+                self.buffer_processor.create_buffer(properties),
                 Vec::default(),
             ),
         );

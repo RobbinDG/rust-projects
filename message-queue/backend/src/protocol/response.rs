@@ -7,7 +7,7 @@ use std::str::FromStr;
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ResponseError {
     RequestNotUnderstood,
-    ExecFailed,
+    ExecFailed(Status),
     CommunicationFailed,
 }
 

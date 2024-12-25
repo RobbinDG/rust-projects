@@ -1,4 +1,4 @@
-use crate::message_buffer::{BufferProperties, MessageBuffer};
+use backend::protocol::{BufferProperties, MessageBuffer};
 use backend::protocol::Message;
 use std::time::{Duration, SystemTime};
 
@@ -10,13 +10,15 @@ struct TopicMessage {
 
 /// Implements a topic buffer with a fixed time to live. Ordering of messages is not guaranteed.
 pub struct Topic {
+    properties: BufferProperties,
     ttl: Duration,
     messages: Vec<TopicMessage>,
 }
 
 impl Topic {
-    pub fn new(ttl: Duration) -> Self {
+    pub fn new(properties: BufferProperties, ttl: Duration) -> Self {
         Self {
+            properties,
             ttl,
             messages: Vec::new(),
         }
@@ -51,9 +53,7 @@ impl Topic {
 
 impl MessageBuffer for Topic {
     fn properties(&self) -> BufferProperties {
-        BufferProperties {
-            system_buffer: false,
-        }
+        self.properties.clone()
     }
 
     fn message_count(&self) -> usize {

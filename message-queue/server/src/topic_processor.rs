@@ -1,6 +1,6 @@
 use crate::buffer_processor::BufferProcessor;
 use crate::topic::Topic;
-use backend::protocol::BufferAddress;
+use backend::protocol::{BufferAddress, BufferProperties};
 use backend::stream_io::StreamIO;
 use std::time::Duration;
 
@@ -9,8 +9,8 @@ pub struct TopicProcessor {}
 impl TopicProcessor {}
 
 impl BufferProcessor<Topic> for TopicProcessor {
-    fn create_buffer(&self) -> Topic {
-        Topic::new(Duration::from_secs(50))
+    fn create_buffer(&self, properties: BufferProperties) -> Topic {
+        Topic::new(properties, Duration::from_secs(50))
     }
 
     fn address_from_string(&self, string: String) -> BufferAddress {

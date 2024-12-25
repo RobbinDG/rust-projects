@@ -2,7 +2,6 @@ mod admin_worker;
 mod buffer_type_manager;
 mod buffer_processor;
 mod connection_manager;
-mod message_buffer;
 pub mod message_queue;
 mod queue_manager;
 mod request_handler;

@@ -1,11 +1,12 @@
 use crate::protocol::buffer_address::BufferAddress;
+use crate::protocol::response::ResponseError;
 use crate::protocol::status_code::Status;
 use crate::stream_io::StreamIOError;
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 use std::str;
 use std::str::Utf8Error;
-use crate::protocol::response::ResponseError;
+use crate::protocol::BufferProperties;
 
 #[derive(Debug)]
 pub enum RequestError {
@@ -60,6 +61,11 @@ pub struct DeleteQueue {
     pub queue_name: BufferAddress,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetProperties {
+    pub buffer: BufferAddress,
+}
+
 impl RequestType for ListQueues {
     type Response = Vec<(BufferAddress, usize, usize, usize)>;
 }
@@ -76,12 +82,17 @@ impl RequestType for DeleteQueue {
     type Response = Status;
 }
 
+impl RequestType for GetProperties {
+    type Response = BufferProperties;
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AdminRequest {
     ListQueues(ListQueues),
     CheckQueue(CheckQueue),
     CreateQueue(CreateQueue),
     DeleteQueue(DeleteQueue),
+    GetProperties(GetProperties),
 }
 
 impl From<ListQueues> for AdminRequest {
@@ -105,6 +116,12 @@ impl From<CreateQueue> for AdminRequest {
 impl From<DeleteQueue> for AdminRequest {
     fn from(value: DeleteQueue) -> Self {
         AdminRequest::DeleteQueue(value)
+    }
+}
+
+impl From<GetProperties> for AdminRequest {
+    fn from(value: GetProperties) -> Self {
+        AdminRequest::GetProperties(value)
     }
 }
 

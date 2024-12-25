@@ -2,7 +2,7 @@ use crate::buffer_manager::BufferManager;
 use crate::request_handler::RequestHandler;
 use crate::server_error::ServerError;
 use backend::protocol::request::AdminRequest;
-use backend::protocol::ResponseError;
+use backend::protocol::{ResponseError, Status};
 use backend::stream_io::{StreamIO, StreamIOError};
 use log::{debug, error, info};
 use postcard::to_allocvec;
@@ -88,7 +88,7 @@ impl AdminWorker {
     fn handle_request(&mut self, req: AdminRequest) -> Result<Vec<u8>, ResponseError> {
         self.handle_request2(req).unwrap_or_else(|err| {
             error!("Execution failed: {:?}", err);
-            Err(ResponseError::ExecFailed)
+            Err(ResponseError::ExecFailed(Status::Error))
         })
     }
 
@@ -107,6 +107,9 @@ impl AdminWorker {
                 .handle_request(self.queue_manager.clone())
                 .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
             AdminRequest::DeleteQueue(r) => r
+                .handle_request(self.queue_manager.clone())
+                .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
+            AdminRequest::GetProperties(b) => b
                 .handle_request(self.queue_manager.clone())
                 .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
         }

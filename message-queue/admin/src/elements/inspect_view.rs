@@ -1,4 +1,4 @@
-use backend::protocol::BufferAddress;
+use backend::protocol::{BufferAddress, BufferProperties};
 use iced::widget::{button, column, row, text};
 use iced::{Alignment, Element, Length};
 
@@ -9,7 +9,7 @@ pub enum InspectViewMessage {
 }
 
 pub struct InspectView {
-    pub buffer_info: Option<BufferAddress>,
+    pub buffer_info: Option<(BufferAddress, BufferProperties)>,
 }
 
 impl InspectView {
@@ -22,19 +22,23 @@ impl InspectView {
         Message: From<InspectViewMessage> + 'a,
     {
         match &self.buffer_info {
-            Some(buffer_info) => {
+            Some((address, properties)) => {
+                let mut delete_btn = button("Delete");
+                if !properties.system_buffer {
+                    delete_btn = delete_btn.on_press(InspectViewMessage::Delete);
+                }
                 let element: Element<InspectViewMessage> = column![
                     row![
                         button("<").on_press(InspectViewMessage::Close),
                         text(format![
                             "{:?} {}",
-                            buffer_info.buffer_type(),
-                            buffer_info.to_string()
+                            address.buffer_type(),
+                            address.to_string()
                         ])
                         .width(Length::Fill)
                         .align_x(Alignment::Center),
                     ],
-                    button("Delete").on_press(InspectViewMessage::Delete),
+                    delete_btn,
                 ]
                 .into();
                 element.map(Message::from)

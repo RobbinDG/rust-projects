@@ -2,10 +2,10 @@ use crate::elements::connection_interface::{ConnectionInterface, ConnectionInter
 use crate::elements::inspect_view::{InspectView, InspectViewMessage};
 use crate::elements::{QueueView, UIMessage};
 use crate::server_connector::ServerConnector;
+use backend::protocol::request::{DeleteQueue, GetProperties};
 use backend::protocol::BufferAddress;
 use iced::widget::{column, container, text, vertical_space};
 use iced::{Alignment, Element, Length};
-use backend::protocol::request::DeleteQueue;
 
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
@@ -92,7 +92,7 @@ impl AdminView {
             AdminViewMessage::Inspector(m) => {
                 println!("{m:?}");
                 if let InspectViewMessage::Delete = m {
-                    if let Some(addr) = &self.inspect_view.buffer_info {
+                    if let Some((addr, _)) = &self.inspect_view.buffer_info {
                         self.delete_buffer(addr.clone());
                         self.buffer_view.update(UIMessage::Refresh, &mut self.connector)
                     }
@@ -100,7 +100,10 @@ impl AdminView {
                 self.inspect_view.update(m)
             }
             AdminViewMessage::InspectBuffer(address) => {
-                self.inspect_view.buffer_info = Some(address)
+                if let Ok(client) = self.connector.client() {
+                    let properties = client.transfer_admin_request(GetProperties { buffer: address.clone() }).unwrap();
+                    self.inspect_view.buffer_info = Some((address, properties));
+                }
             }
             AdminViewMessage::ConnectionUpdated(m) => {
                 self.connection_interface.update(m, &mut self.connector)
@@ -110,9 +113,7 @@ impl AdminView {
 
     fn delete_buffer(&mut self, s: BufferAddress) {
         if let Ok(client) = self.connector.client() {
-            if let Err(_) = client.transfer_admin_request(DeleteQueue { queue_name: s }) {
-                panic!()
-            }
+            client.transfer_admin_request(DeleteQueue { queue_name: s }).unwrap();
         }
     }
 }
