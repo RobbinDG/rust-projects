@@ -1,8 +1,8 @@
 use crate::elements::UIMessage;
 use backend::protocol::BufferAddress;
 use iced::widget::{
-    button, column, container, horizontal_rule, hover, mouse_area, row, scrollable, text, Column
-    , Row,
+    column, container, horizontal_rule, hover, mouse_area, row, scrollable, text, Column,
+    Row,
 };
 use iced::{color, font, Alignment, Background, Border, Element, Length};
 use std::iter::zip;
@@ -74,9 +74,7 @@ impl QueueTable {
                 row_content.1[i - 1].clone()
             }
         });
-        let mut r: Row<UIMessage> =
-            row(zip(self.widths, rows).map(|(w, c)| text(c).width(w).into()));
-        r = r.push(button("Delete").on_press(UIMessage::DeleteQueue(row_content.0.clone())));
+        let r: Row<UIMessage> = row(zip(self.widths, rows).map(|(w, c)| text(c).width(w).into()));
         mouse_area(hover(
             r,
             container("")

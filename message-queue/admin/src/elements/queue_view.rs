@@ -1,7 +1,7 @@
 use crate::elements::QueueTable;
 use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
-use backend::protocol::request::{CreateQueue, DeleteQueue, ListQueues};
+use backend::protocol::request::{CreateQueue, ListQueues};
 use backend::protocol::{BufferAddress, BufferType};
 use iced::widget::{button, column, radio, row, text_input};
 use iced::Element;
@@ -39,7 +39,7 @@ impl QueueView {
             }
         );
 
-        let mut cols = column![
+        let cols = column![
             self.queue_table.view().height(500),
             row![
                 radio(
@@ -75,20 +75,10 @@ impl QueueView {
                 self.create(connector);
                 self.refresh(connector);
             }
-            UIMessage::DeleteQueue(s) => {
-                self.delete(s, connector);
-                self.refresh(connector);
-            }
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
             }
             UIMessage::InspectBuffer(_) => {}
-        }
-    }
-
-    fn delete(&mut self, s: BufferAddress, connector: &mut ServerConnector) {
-        if let Ok(client) = connector.client() {
-            if let Err(_) = client.transfer_admin_request(DeleteQueue { queue_name: s }) {}
         }
     }
 
