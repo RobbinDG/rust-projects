@@ -1,9 +1,10 @@
+use crate::protocol::new::codec::{encode, CodecError};
 use crate::protocol::ResponseError;
 use serde::{Deserialize, Serialize};
-use std::io;
-use std::io::{ErrorKind, Read, Write};
-use std::net::{Shutdown, TcpStream};
-use std::time::{Duration, SystemTime};
+use std::io::Read;
+use std::time::SystemTime;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 const BUFFER_SIZE: usize = 1024;
 
@@ -16,9 +17,16 @@ pub struct StreamIO {
 #[derive(Debug)]
 pub enum StreamIOError {
     /// For errors related to the transfer of packets.
-    Stream(io::Error),
+    Stream(std::io::Error),
     /// For errors with serialisation of messages.
     Codec(postcard::Error),
+}
+
+impl From<CodecError> for StreamIOError {
+    fn from(e: CodecError) -> Self {
+        let CodecError(pce) = e;
+        StreamIOError::Codec(pce)
+    }
 }
 
 impl From<StreamIOError> for String {
@@ -30,8 +38,14 @@ impl From<StreamIOError> for String {
     }
 }
 
-impl From<io::Error> for StreamIOError {
-    fn from(value: io::Error) -> Self {
+// impl From<tokio::io::Error> for StreamIOError {
+//     fn from(value: tokio::io::Error) -> Self {
+//         StreamIOError::Codec(value.into())
+//     }
+// }
+
+impl From<std::io::Error> for StreamIOError {
+    fn from(value: std::io::Error) -> Self {
         StreamIOError::Stream(value)
     }
 }
@@ -55,35 +69,42 @@ impl StreamIO {
         }
     }
 
-    pub fn set_timeout(&mut self, duration: Option<Duration>) -> io::Result<()> {
-        self.stream.set_read_timeout(duration)?;
-        self.stream.set_write_timeout(duration)
-    }
-
-    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
-        self.stream.set_nonblocking(nonblocking)
-    }
-
-    /// Write a struct to the stream, after first encoding it. The struct must
-    /// be serialisable and deserialisable by `serde`.
-    pub fn write<T>(&mut self, message: &T) -> Result<(), StreamIOError>
-    where
-        T: Serialize + for<'a> Deserialize<'a>,
-    {
-        let result = Ok(self.stream.write_all(&postcard::to_allocvec(message)?)?);
+    pub async fn write(&mut self, data: &Vec<u8>) -> Result<(), StreamIOError> {
+        let result = Ok(self.stream.write_all(data).await?);
         self.last_write = Some(SystemTime::now());
         result
     }
 
+    /// Write a struct to the stream, after first encoding it. The struct must
+    /// be serialisable and deserialisable by `serde`.
+    pub async fn write_encode<T>(&mut self, message: &T) -> Result<(), StreamIOError>
+    where
+        T: Serialize + for<'a> Deserialize<'a>,
+    {
+        self.write(&encode(message)?).await
+    }
+
     /// Read a struct from the stream, after first decoding it. The struct must
     /// be serialisable and deserialisable by `serde`.
-    pub fn read<T>(&mut self) -> Result<T, StreamIOError>
+    pub async fn read<T>(&mut self) -> Result<T, StreamIOError>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
         let mut buf = [0; BUFFER_SIZE];
-        self.stream.read(&mut buf)?;
-        self.stream.flush()?;
+        self.stream.read(&mut buf).await?;
+        let result = Ok(postcard::from_bytes(&buf)?);
+        self.last_read = Some(SystemTime::now());
+        result
+    }
+
+    /// Try to read a struct from the stream, after first decoding it. The struct must
+    /// be serialisable and deserialisable by `serde`.
+    pub async fn try_read<T>(&mut self) -> Result<T, StreamIOError>
+    where
+        T: Serialize + for<'a> Deserialize<'a>,
+    {
+        let mut buf = [0; BUFFER_SIZE];
+        self.stream.try_read(&mut buf)?;
         let result = Ok(postcard::from_bytes(&buf)?);
         self.last_read = Some(SystemTime::now());
         result
@@ -93,11 +114,13 @@ impl StreamIO {
     /// from the stream. This assumes that the `Ok` value is encoded prior to being wrapped
     /// in the `Result`, and therefore is doubly encoded. The struct must be serialisable
     /// and deserialisable by `serde`.
-    pub fn read_encoded_result<T>(&mut self) -> Result<Result<T, ResponseError>, StreamIOError>
+    pub async fn read_encoded_result<T>(
+        &mut self,
+    ) -> Result<Result<T, ResponseError>, StreamIOError>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        let response: Result<Vec<u8>, ResponseError> = self.read()?;
+        let response: Result<Vec<u8>, ResponseError> = self.read().await?;
         Ok(match response {
             Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
             Err(err) => Err(err),
@@ -115,20 +138,5 @@ impl StreamIO {
     pub fn reset(&mut self) {
         self.last_write = None;
         self.last_read = None;
-    }
-}
-
-impl Drop for StreamIO {
-    fn drop(&mut self) {
-        if let Err(e) = self.stream.shutdown(Shutdown::Both) {
-            match e.kind() {
-                ErrorKind::BrokenPipe
-                | ErrorKind::ConnectionAborted
-                | ErrorKind::ConnectionRefused
-                | ErrorKind::ConnectionReset
-                | ErrorKind::NotConnected => return,
-                _ => Err(e).unwrap(),
-            }
-        }
     }
 }

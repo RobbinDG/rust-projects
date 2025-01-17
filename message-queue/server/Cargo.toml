@@ -7,6 +7,8 @@ resolver = "2"
 [dependencies]
 backend = { path = "../backend" }
 serde = { version = "1.0.214", default-features = false }
-postcard = { version = "1.0.10", features = ["alloc"] }
-env_logger = "0.11.5"
-log = "0.4.22"
+erased-serde = "0.4.5"
+postcard = { version = "1.1.1", features = ["alloc"] }
+env_logger = "0.11.6"
+log = "0.4.25"
+tokio = { version = "1.43.0", features = ["rt", "rt-multi-thread", "macros", "net"] }

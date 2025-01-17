@@ -13,13 +13,19 @@ mod topic_processor;
 mod buffer_manager;
 mod buffer_interface;
 mod server_error;
+mod buffer_channel;
+mod new;
 
+use std::error::Error;
 use server::Server;
 use std::net::TcpListener;
+use std::io;
 
-fn main() {
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-    let socket_listener = TcpListener::bind("127.0.0.1:1234").unwrap();
+    let socket_listener = TcpListener::bind("127.0.0.1:1234").await?;
     let server = Server::new(socket_listener);
-    server.run();
+    Ok(server.run())
 }

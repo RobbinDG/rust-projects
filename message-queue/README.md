@@ -10,3 +10,5 @@
 - Dead lettering
 - Reconnect on disconnect admin panel
   - Better information on connection state
+- Filtering on topics on the receiving end
+- Messages with payloads other than strings.

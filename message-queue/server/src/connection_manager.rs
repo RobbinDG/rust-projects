@@ -1,49 +1,59 @@
 use crate::admin_worker::AdminWorker;
 use crate::buffer_interface::BufferInterface;
 use crate::buffer_manager::BufferManager;
+use crate::new::publisher_manager::PublisherManager;
+use crate::new::queue_store::QueueStore;
+use crate::new::subscription_manager::SubscriptionManager;
 use crate::setup_worker::SetupWorker;
 use backend::protocol::SetupResponse;
 use backend::stream_io::StreamIO;
 use log::{error, info};
-use std::net::{SocketAddr, TcpListener, };
+use std::net::SocketAddr;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
+use std::time::Duration;
 use std::{io, thread};
+use tokio::net::TcpListener;
+use tokio::task::JoinHandle;
 
 pub struct ConnectionManager {
     listener: TcpListener,
-    buffer_manager: Arc<Mutex<BufferManager>>,
-    setup_connections: Mutex<
-        Vec<(
-            SocketAddr,
-            Option<JoinHandle<(StreamIO, SetupResponse)>>,
-        )>,
-    >,
-    admin_connections: Mutex<Vec<(SocketAddr, Option<JoinHandle<StreamIO>>, Sender<()>)>>,
+    queues: Arc<Mutex<QueueStore>>,
+    setup_connections: Mutex<Vec<(SocketAddr, JoinHandle<()>)>>,
+    admin_connections: Mutex<Vec<(SocketAddr, JoinHandle<StreamIO>, Sender<()>)>>,
+    publisher_manager: Arc<Mutex<PublisherManager>>,
+    subscription_manager: Arc<Mutex<SubscriptionManager>>,
 }
 
 impl ConnectionManager {
-    pub fn new(listener: TcpListener, buffer_manager: Arc<Mutex<BufferManager>>) -> Self {
+    pub fn new(
+        listener: TcpListener,
+        queues: Arc<Mutex<QueueStore>>,
+        publisher_manager: Arc<Mutex<PublisherManager>>,
+        subscription_manager: Arc<Mutex<SubscriptionManager>>,
+    ) -> Self {
         Self {
             listener,
-            buffer_manager,
+            queues,
+            publisher_manager,
+            subscription_manager,
             setup_connections: Mutex::new(Vec::default()),
             admin_connections: Mutex::new(Vec::default()),
         }
     }
 
-    pub fn start(&self) {
+    pub async fn start(&self) {
+        thread::spawn(|| {
+            self.check_and_join_disconnects().unwrap();
+
+            thread::sleep(Duration::from_secs(1));
+        });
         loop {
-            match self.listener.accept() {
+            match self.listener.accept().await {
                 Ok((stream, addr)) => {
-                    info!("{addr}");
+                    info!("New client: {addr}");
                     let worker = SetupWorker::new(stream);
-                    let handle = thread::spawn(move || worker.run());
-                    self.setup_connections
-                        .lock()
-                        .unwrap()
-                        .push((addr, Some(handle)));
+                    self.handle_setup(addr, worker);
                     info!("connected");
                 }
                 Err(e) => {
@@ -56,67 +66,58 @@ impl ConnectionManager {
         }
     }
 
-    pub fn check_and_join_disconnects(&self) -> io::Result<()> {
-        for (addr, handle_opt) in &mut self.setup_connections.lock().unwrap().iter_mut() {
-            let handle = handle_opt.take().unwrap();
-            if handle.is_finished() {
-                let (stream, termination) = handle.join().unwrap();
-                match termination {
-                    SetupResponse::Disconnect => info!("{} Disconnected", addr),
-                    SetupResponse::Sender(queue) => {
-                        self.buffer_manager
-                            .lock()
-                            .unwrap()
-                            .connect_sender(&queue, stream)?;
-                    }
-                    SetupResponse::Receiver(queue) => {
-                        self.buffer_manager
-                            .lock()
-                            .unwrap()
-                            .connect_receiver(&queue, stream);
-                    }
-                    SetupResponse::Admin => {
-                        let (admin_worker, interrupt) =
-                            AdminWorker::new(self.buffer_manager.clone(), stream);
-                        let admin_handle = thread::spawn(move || admin_worker.run());
-                        self.admin_connections.lock().unwrap().push((
-                            addr.clone(),
-                            Some(admin_handle),
-                            interrupt,
-                        ));
-                    }
+    fn handle_setup(&self, addr: SocketAddr, worker: SetupWorker) {
+        let pm = self.publisher_manager.clone();
+        let sm = self.subscription_manager.clone();
+        let handle = tokio::spawn(async move {
+            let (stream, termination) = worker.run().await;
+            match termination {
+                SetupResponse::Disconnect => info!("{} Disconnected", addr),
+                SetupResponse::Sender => {
+                    pm.lock().unwrap().register_publisher(stream);
                 }
-            } else {
-                let _ = handle_opt.insert(handle);
+                SetupResponse::Receiver(queue) => {
+                    sm.lock().unwrap().subscribe(stream, &queue);
+                }
+                SetupResponse::Admin => {
+                    let (admin_worker, interrupt) = AdminWorker::new(self.queues.clone(), stream);
+                    self.handle_admin(addr, admin_worker, interrupt);
+                }
             }
-        }
-        self.setup_connections
-            .lock()
-            .unwrap()
-            .retain(|(_, h)| h.is_some());
-        for (addr, handle_opt, _) in &mut self.admin_connections.lock().unwrap().iter_mut() {
-            let handle = handle_opt.take().unwrap();
-            if handle.is_finished() {
-                handle.join().unwrap();
-                info!("{} Disconnected", addr);
-            } else {
-                let _ = handle_opt.insert(handle);
-            }
-        }
+        });
+        self.setup_connections.lock().unwrap().push((addr, handle));
+    }
+
+    fn handle_admin(&self, addr: SocketAddr, worker: AdminWorker, interrupt: Sender<()>) {
+        let admin_handle = tokio::spawn(async move {
+            let stream = worker.run();
+            info!("{} Disconnected", addr);
+            stream
+        });
         self.admin_connections
             .lock()
             .unwrap()
-            .retain(|(_, h, _)| h.is_some());
+            .push((addr.clone(), admin_handle, interrupt));
+    }
+
+    pub fn check_and_join_disconnects(&self) -> io::Result<()> {
+        self.setup_connections
+            .lock()
+            .unwrap()
+            .retain(|(_, h)| !h.is_finished());
+        self.admin_connections
+            .lock()
+            .unwrap()
+            .retain(|(_, h, _)| !h.is_finished());
         Ok(())
     }
 }
 
 impl Drop for ConnectionManager {
     fn drop(&mut self) {
-        for (_, handle, interrupt) in &mut self.admin_connections.lock().unwrap().iter_mut() {
+        for (_, _, interrupt) in &mut self.admin_connections.lock().unwrap().iter_mut() {
             // TODO handle errors
             interrupt.send(()).unwrap();
-            handle.take().unwrap().join().unwrap(); // Drop using "option dance"
         }
     }
 }
