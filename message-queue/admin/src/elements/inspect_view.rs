@@ -1,4 +1,5 @@
-use backend::protocol::{BufferAddress, BufferProperties};
+use backend::protocol::new::queue_id::QueueId;
+use backend::protocol::BufferProperties;
 use iced::widget::{button, column, row, text};
 use iced::{Alignment, Element, Length};
 
@@ -9,7 +10,7 @@ pub enum InspectViewMessage {
 }
 
 pub struct InspectView {
-    pub buffer_info: Option<(BufferAddress, BufferProperties)>,
+    pub buffer_info: Option<(QueueId, BufferProperties)>,
 }
 
 impl InspectView {
@@ -32,7 +33,7 @@ impl InspectView {
                         button("<").on_press(InspectViewMessage::Close),
                         text(format![
                             "{:?} {}",
-                            address.buffer_type(),
+                            address.queue_type(),
                             address.to_string()
                         ])
                         .width(Length::Fill)

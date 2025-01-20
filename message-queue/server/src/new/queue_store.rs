@@ -36,6 +36,10 @@ impl QueueStore {
         }
     }
 
+    pub fn list(&self) -> Vec<(QueueId, usize, usize, usize)> {
+        self.queues.keys().cloned().map(|id| (id, 0, 0, 0)).collect()
+    }
+
     pub fn create(&mut self, queue_id: QueueId) {
         match &queue_id {
             QueueId::Queue(name) => self

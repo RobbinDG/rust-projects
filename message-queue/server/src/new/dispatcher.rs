@@ -1,12 +1,16 @@
+use crate::new::queue_store::QueueStore;
 use crate::new::request_worker::RequestWorker;
 use backend::protocol::new::codec::{encode, CodecError};
 use backend::protocol::new::request_error::RequestError;
-use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, SupportedRequest};
-use backend::protocol::{Request, ResponseError};
+use backend::protocol::request::{
+    CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, SupportedRequest,
+};
+use backend::protocol::Request;
 use backend::stream_io::{StreamIO, StreamIOError};
 use log::error;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 
 trait StreamResponder<R>
 where
@@ -15,7 +19,7 @@ where
     async fn send_over_stream(self, stream: &mut StreamIO) -> std::io::Result<()>;
 }
 
-impl<R> StreamResponder<R> for Result<R::Response, ResponseError>
+impl<R> StreamResponder<R> for Result<R::Response, RequestError>
 where
     R: Request,
 {
@@ -34,17 +38,19 @@ trait Handler<R>
 where
     R: Request,
 {
-    fn handle(&mut self, request: &R) -> Result<R::Response, ResponseError>;
+    fn handle(&mut self, request: &R) -> Result<R::Response, RequestError>;
 }
 
-struct ListQueuesHandler {}
+struct ListQueuesHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
 
 impl Handler<ListQueues> for ListQueuesHandler {
     fn handle(
         &mut self,
         request: &ListQueues,
-    ) -> Result<<ListQueues as Request>::Response, ResponseError> {
-        todo!()
+    ) -> Result<<ListQueues as Request>::Response, RequestError> {
+        Ok(self.queues.lock()?.list())
     }
 }
 
@@ -54,7 +60,7 @@ impl Handler<CheckQueue> for CheckQueueHandler {
     fn handle(
         &mut self,
         request: &CheckQueue,
-    ) -> Result<<CheckQueue as Request>::Response, ResponseError> {
+    ) -> Result<<CheckQueue as Request>::Response, RequestError> {
         todo!()
     }
 }
@@ -62,7 +68,10 @@ impl Handler<CheckQueue> for CheckQueueHandler {
 struct CreateQueueHandler {}
 
 impl Handler<CreateQueue> for CreateQueueHandler {
-    fn handle(&mut self, request: &CreateQueue) -> Result<<CreateQueue as Request>::Response, ResponseError> {
+    fn handle(
+        &mut self,
+        request: &CreateQueue,
+    ) -> Result<<CreateQueue as Request>::Response, RequestError> {
         todo!()
     }
 }
@@ -70,7 +79,10 @@ impl Handler<CreateQueue> for CreateQueueHandler {
 struct DeleteQueueHandler {}
 
 impl Handler<DeleteQueue> for DeleteQueueHandler {
-    fn handle(&mut self, request: &DeleteQueue) -> Result<<DeleteQueue as Request>::Response, ResponseError> {
+    fn handle(
+        &mut self,
+        request: &DeleteQueue,
+    ) -> Result<<DeleteQueue as Request>::Response, RequestError> {
         todo!()
     }
 }
@@ -78,21 +90,30 @@ impl Handler<DeleteQueue> for DeleteQueueHandler {
 struct GetPropertiesHandler {}
 
 impl Handler<GetProperties> for GetPropertiesHandler {
-    fn handle(&mut self, request: &GetProperties) -> Result<<GetProperties as Request>::Response, ResponseError> {
+    fn handle(
+        &mut self,
+        request: &GetProperties,
+    ) -> Result<<GetProperties as Request>::Response, RequestError> {
         todo!()
     }
 }
 
-pub struct RequestDispatcher {}
+pub struct RequestDispatcher {
+    list_queues: ListQueuesHandler,
+}
 
 impl RequestDispatcher {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(queue_store: Arc<Mutex<QueueStore>>) -> Self {
+        Self {
+            list_queues: ListQueuesHandler {
+                queues: queue_store,
+            },
+        }
     }
 
-    pub async fn dispatch(&self, request: SupportedRequest) -> Result<Vec<u8>, CodecError> {
+    pub async fn dispatch(&mut self, request: SupportedRequest) -> Result<Vec<u8>, CodecError> {
         match request {
-            SupportedRequest::ListQueues(r) => handle_and_send(r, &mut ListQueuesHandler {}),
+            SupportedRequest::ListQueues(r) => handle_and_send(r, &mut self.list_queues),
             SupportedRequest::CheckQueue(r) => handle_and_send(r, &mut CheckQueueHandler {}),
             SupportedRequest::CreateQueue(r) => handle_and_send(r, &mut CreateQueueHandler {}),
             SupportedRequest::DeleteQueue(r) => handle_and_send(r, &mut DeleteQueueHandler {}),

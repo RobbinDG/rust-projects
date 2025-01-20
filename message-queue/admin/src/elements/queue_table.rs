@@ -1,5 +1,5 @@
 use crate::elements::UIMessage;
-use backend::protocol::BufferAddress;
+use backend::protocol::new::queue_id::QueueId;
 use iced::widget::{
     column, container, horizontal_rule, hover, mouse_area, row, scrollable, text, Column,
     Row,
@@ -10,7 +10,7 @@ use std::iter::zip;
 pub struct QueueTable {
     names: [&'static str; 4],
     widths: [u16; 4],
-    content: Vec<(BufferAddress, [String; 3])>,
+    content: Vec<(QueueId, [String; 3])>,
     header_font: font::Font,
     height: Length,
 }
@@ -33,7 +33,7 @@ impl QueueTable {
         self.content.clear();
     }
 
-    pub fn push(&mut self, row: (BufferAddress, usize, usize, usize)) {
+    pub fn push(&mut self, row: (QueueId, usize, usize, usize)) {
         self.content.push((
             row.0,
             [row.1.to_string(), row.2.to_string(), row.3.to_string()],
@@ -66,7 +66,7 @@ impl QueueTable {
         column![header, divider, scrollable(rows_column).width(Length::Fill)].height(self.height)
     }
 
-    fn make_content_row(&self, row_content: &(BufferAddress, [String; 3])) -> Element<UIMessage> {
+    fn make_content_row(&self, row_content: &(QueueId, [String; 3])) -> Element<UIMessage> {
         let rows: [String; 4] = std::array::from_fn(|i| {
             if i == 0 {
                 row_content.0.to_string()

@@ -57,7 +57,8 @@ impl ServerConnector {
     }
 
     fn attempt_connect(c: DisconnectedClient<String>) -> Client {
-        match block_on(c.connect()) {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        match rt.block_on(c.connect()) {
             Ok(mut connected) => match block_on(connected.transfer_request(SetupRequest::Admin)) {
                 Ok(SetupResponse::Admin) => Client::Connected(connected),
                 _ => Client::Disconnected(connected.disconnect()),

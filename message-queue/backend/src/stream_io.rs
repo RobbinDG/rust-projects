@@ -1,5 +1,5 @@
 use crate::protocol::new::codec::{encode, CodecError};
-use crate::protocol::ResponseError;
+use crate::protocol::RequestError;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::time::SystemTime;
@@ -116,11 +116,11 @@ impl StreamIO {
     /// and deserialisable by `serde`.
     pub async fn read_encoded_result<T>(
         &mut self,
-    ) -> Result<Result<T, ResponseError>, StreamIOError>
+    ) -> Result<Result<T, RequestError>, StreamIOError>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        let response: Result<Vec<u8>, ResponseError> = self.read().await?;
+        let response: Result<Vec<u8>, RequestError> = self.read().await?;
         Ok(match response {
             Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
             Err(err) => Err(err),

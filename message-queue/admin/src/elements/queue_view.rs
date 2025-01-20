@@ -6,12 +6,13 @@ use backend::protocol::{BufferAddress, BufferType};
 use iced::widget::{button, column, radio, row, text_input};
 use iced::Element;
 use iced::futures::executor::block_on;
+use backend::protocol::new::queue_id::{QueueId, QueueType};
 
 pub struct QueueView {
     // Widget state
     queue_table: QueueTable,
     new_queue_text: String,
-    selected_buffer_type: Option<BufferType>,
+    selected_buffer_type: Option<QueueType>,
 }
 
 impl Default for QueueView {
@@ -22,7 +23,7 @@ impl Default for QueueView {
                 [300, 200, 200, 200],
             ),
             new_queue_text: String::new(),
-            selected_buffer_type: Some(BufferType::Queue),
+            selected_buffer_type: Some(QueueType::Queue),
         }
     }
 }
@@ -35,7 +36,7 @@ impl QueueView {
         let placeholder = format!(
             "New {} name",
             match self.selected_buffer_type {
-                Some(BufferType::Topic) => "topic",
+                Some(QueueType::Topic) => "topic",
                 _ => "queue",
             }
         );
@@ -45,13 +46,13 @@ impl QueueView {
             row![
                 radio(
                     "Queue",
-                    BufferType::Queue,
+                    QueueType::Queue,
                     self.selected_buffer_type,
                     UIMessage::SelectBufferType
                 ),
                 radio(
                     "Topic",
-                    BufferType::Topic,
+                    QueueType::Topic,
                     self.selected_buffer_type,
                     UIMessage::SelectBufferType
                 ),
@@ -87,12 +88,7 @@ impl QueueView {
         if let Ok(client) = connector.client() {
             if let Err(_) = block_on(client.transfer_admin_request(CreateQueue {
                 queue_address: match self.selected_buffer_type {
-                    Some(BufferType::Queue) => {
-                        BufferAddress::new_queue(self.new_queue_text.clone())
-                    }
-                    Some(BufferType::Topic) => {
-                        BufferAddress::new_topic(self.new_queue_text.clone())
-                    }
+                    Some(type_) => QueueId::new(self.new_queue_text.clone(), type_),
                     _ => todo!("No buffer selected"),
                 },
             })) {}

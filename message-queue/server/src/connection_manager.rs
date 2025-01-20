@@ -42,7 +42,7 @@ impl ConnectionManager {
                 Ok((stream, addr)) => {
                     info!("New client: {addr}");
                     // let worker = SetupWorker::new(stream);
-                    let dispatcher = RequestDispatcher::new();
+                    let dispatcher = RequestDispatcher::new(self.queues.clone());
                     let worker = RequestWorker::new(StreamIO::new(stream), dispatcher);
                     tokio::spawn(async move {
                         let exit_status = worker.run().await;

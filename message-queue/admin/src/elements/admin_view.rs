@@ -7,10 +7,11 @@ use backend::protocol::BufferAddress;
 use iced::widget::{column, container, text, vertical_space};
 use iced::{Alignment, Element, Length};
 use iced::futures::executor::block_on;
+use backend::protocol::new::queue_id::QueueId;
 
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
-    InspectBuffer(BufferAddress),
+    InspectBuffer(QueueId),
     BufferView(UIMessage),
     Inspector(InspectViewMessage),
     ConnectionUpdated(ConnectionInterfaceMessage),
@@ -112,7 +113,7 @@ impl AdminView {
         }
     }
 
-    fn delete_buffer(&mut self, s: BufferAddress) {
+    fn delete_buffer(&mut self, s: QueueId) {
         if let Ok(client) = self.connector.client() {
             block_on(client.transfer_admin_request(DeleteQueue { queue_name: s })).unwrap();
         }

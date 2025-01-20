@@ -1,10 +1,10 @@
-use backend::protocol::{BufferAddress, BufferType};
+use backend::protocol::new::queue_id::{QueueId, QueueType};
 
 #[derive(Debug, Clone)]
 pub enum UIMessage {
     Refresh,
     NewQueueName(String),
     CreateQueue,
-    SelectBufferType(BufferType),
-    InspectBuffer(BufferAddress),
+    SelectBufferType(QueueType),
+    InspectBuffer(QueueId),
 }

@@ -11,7 +11,7 @@ pub mod new;
 pub use message_buffer::{MessageBuffer, BufferProperties};
 pub use message::{Message, DLXPreference};
 pub use request::Request;
-pub use response::{ResponseError, ServerResponse};
+pub use response::{RequestError, ServerResponse};
 pub use status_code::Status;
 pub use setup_request::SetupRequest;
 pub use setup_response::SetupResponse;

@@ -1,5 +1,5 @@
 use crate::protocol::buffer_address::BufferAddress;
-use crate::protocol::response::ResponseError;
+use crate::protocol::response::RequestError as ResponseError;
 use crate::protocol::status_code::Status;
 use crate::stream_io::StreamIOError;
 use serde::{Deserialize, Serialize};
@@ -7,6 +7,7 @@ use std::io::Error;
 use std::str;
 use std::str::Utf8Error;
 use crate::protocol::BufferProperties;
+use crate::protocol::new::queue_id::QueueId;
 
 #[derive(Debug)]
 pub enum RequestError {
@@ -48,26 +49,26 @@ pub struct ListQueues {}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CheckQueue {
-    pub queue_address: BufferAddress,
+    pub queue_address: QueueId,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateQueue {
-    pub queue_address: BufferAddress,
+    pub queue_address: QueueId,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DeleteQueue {
-    pub queue_name: BufferAddress,
+    pub queue_name: QueueId,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProperties {
-    pub buffer: BufferAddress,
+    pub buffer: QueueId,
 }
 
 impl Request for ListQueues {
-    type Response = Vec<(BufferAddress, usize, usize, usize)>;
+    type Response = Vec<(QueueId, usize, usize, usize)>;
 }
 
 impl Request for CheckQueue {

@@ -5,15 +5,15 @@ use std::str;
 use std::str::FromStr;
 
 #[derive(Deserialize, Serialize, Debug)]
-pub enum ResponseError {
+pub enum RequestError {
     RequestNotUnderstood,
     ExecFailed(Status),
     CommunicationFailed,
 }
 
-impl From<postcard::Error> for ResponseError {
+impl From<postcard::Error> for RequestError {
     fn from(_: postcard::Error) -> Self {
-        ResponseError::RequestNotUnderstood
+        RequestError::RequestNotUnderstood
     }
 }
 
