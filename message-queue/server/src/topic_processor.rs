@@ -1,7 +1,9 @@
-use crate::buffer_processor::BufferProcessor;
-use crate::topic::Topic;
+use crate::buffer_channel::ChannelInput;
+use crate::buffer_processor::{BufferInput, BufferProcessor};
+use crate::topic::{Topic, TopicMessage};
 use backend::protocol::{BufferAddress, BufferProperties};
 use backend::stream_io::StreamIO;
+use log::error;
 use std::time::Duration;
 
 pub struct TopicProcessor {}
@@ -9,8 +11,8 @@ pub struct TopicProcessor {}
 impl TopicProcessor {}
 
 impl BufferProcessor<Topic> for TopicProcessor {
-    fn create_buffer(&self, properties: BufferProperties) -> Topic {
-        Topic::new(properties, Duration::from_secs(50))
+    fn create_buffer(&self, properties: BufferProperties, dlx_channel: ChannelInput) -> Topic {
+        Topic::new(properties, Duration::from_secs(50), dlx_channel)
     }
 
     fn address_from_string(&self, string: String) -> BufferAddress {
@@ -19,13 +21,13 @@ impl BufferProcessor<Topic> for TopicProcessor {
 
     fn process_buffer(
         &mut self,
-        senders: &mut Vec<StreamIO>,
+        senders: &mut Vec<BufferInput>,
         receivers: &mut Vec<StreamIO>,
         topic: &mut Topic,
     ) {
-        topic.check_expired();
+        let to_dead_letter = topic.purge_expired();
         for sender in senders {
-            while let Ok(message) = sender.read() {
+            while let Some(message) = sender.read() {
                 topic.publish(message);
             }
         }
@@ -34,10 +36,19 @@ impl BufferProcessor<Topic> for TopicProcessor {
             // all messages. Using the iterator will update the last_write parameter of the stream
             // after the first write, which is guaranteed to be later than the remaining messages'
             // insert time.
-            let messages = topic.unsent_messages(receiver.last_write()).collect::<Vec<_>>();
+            let messages = topic
+                .unsent_messages(receiver.last_write())
+                .collect::<Vec<_>>();
             for message in messages {
-                println!("Writing {:?}", message);
-                if let Err(_) = receiver.write(message) {
+                if let Err(_) = message.send_using(|m| receiver.write_encode(m)) {
+                    continue;
+                }
+            }
+        }
+        for message in to_dead_letter {
+            if let TopicMessage { message: m, .. } = message {
+                if let Err(e) = topic.dlx_channel.write(m) {
+                    error!("Error when sending message to DLX: {}", e);
                     continue;
                 }
             }

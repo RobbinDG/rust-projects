@@ -2,7 +2,7 @@ use backend::protocol::{SetupRequest, SetupResponse};
 use backend::stream_io::{StreamIO, StreamIOError};
 use log::{debug, error, info};
 use std::io::ErrorKind;
-use std::net::TcpStream;
+use tokio::net::TcpStream;
 
 pub struct SetupWorker {
     stream: StreamIO,
@@ -15,13 +15,9 @@ impl SetupWorker {
         }
     }
 
-    pub fn run(mut self) -> (StreamIO, SetupResponse) {
+    pub async fn run(mut self) -> (StreamIO, SetupResponse) {
         info!("worker started");
-        if let Err(_) = self.stream.set_timeout(None) {
-            return (self.stream, SetupResponse::Disconnect);
-        }
-
-        let request: SetupRequest = match self.stream.read() {
+        let request: SetupRequest = match self.stream.read().await {
             Ok(buf) => buf,
             Err(err) => {
                 return match err {
@@ -54,7 +50,7 @@ impl SetupWorker {
         };
 
         debug!("Sending promotion response.");
-        if let Err(e) = self.stream.write(&promotion) {
+        if let Err(e) = self.stream.write_encode(&promotion).await {
             error!("Unhandled error: {e:?}");
             return (self.stream, SetupResponse::Disconnect);
         }

@@ -1,4 +1,4 @@
-use crate::protocol::request::RequestType;
+use crate::protocol::request::Request;
 use crate::protocol::{BufferAddress, SetupResponse};
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +9,6 @@ pub enum SetupRequest {
     Receiver(BufferAddress),
 }
 
-impl RequestType for SetupRequest {
+impl Request for SetupRequest {
     type Response = SetupResponse;
 }

@@ -39,7 +39,7 @@ impl From<ResponseError> for RequestError {
     }
 }
 
-pub trait RequestType {
+pub trait Request {
     type Response: Serialize + for<'de> Deserialize<'de> + Sized;
 }
 
@@ -66,23 +66,23 @@ pub struct GetProperties {
     pub buffer: BufferAddress,
 }
 
-impl RequestType for ListQueues {
+impl Request for ListQueues {
     type Response = Vec<(BufferAddress, usize, usize, usize)>;
 }
 
-impl RequestType for CheckQueue {
+impl Request for CheckQueue {
     type Response = Status;
 }
 
-impl RequestType for CreateQueue {
+impl Request for CreateQueue {
     type Response = Status;
 }
 
-impl RequestType for DeleteQueue {
+impl Request for DeleteQueue {
     type Response = Status;
 }
 
-impl RequestType for GetProperties {
+impl Request for GetProperties {
     type Response = BufferProperties;
 }
 
@@ -125,6 +125,21 @@ impl From<GetProperties> for AdminRequest {
     }
 }
 
-impl RequestType for AdminRequest {
+impl Request for AdminRequest {
     type Response = Vec<u8>;
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SupportedRequest {
+    ListQueues(ListQueues),
+    CheckQueue(CheckQueue),
+    CreateQueue(CreateQueue),
+    DeleteQueue(DeleteQueue),
+    GetProperties(GetProperties),
+}
+
+impl From<CreateQueue> for SupportedRequest {
+    fn from(r: CreateQueue) -> Self {
+        SupportedRequest::CreateQueue(r)
+    }
 }

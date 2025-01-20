@@ -1,11 +1,12 @@
 use crate::buffer_interface::BufferInterface;
-use crate::buffer_processor::BufferProcessor;
-use backend::protocol::{BufferProperties, MessageBuffer};
+use crate::buffer_processor::{BufferInput, BufferProcessor};
+use backend::protocol::{BufferProperties, Message, MessageBuffer};
 use backend::protocol::BufferAddress;
 use backend::stream_io::StreamIO;
 use log::warn;
 use std::collections::HashMap;
 use std::io;
+use crate::buffer_channel::{BufferChannel, ChannelInput};
 
 pub struct BufferTypeManager<T, P>
 where
@@ -13,7 +14,7 @@ where
     P: BufferProcessor<T>,
 {
     buffer_processor: P,
-    queues: HashMap<String, (Vec<StreamIO>, T, Vec<StreamIO>)>,
+    queues: HashMap<String, (Vec<BufferInput>, T, Vec<StreamIO>)>,
 }
 
 impl<T, P> BufferTypeManager<T, P>
@@ -26,6 +27,25 @@ where
             buffer_processor,
             queues: HashMap::new(),
         }
+    }
+
+    pub fn dead_letter_channel(&mut self, buffer_name: &String) -> ChannelInput {
+        let (i, o) = BufferChannel::new();
+        if let Some((senders, _, _)) = self.queues.get_mut(buffer_name) {
+            senders.push(BufferInput::Buffer(o));
+        }
+        i
+    }
+
+    pub fn create(&mut self, name: String, properties: BufferProperties, dlx_channel: ChannelInput) {
+        self.queues.insert(
+            name,
+            (
+                Vec::default(),
+                self.buffer_processor.create_buffer(properties, dlx_channel),
+                Vec::default(),
+            ),
+        );
     }
 }
 
@@ -49,21 +69,10 @@ where
         self.queues.get(buffer).map(|(_, t, _)| t.properties())
     }
 
-    fn create(&mut self, name: String, properties: BufferProperties) {
-        self.queues.insert(
-            name,
-            (
-                Vec::default(),
-                self.buffer_processor.create_buffer(properties),
-                Vec::default(),
-            ),
-        );
-    }
-
     /// Deletes a queue and all remaining messages. If successful, returns all senders
     /// and receivers on this queue. If the result is not handled, the streams go out of scope
     /// and connections will be closed.
-    fn delete(&mut self, name: &String) -> Option<(Vec<StreamIO>, Vec<StreamIO>)> {
+    fn delete(&mut self, name: &String) -> Option<(Vec<BufferInput>, Vec<StreamIO>)> {
         if let Some((_, buf, _)) = self.queues.get(name) {
             if buf.properties().system_buffer {
                 return None; // TODO a "refused" response would be appropriate in this case.
@@ -77,9 +86,8 @@ where
     }
 
     fn connect_sender(&mut self, queue_name: &String, mut stream: StreamIO) -> io::Result<()> {
-        stream.set_nonblocking(true)?;
         if let Some((senders, _, _)) = self.queues.get_mut(queue_name) {
-            senders.push(stream)
+            senders.push(BufferInput::Stream(stream))
         }
         Ok(())
     }

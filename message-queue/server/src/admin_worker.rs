@@ -10,19 +10,20 @@ use std::io::ErrorKind;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use crate::new::queue_store::QueueStore;
 
 pub struct AdminWorker {
-    queue_manager: Arc<Mutex<BufferManager>>,
+    queues: Arc<Mutex<QueueStore>>,
     stream: StreamIO,
     interrupt_channel: Receiver<()>,
 }
 
 impl AdminWorker {
-    pub fn new(queue_manager: Arc<Mutex<BufferManager>>, stream: StreamIO) -> (Self, Sender<()>) {
+    pub fn new(queues: Arc<Mutex<QueueStore>>, stream: StreamIO) -> (Self, Sender<()>) {
         let (tx, rx) = channel();
         (
             Self {
-                queue_manager,
+                queues,
                 stream,
                 interrupt_channel: rx,
             },
@@ -32,12 +33,8 @@ impl AdminWorker {
 
     pub fn run(mut self) -> StreamIO {
         info!("Started admin worker");
-        if let Err(_) = self.stream.set_timeout(Some(Duration::from_secs(1))) {
-            return self.stream;
-        }
-
         while self.interrupt_channel.try_recv().is_err() {
-            let request: Result<AdminRequest, ResponseError> = match self.stream.read() {
+            let request: Result<AdminRequest, ResponseError> = match self.stream.try_read() {
                 Ok(buf) => Ok(buf),
                 Err(err) => {
                     match err {
@@ -64,7 +61,7 @@ impl AdminWorker {
                 request.and_then(|r| self.handle_request(r));
 
             debug!("Sending response {:?}", response);
-            if let Err(err) = self.stream.write(&response) {
+            if let Err(err) = self.stream.write_encode(&response) {
                 match err {
                     StreamIOError::Stream(e) => match e.kind() {
                         ErrorKind::TimedOut => continue,
@@ -98,19 +95,19 @@ impl AdminWorker {
     ) -> Result<Result<Vec<u8>, ResponseError>, ServerError> {
         match req {
             AdminRequest::ListQueues(r) => r
-                .handle_request(self.queue_manager.clone())
+                .handle_request(self.queues.clone())
                 .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
             AdminRequest::CheckQueue(r) => r
-                .handle_request(self.queue_manager.clone())
+                .handle_request(self.queues.clone())
                 .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
             AdminRequest::CreateQueue(r) => r
-                .handle_request(self.queue_manager.clone())
+                .handle_request(self.queues.clone())
                 .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
             AdminRequest::DeleteQueue(r) => r
-                .handle_request(self.queue_manager.clone())
+                .handle_request(self.queues.clone())
                 .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
             AdminRequest::GetProperties(b) => b
-                .handle_request(self.queue_manager.clone())
+                .handle_request(self.queues.clone())
                 .map(|s| s.and_then(|v| to_allocvec(&v).map_err(Into::into))),
         }
     }

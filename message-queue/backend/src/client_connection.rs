@@ -1,10 +1,9 @@
 use std::fmt::Debug;
-use crate::protocol::request::{AdminRequest, RequestError, RequestType};
+use crate::protocol::request::{AdminRequest, RequestError, Request};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
 use std::io;
-use std::net::{TcpStream, ToSocketAddrs};
-use std::time::Duration;
+use tokio::net::{TcpStream, ToSocketAddrs};
 
 pub struct ConnectionConfig<T>
 where
@@ -42,22 +41,22 @@ impl<T: ToSocketAddrs + Clone + Debug> DisconnectedClient<T> {
         }
     }
 
-    pub fn connect(self) -> Result<ConnectedClient<T>, ConnectionError<T>> {
+    pub async fn connect(self) -> Result<ConnectedClient<T>, ConnectionError<T>> {
         println!("Connecting to {:?}", self.config.address);
-        let addr = match self.config.address.to_socket_addrs() {
-            Ok(mut addrs) => match addrs.next() {
-                None => return Err(ConnectionError {
-                    error_body: None, // TODO give this a proper error type. Occurs when parsing fails.
-                    server: self,
-                }),
-                Some(a) => a,
-            },
-            Err(e) => return Err(ConnectionError {
-                error_body: Some(e),
-                server: self,
-            }),
-        };
-        match TcpStream::connect_timeout(&addr, Duration::from_secs(5)) {
+        // let addr = match self.config.address.to_socket_addrs() {
+        //     Ok(mut addrs) => match addrs.next() {
+        //         None => return Err(ConnectionError {
+        //             error_body: None, // TODO give this a proper error type. Occurs when parsing fails.
+        //             server: self,
+        //         }),
+        //         Some(a) => a,
+        //     },
+        //     Err(e) => return Err(ConnectionError {
+        //         error_body: Some(e),
+        //         server: self,
+        //     }),
+        // };
+        match TcpStream::connect(&self.config.address).await {
             Ok(stream) => Ok(ConnectedClient {
                 config: self.config,
                 stream: StreamIO::new(stream),
@@ -72,28 +71,28 @@ impl<T: ToSocketAddrs + Clone + Debug> DisconnectedClient<T> {
 }
 
 impl<T: ToSocketAddrs + Clone + Debug> ConnectedClient<T> {
-    pub fn transfer_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
+    pub async fn transfer_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
     where
-        R: RequestType + Serialize + for<'a> Deserialize<'a>,
+        R: Request + Serialize + for<'a> Deserialize<'a>,
     {
-        self.push_message(request)?;
-        self.pull_message()
+        self.push_message(request).await?;
+        self.pull_message().await
     }
 
-    pub fn transfer_admin_request<R>(&mut self, request: R) -> Result<R::Response, RequestError>
+    pub async fn transfer_admin_request<R>(&mut self, request: R) -> Result<R::Response, RequestError>
     where
-        R: RequestType + Serialize + for<'a> Deserialize<'a>,
+        R: Request + Serialize + for<'a> Deserialize<'a>,
         AdminRequest: From<R>,
     {
-        self.push_message(AdminRequest::from(request))?;
-        self.pull_admin_response()
+        self.push_message(AdminRequest::from(request)).await?;
+        self.pull_admin_response().await
     }
 
-    pub fn push_message<R>(&mut self, message: R) -> Result<(), StreamIOError>
+    pub async fn push_message<R>(&mut self, message: R) -> Result<(), StreamIOError>
     where
         R: Serialize + for<'a> Deserialize<'a>,
     {
-        let result = self.stream.write(&message);
+        let result = self.stream.write_encode(&message).await;
 
         if let Err(StreamIOError::Stream(e)) = &result {
             if e.kind() == io::ErrorKind::BrokenPipe {
@@ -103,11 +102,11 @@ impl<T: ToSocketAddrs + Clone + Debug> ConnectedClient<T> {
         result
     }
 
-    pub fn pull_message<R>(&mut self) -> Result<R, StreamIOError>
+    pub async fn pull_message<R>(&mut self) -> Result<R, StreamIOError>
     where
         R: Serialize + for<'a> Deserialize<'a>,
     {
-        let result = self.stream.read();
+        let result = self.stream.read().await;
 
         if let Err(StreamIOError::Stream(e)) = &result {
             if e.kind() == io::ErrorKind::BrokenPipe {
@@ -117,11 +116,11 @@ impl<T: ToSocketAddrs + Clone + Debug> ConnectedClient<T> {
         result
     }
 
-    pub fn pull_admin_response<R>(&mut self) -> Result<R, RequestError>
+    pub async fn pull_admin_response<R>(&mut self) -> Result<R, RequestError>
     where
         R: Serialize + for<'a> Deserialize<'a>,
     {
-        match self.stream.read_encoded_result() {
+        match self.stream.read_encoded_result().await {
             Ok(response) => Ok(response?),
             Err(err) => {
                 if let StreamIOError::Stream(e) = &err {

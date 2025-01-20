@@ -1,19 +1,39 @@
-use log::{debug, error};
-use backend::protocol::{BufferAddress, BufferProperties};
+use crate::buffer_channel::{ChannelInput, ChannelOutput};
 use crate::message_queue::MessageQueue;
-use backend::stream_io::StreamIO;
 use backend::protocol::MessageBuffer;
+use backend::protocol::{BufferAddress, BufferProperties, Message};
+use backend::stream_io::{StreamIO, StreamIOError};
+use log::{debug, error};
+
+pub enum BufferInput {
+    Stream(StreamIO),
+    Buffer(ChannelOutput),
+}
+
+impl BufferInput {
+    pub fn read(&mut self) -> Option<Message> {
+        match self {
+            BufferInput::Stream(stream) => stream
+                .read()
+                .inspect_err(|err| {
+                    error!("Error reading from stream input: {:?}", err);
+                })
+                .ok(),
+            BufferInput::Buffer(buf) => buf.read(),
+        }
+    }
+}
 
 pub trait BufferProcessor<T>
 where
     T: MessageBuffer,
 {
-    fn create_buffer(&self, properties: BufferProperties) -> T;
+    fn create_buffer(&self, properties: BufferProperties, dlx_channel: ChannelInput) -> T;
 
     fn address_from_string(&self, string: String) -> BufferAddress;
     fn process_buffer(
         &mut self,
-        senders: &mut Vec<StreamIO>,
+        senders: &mut Vec<BufferInput>,
         receivers: &mut Vec<StreamIO>,
         queue: &mut T,
     );
@@ -22,7 +42,7 @@ where
 pub struct MessageQueueProcessor {}
 
 impl BufferProcessor<MessageQueue> for MessageQueueProcessor {
-    fn create_buffer(&self, properties: BufferProperties) -> MessageQueue {
+    fn create_buffer(&self, properties: BufferProperties, dlx_channel: ChannelInput) -> MessageQueue {
         MessageQueue::new_empty(properties)
     }
 
@@ -32,17 +52,17 @@ impl BufferProcessor<MessageQueue> for MessageQueueProcessor {
 
     fn process_buffer(
         &mut self,
-        senders: &mut Vec<StreamIO>,
+        senders: &mut Vec<BufferInput>,
         receivers: &mut Vec<StreamIO>,
         queue: &mut MessageQueue,
     ) {
         for sender in senders {
             match sender.read() {
-                Ok(message) => {
+                Some(message) => {
                     debug!("{:?}", message);
                     queue.push(message)
                 }
-                Err(_) => {
+                None => {
                     continue;
                 }
             }
@@ -58,7 +78,7 @@ impl MessageQueueProcessor {
     fn empty_queue_to_stream(queue: &mut MessageQueue, recipient: &mut StreamIO) {
         while let Some(message) = queue.pop() {
             debug!("sending... {:?}", message);
-            if let Err(e) = recipient.write(&message) {
+            if let Err(e) = recipient.write_encode(&message) {
                 error!("{:?}", e);
             }
         }

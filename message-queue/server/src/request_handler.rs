@@ -1,25 +1,25 @@
 use crate::buffer_interface::BufferInterface;
-use crate::buffer_manager::BufferManager;
+use crate::new::queue_store::QueueStore;
 use crate::server_error::ServerError;
 use backend::protocol::request::{
-    CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, RequestType,
+    CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Request,
 };
 use backend::protocol::{BufferProperties, ResponseError, Status};
 use std::sync::{Arc, Mutex};
 
-pub trait RequestHandler: RequestType {
+pub trait RequestHandler: Request {
     /// TODO does this need to take a reference or can it consume the request? This avoids
     ///  cloning
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<BufferManager>>,
+        queue_manager: Arc<Mutex<QueueStore>>,
     ) -> Result<Result<Self::Response, ResponseError>, ServerError>;
 }
 
 impl RequestHandler for ListQueues {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<BufferManager>>,
+        queue_manager: Arc<Mutex<QueueStore>>,
     ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
         Ok(Ok(queue_manager.lock()?.buffers()))
     }
@@ -28,7 +28,7 @@ impl RequestHandler for ListQueues {
 impl RequestHandler for CheckQueue {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<BufferManager>>,
+        queue_manager: Arc<Mutex<QueueStore>>,
     ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
         Ok(if queue_manager.lock()?.queue_exists(&self.queue_address) {
             Ok(Status::Exists)
@@ -41,7 +41,7 @@ impl RequestHandler for CheckQueue {
 impl RequestHandler for CreateQueue {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<BufferManager>>,
+        queue_manager: Arc<Mutex<QueueStore>>,
     ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
         let mut qm = queue_manager.lock()?;
 
@@ -62,7 +62,7 @@ impl RequestHandler for CreateQueue {
 impl RequestHandler for DeleteQueue {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<BufferManager>>,
+        queue_manager: Arc<Mutex<QueueStore>>,
     ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
         let mut qm = queue_manager.lock()?;
 
@@ -77,7 +77,7 @@ impl RequestHandler for DeleteQueue {
 impl RequestHandler for GetProperties {
     fn handle_request(
         self,
-        queue_manager: Arc<Mutex<BufferManager>>,
+        queue_manager: Arc<Mutex<QueueStore>>,
     ) -> Result<Result<Self::Response, ResponseError>, ServerError> {
         let mut qm = queue_manager.lock()?;
         Ok(qm

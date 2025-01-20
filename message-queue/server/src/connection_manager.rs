@@ -43,11 +43,11 @@ impl ConnectionManager {
     }
 
     pub async fn start(&self) {
-        thread::spawn(|| {
-            self.check_and_join_disconnects().unwrap();
-
-            thread::sleep(Duration::from_secs(1));
-        });
+        // thread::spawn(|| {
+        //     self.check_and_join_disconnects().unwrap();
+        //
+        //     thread::sleep(Duration::from_secs(1));
+        // });
         loop {
             match self.listener.accept().await {
                 Ok((stream, addr)) => {

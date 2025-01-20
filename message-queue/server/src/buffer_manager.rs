@@ -1,9 +1,9 @@
 use crate::buffer_interface::BufferInterface;
-use crate::buffer_processor::MessageQueueProcessor;
+use crate::buffer_processor::{BufferInput, MessageQueueProcessor};
 use crate::queue_manager::QueueManager;
 use crate::topic_manager::TopicManager;
 use crate::topic_processor::TopicProcessor;
-use backend::protocol::{BufferAddress, BufferProperties, BufferType};
+use backend::protocol::{BufferAddress, BufferProperties, BufferType, DLXPreference, Message};
 use backend::stream_io::StreamIO;
 use std::io;
 
@@ -17,13 +17,41 @@ impl BufferManager {
     pub fn new() -> Self {
         let default_dlx = BufferAddress::new_queue("default_dlx".to_string());
         let mut qm = QueueManager::new(MessageQueueProcessor {});
-        qm.create(default_dlx.to_string(), BufferProperties {
-            system_buffer: true,
-        });
+        qm.create(
+            default_dlx.to_string(),
+            BufferProperties {
+                system_buffer: true,
+                dlx_preference: DLXPreference::Default,
+            },
+
+        );
         Self {
             default_dlx,
             queues: qm,
             topics: TopicManager::new(TopicProcessor {}),
+        }
+    }
+
+    pub fn create(&mut self, queue: BufferAddress, properties: BufferProperties) {
+        let dlx_channel = match properties.dlx_preference {
+            DLXPreference::Buffer => todo!(),
+            DLXPreference::Default => match self.default_dlx.buffer_type() {
+                BufferType::Queue => self.queues.dead_letter_channel(&queue.to_string()),
+                BufferType::Topic => self.topics.dead_letter_channel(&queue.to_string()),
+            }
+        };
+        match queue.buffer_type() {
+            BufferType::Queue => self.queues.create(queue.to_string(), properties, dlx_channel),
+            BufferType::Topic => self.topics.create(queue.to_string(), properties, dlx_channel),
+        }
+    }
+
+    fn send_to_dead_letter(&mut self, messages: Vec<Message>) {
+        for message in messages {
+            match message.dlx() {
+                DLXPreference::Buffer => {}
+                DLXPreference::Default => {}
+            }
         }
     }
 }
@@ -50,14 +78,7 @@ impl BufferInterface<BufferAddress> for BufferManager {
         }
     }
 
-    fn create(&mut self, queue: BufferAddress, properties: BufferProperties) {
-        match queue.buffer_type() {
-            BufferType::Queue => self.queues.create(queue.to_string(), properties),
-            BufferType::Topic => self.topics.create(queue.to_string(), properties),
-        }
-    }
-
-    fn delete(&mut self, queue: &BufferAddress) -> Option<(Vec<StreamIO>, Vec<StreamIO>)> {
+    fn delete(&mut self, queue: &BufferAddress) -> Option<(Vec<BufferInput>, Vec<StreamIO>)> {
         match queue.buffer_type() {
             BufferType::Queue => self.queues.delete(&queue.to_string()),
             BufferType::Topic => self.topics.delete(&queue.to_string()),
