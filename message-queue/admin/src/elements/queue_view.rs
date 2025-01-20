@@ -5,6 +5,7 @@ use backend::protocol::request::{CreateQueue, ListQueues};
 use backend::protocol::{BufferAddress, BufferType};
 use iced::widget::{button, column, radio, row, text_input};
 use iced::Element;
+use iced::futures::executor::block_on;
 
 pub struct QueueView {
     // Widget state
@@ -84,7 +85,7 @@ impl QueueView {
 
     fn create(&mut self, connector: &mut ServerConnector) {
         if let Ok(client) = connector.client() {
-            if let Err(_) = client.transfer_admin_request(CreateQueue {
+            if let Err(_) = block_on(client.transfer_admin_request(CreateQueue {
                 queue_address: match self.selected_buffer_type {
                     Some(BufferType::Queue) => {
                         BufferAddress::new_queue(self.new_queue_text.clone())
@@ -94,13 +95,13 @@ impl QueueView {
                     }
                     _ => todo!("No buffer selected"),
                 },
-            }) {}
+            })) {}
         }
     }
 
     fn refresh(&mut self, connector: &mut ServerConnector) {
         if let Ok(client) = connector.client() {
-            match client.transfer_admin_request(ListQueues {}) {
+            match block_on(client.transfer_admin_request(ListQueues {})) {
                 Ok(response) => {
                     self.queue_table.clear();
                     for queue_data in response {

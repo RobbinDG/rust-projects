@@ -1,3 +1,4 @@
+use iced::futures::executor::block_on;
 use backend::protocol::{SetupRequest, SetupResponse};
 use backend::{ConnectedClient, DisconnectedClient};
 
@@ -26,7 +27,7 @@ impl ServerConnector {
                 Client::Connected(connected) => {
                     if connected.broken_pipe() {
                         let disconnected = connected.disconnect();
-                        match disconnected.connect() {
+                        match block_on(disconnected.connect()) {
                             Ok(c) => Client::Connected(c),
                             Err(e) => Client::Disconnected(e.server),
                         }
@@ -49,15 +50,15 @@ impl ServerConnector {
             }
         }
         let new_client = DisconnectedClient::new(addr);
-        let _ = self.client.insert(match new_client.connect() {
+        let _ = self.client.insert(match block_on(new_client.connect()) {
             Ok(c) => Client::Connected(c),
             Err(e) => Client::Disconnected(e.server),
         });
     }
 
     fn attempt_connect(c: DisconnectedClient<String>) -> Client {
-        match c.connect() {
-            Ok(mut connected) => match connected.transfer_request(SetupRequest::Admin) {
+        match block_on(c.connect()) {
+            Ok(mut connected) => match block_on(connected.transfer_request(SetupRequest::Admin)) {
                 Ok(SetupResponse::Admin) => Client::Connected(connected),
                 _ => Client::Disconnected(connected.disconnect()),
             },

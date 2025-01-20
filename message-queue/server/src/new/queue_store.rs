@@ -1,13 +1,23 @@
-use std::collections::HashMap;
-use backend::protocol::new::queue_id::QueueId;
 use crate::new::queue::Queue;
+use backend::protocol::new::queue_id::QueueId;
+use std::collections::HashMap;
 
 pub struct MessageQueue {
     queue: Queue,
 }
 
-pub struct MessageTopic {
+impl MessageQueue {
+    pub fn new() -> Self {
+        todo!()
+    }
+}
 
+pub struct MessageTopic {}
+
+impl MessageTopic {
+    pub fn new() -> Self {
+        todo!()
+    }
 }
 
 enum QueueType {
@@ -21,11 +31,20 @@ pub struct QueueStore {
 
 impl QueueStore {
     pub fn new() -> Self {
-        todo!()
+        Self {
+            queues: HashMap::new(),
+        }
     }
 
     pub fn create(&mut self, queue_id: QueueId) {
-        todo!()
+        match &queue_id {
+            QueueId::Queue(name) => self
+                .queues
+                .insert(queue_id, QueueType::Queue(MessageQueue::new())),
+            QueueId::Topic(name) => self
+                .queues
+                .insert(queue_id, QueueType::Topic(MessageTopic::new())),
+        };
     }
 
     pub fn delete(&mut self, queue_id: &QueueId) {

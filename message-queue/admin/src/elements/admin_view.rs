@@ -6,6 +6,7 @@ use backend::protocol::request::{DeleteQueue, GetProperties};
 use backend::protocol::BufferAddress;
 use iced::widget::{column, container, text, vertical_space};
 use iced::{Alignment, Element, Length};
+use iced::futures::executor::block_on;
 
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
@@ -101,7 +102,7 @@ impl AdminView {
             }
             AdminViewMessage::InspectBuffer(address) => {
                 if let Ok(client) = self.connector.client() {
-                    let properties = client.transfer_admin_request(GetProperties { buffer: address.clone() }).unwrap();
+                    let properties = block_on(client.transfer_admin_request(GetProperties { buffer: address.clone() })).unwrap();
                     self.inspect_view.buffer_info = Some((address, properties));
                 }
             }
@@ -113,7 +114,7 @@ impl AdminView {
 
     fn delete_buffer(&mut self, s: BufferAddress) {
         if let Ok(client) = self.connector.client() {
-            client.transfer_admin_request(DeleteQueue { queue_name: s }).unwrap();
+            block_on(client.transfer_admin_request(DeleteQueue { queue_name: s })).unwrap();
         }
     }
 }

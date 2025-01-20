@@ -10,7 +10,7 @@ pub struct Server {
     connection_manager: ConnectionManager,
     queues: Arc<Mutex<QueueStore>>,
     router: Router,
-    queue_manager: QueueManager,
+    // queue_manager: QueueManager,
 }
 
 impl Server {
@@ -21,7 +21,7 @@ impl Server {
             connection_manager,
             queues,
             router: Router {},
-            queue_manager: QueueManager::new(),
+            // queue_manager: QueueManager::new(),
         }
     }
 
