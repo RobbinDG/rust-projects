@@ -5,4 +5,5 @@ pub enum RequestError {
     DecodeError,
     NotUnderstood,
     RequestHandlingError,
+    PayloadEncodeError,
 }

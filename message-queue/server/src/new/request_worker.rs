@@ -12,21 +12,35 @@ pub struct RequestWorker {
 }
 
 impl RequestWorker {
-    async fn run(mut self) -> tokio::io::Result<StreamIO> {
+    pub fn new(stream: StreamIO, dispatcher: RequestDispatcher) -> Self {
+        Self {
+            stream_io: stream,
+            dispatcher,
+        }
+    }
+
+    pub async fn run(mut self) -> tokio::io::Result<StreamIO> {
         loop {
             let request: Result<SupportedRequest, StreamIOError> = self.stream_io.read().await;
-            let response = request.map_err(|_| RequestError::DecodeError);
-            match self.dispatcher.dispatch(response).await {
-                Ok(data) => {
-                    if let Err(err) = self.stream_io.write(&data).await {
-                        error!("Error while writing to stream: {}", err);
-                        break;
+            let request = request.map_err(|_| RequestError::DecodeError);
+            let response = match request {
+                Ok(r) => self
+                    .dispatcher
+                    .dispatch(r)
+                    .await
+                    .or(Err(RequestError::PayloadEncodeError)),
+                Err(e) => Err(e),
+            };
+            if let Err(e) = self.stream_io.write_encode(&response).await {
+                match e {
+                    StreamIOError::Stream(err) => return Err(err),
+                    StreamIOError::Codec(_) => {
+                        error!("Failed to encode response.")
                     }
                 }
-                Err(err) => {
-                    error!("Error when encoding response: {:?}.", err)
-                }
-            };
+                error!("Failed to send response to client: {:?}", e);
+                break;
+            }
         }
         Ok(self.stream_io)
     }

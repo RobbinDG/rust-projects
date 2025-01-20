@@ -1,10 +1,8 @@
-use crate::admin_worker::AdminWorker;
-use crate::buffer_interface::BufferInterface;
-use crate::buffer_manager::BufferManager;
+use crate::new::dispatcher::RequestDispatcher;
 use crate::new::publisher_manager::PublisherManager;
 use crate::new::queue_store::QueueStore;
+use crate::new::request_worker::RequestWorker;
 use crate::new::subscription_manager::SubscriptionManager;
-use crate::setup_worker::SetupWorker;
 use backend::protocol::SetupResponse;
 use backend::stream_io::StreamIO;
 use log::{error, info};
@@ -21,22 +19,13 @@ pub struct ConnectionManager {
     queues: Arc<Mutex<QueueStore>>,
     setup_connections: Mutex<Vec<(SocketAddr, JoinHandle<()>)>>,
     admin_connections: Mutex<Vec<(SocketAddr, JoinHandle<StreamIO>, Sender<()>)>>,
-    publisher_manager: Arc<Mutex<PublisherManager>>,
-    subscription_manager: Arc<Mutex<SubscriptionManager>>,
 }
 
 impl ConnectionManager {
-    pub fn new(
-        listener: TcpListener,
-        queues: Arc<Mutex<QueueStore>>,
-        publisher_manager: Arc<Mutex<PublisherManager>>,
-        subscription_manager: Arc<Mutex<SubscriptionManager>>,
-    ) -> Self {
+    pub fn new(listener: TcpListener, queues: Arc<Mutex<QueueStore>>) -> Self {
         Self {
             listener,
             queues,
-            publisher_manager,
-            subscription_manager,
             setup_connections: Mutex::new(Vec::default()),
             admin_connections: Mutex::new(Vec::default()),
         }
@@ -52,8 +41,13 @@ impl ConnectionManager {
             match self.listener.accept().await {
                 Ok((stream, addr)) => {
                     info!("New client: {addr}");
-                    let worker = SetupWorker::new(stream);
-                    self.handle_setup(addr, worker);
+                    // let worker = SetupWorker::new(stream);
+                    let dispatcher = RequestDispatcher::new();
+                    let worker = RequestWorker::new(StreamIO::new(stream), dispatcher);
+                    tokio::spawn(async move {
+                        let exit_status = worker.run().await;
+                    });
+                    // self.handle_setup(addr, worker);
                     info!("connected");
                 }
                 Err(e) => {
@@ -66,39 +60,39 @@ impl ConnectionManager {
         }
     }
 
-    fn handle_setup(&self, addr: SocketAddr, worker: SetupWorker) {
-        let pm = self.publisher_manager.clone();
-        let sm = self.subscription_manager.clone();
-        let handle = tokio::spawn(async move {
-            let (stream, termination) = worker.run().await;
-            match termination {
-                SetupResponse::Disconnect => info!("{} Disconnected", addr),
-                SetupResponse::Sender => {
-                    pm.lock().unwrap().register_publisher(stream);
-                }
-                SetupResponse::Receiver(queue) => {
-                    sm.lock().unwrap().subscribe(stream, &queue);
-                }
-                SetupResponse::Admin => {
-                    let (admin_worker, interrupt) = AdminWorker::new(self.queues.clone(), stream);
-                    self.handle_admin(addr, admin_worker, interrupt);
-                }
-            }
-        });
-        self.setup_connections.lock().unwrap().push((addr, handle));
-    }
+    // fn handle_setup(&self, addr: SocketAddr, worker: SetupWorker) {
+    //     let pm = self.publisher_manager.clone();
+    //     let sm = self.subscription_manager.clone();
+    //     let handle = tokio::spawn(async move {
+    //         let (stream, termination) = worker.run().await;
+    //         match termination {
+    //             SetupResponse::Disconnect => info!("{} Disconnected", addr),
+    //             SetupResponse::Sender => {
+    //                 pm.lock().unwrap().register_publisher(stream);
+    //             }
+    //             SetupResponse::Receiver(queue) => {
+    //                 sm.lock().unwrap().subscribe(stream, &queue);
+    //             }
+    //             SetupResponse::Admin => {
+    //                 let (admin_worker, interrupt) = AdminWorker::new(self.queues.clone(), stream);
+    //                 self.handle_admin(addr, admin_worker, interrupt);
+    //             }
+    //         }
+    //     });
+    //     self.setup_connections.lock().unwrap().push((addr, handle));
+    // }
 
-    fn handle_admin(&self, addr: SocketAddr, worker: AdminWorker, interrupt: Sender<()>) {
-        let admin_handle = tokio::spawn(async move {
-            let stream = worker.run();
-            info!("{} Disconnected", addr);
-            stream
-        });
-        self.admin_connections
-            .lock()
-            .unwrap()
-            .push((addr.clone(), admin_handle, interrupt));
-    }
+    // fn handle_admin(&self, addr: SocketAddr, worker: AdminWorker, interrupt: Sender<()>) {
+    //     let admin_handle = tokio::spawn(async move {
+    //         let stream = worker.run();
+    //         info!("{} Disconnected", addr);
+    //         stream
+    //     });
+    //     self.admin_connections
+    //         .lock()
+    //         .unwrap()
+    //         .push((addr.clone(), admin_handle, interrupt));
+    // }
 
     pub fn check_and_join_disconnects(&self) -> io::Result<()> {
         self.setup_connections

@@ -1,9 +1,7 @@
 use crate::new::request_worker::RequestWorker;
-use crate::request_handler::RequestHandler;
-use crate::server_error::ServerError;
 use backend::protocol::new::codec::{encode, CodecError};
 use backend::protocol::new::request_error::RequestError;
-use backend::protocol::request::{CheckQueue, CreateQueue, ListQueues, SupportedRequest};
+use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, SupportedRequest};
 use backend::protocol::{Request, ResponseError};
 use backend::stream_io::{StreamIO, StreamIOError};
 use log::error;
@@ -61,27 +59,44 @@ impl Handler<CheckQueue> for CheckQueueHandler {
     }
 }
 
+struct CreateQueueHandler {}
+
+impl Handler<CreateQueue> for CreateQueueHandler {
+    fn handle(&mut self, request: &CreateQueue) -> Result<<CreateQueue as Request>::Response, ResponseError> {
+        todo!()
+    }
+}
+
+struct DeleteQueueHandler {}
+
+impl Handler<DeleteQueue> for DeleteQueueHandler {
+    fn handle(&mut self, request: &DeleteQueue) -> Result<<DeleteQueue as Request>::Response, ResponseError> {
+        todo!()
+    }
+}
+
+struct GetPropertiesHandler {}
+
+impl Handler<GetProperties> for GetPropertiesHandler {
+    fn handle(&mut self, request: &GetProperties) -> Result<<GetProperties as Request>::Response, ResponseError> {
+        todo!()
+    }
+}
+
 pub struct RequestDispatcher {}
 
 impl RequestDispatcher {
-    pub async fn dispatch<R>(
-        &self,
-        request: Result<SupportedRequest, RequestError>,
-    ) -> Result<Vec<u8>, CodecError>
-    where
-        R: Request,
-        SupportedRequest: From<R>,
-    {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub async fn dispatch(&self, request: SupportedRequest) -> Result<Vec<u8>, CodecError> {
         match request {
-            Ok(SupportedRequest::ListQueues(r)) => handle_and_send(r, &mut ListQueuesHandler {}),
-            Ok(SupportedRequest::CheckQueue(r)) => handle_and_send(r, &mut CheckQueueHandler {}),
-            Ok(SupportedRequest::CreateQueue(r)) => handle_and_send(r),
-            Ok(SupportedRequest::DeleteQueue(r)) => handle_and_send(r),
-            Ok(SupportedRequest::GetProperties(r)) => handle_and_send(r),
-            Err(e) => {
-                let x: Result<R::Response, RequestError> = Err(e);
-                encode(&x)
-            }
+            SupportedRequest::ListQueues(r) => handle_and_send(r, &mut ListQueuesHandler {}),
+            SupportedRequest::CheckQueue(r) => handle_and_send(r, &mut CheckQueueHandler {}),
+            SupportedRequest::CreateQueue(r) => handle_and_send(r, &mut CreateQueueHandler {}),
+            SupportedRequest::DeleteQueue(r) => handle_and_send(r, &mut DeleteQueueHandler {}),
+            SupportedRequest::GetProperties(r) => handle_and_send(r, &mut GetPropertiesHandler {}),
         }
     }
 }
