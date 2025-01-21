@@ -1,5 +1,5 @@
-use std::time::SystemTime;
 use backend::protocol::new::message::Message;
+use std::time::SystemTime;
 
 struct QueuedMessage {
     message: Message,
@@ -18,11 +18,16 @@ impl Queue {
     }
 
     pub fn push(&mut self, message: Message) {
-        todo!()
+        self.messages.push(QueuedMessage {
+            message,
+            inserted_at: SystemTime::now(),
+        });
     }
 
     pub fn pop(&mut self) -> Option<Message> {
-        todo!()
+        match self.messages.pop() {
+            Some(QueuedMessage { message, .. }) => Some(message),
+            _ => None,
+        }
     }
-
 }

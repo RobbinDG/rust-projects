@@ -49,10 +49,11 @@ pub struct AdminView {
 
 impl Default for AdminView {
     fn default() -> Self {
+        let connector = Arc::new(Mutex::new(ServerConnector::new()));
         Self {
-            connector: Arc::new(Mutex::new(ServerConnector::new())),
+            connector: connector.clone(),
             buffer_view: QueueView::default(),
-            inspect_view: InspectView::new(),
+            inspect_view: InspectView::new(connector),
             connection_interface: ConnectionInterface::new(),
         }
     }
@@ -105,8 +106,7 @@ impl AdminView {
                     Task::none()
                 },
                 {
-                    self.inspect_view.update(m);
-                    Task::none()
+                    self.inspect_view.update(m)
                 },
             ]),
             AdminViewMessage::InspectBuffer(address) => {
