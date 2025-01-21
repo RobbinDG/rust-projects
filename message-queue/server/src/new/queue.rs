@@ -12,7 +12,9 @@ pub struct Queue {
 
 impl Queue {
     pub fn new() -> Self {
-        todo!()
+        Self {
+            messages: Vec::new(),
+        }
     }
 
     pub fn push(&mut self, message: Message) {

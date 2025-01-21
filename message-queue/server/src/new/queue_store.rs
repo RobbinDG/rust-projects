@@ -8,7 +8,9 @@ pub struct MessageQueue {
 
 impl MessageQueue {
     pub fn new() -> Self {
-        todo!()
+        Self {
+            queue: Queue::new(),
+        }
     }
 }
 
@@ -16,7 +18,7 @@ pub struct MessageTopic {}
 
 impl MessageTopic {
     pub fn new() -> Self {
-        todo!()
+        Self {}
     }
 }
 
@@ -37,7 +39,11 @@ impl QueueStore {
     }
 
     pub fn list(&self) -> Vec<(QueueId, usize, usize, usize)> {
-        self.queues.keys().cloned().map(|id| (id, 0, 0, 0)).collect()
+        self.queues
+            .keys()
+            .cloned()
+            .map(|id| (id, 0, 0, 0))
+            .collect()
     }
 
     pub fn create(&mut self, queue_id: QueueId) {
@@ -51,8 +57,12 @@ impl QueueStore {
         };
     }
 
-    pub fn delete(&mut self, queue_id: &QueueId) {
-        todo!()
+    pub fn exists(&self, queue_id: &QueueId) -> bool {
+        self.queues.contains_key(queue_id)
+    }
+
+    pub fn delete(&mut self, queue_id: &QueueId) -> bool {
+        self.queues.remove(queue_id).is_some()
     }
 
     pub fn get_queue_mut(&self, queue_id: &QueueId) -> Option<&mut Queue> {

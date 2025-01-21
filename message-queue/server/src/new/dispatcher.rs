@@ -5,7 +5,7 @@ use backend::protocol::new::request_error::RequestError;
 use backend::protocol::request::{
     CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, SupportedRequest,
 };
-use backend::protocol::Request;
+use backend::protocol::{BufferProperties, DLXPreference, Request, Status};
 use backend::stream_io::{StreamIO, StreamIOError};
 use log::error;
 use serde::de::DeserializeOwned;
@@ -54,59 +54,102 @@ impl Handler<ListQueues> for ListQueuesHandler {
     }
 }
 
-struct CheckQueueHandler {}
+struct CheckQueueHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
 
 impl Handler<CheckQueue> for CheckQueueHandler {
     fn handle(
         &mut self,
         request: &CheckQueue,
     ) -> Result<<CheckQueue as Request>::Response, RequestError> {
-        todo!()
+        Ok(if self.queues.lock()?.exists(&request.queue_address) {
+            Status::Exists
+        } else {
+            Status::Failed
+        })
     }
 }
 
-struct CreateQueueHandler {}
+struct CreateQueueHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
 
 impl Handler<CreateQueue> for CreateQueueHandler {
     fn handle(
         &mut self,
         request: &CreateQueue,
     ) -> Result<<CreateQueue as Request>::Response, RequestError> {
-        todo!()
+        let mut queues = self.queues.lock()?;
+        Ok(if queues.exists(&request.queue_address) {
+            Status::Exists
+        } else {
+            queues.create(request.queue_address.clone());
+            Status::Created
+        })
     }
 }
 
-struct DeleteQueueHandler {}
+struct DeleteQueueHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
 
 impl Handler<DeleteQueue> for DeleteQueueHandler {
     fn handle(
         &mut self,
         request: &DeleteQueue,
     ) -> Result<<DeleteQueue as Request>::Response, RequestError> {
-        todo!()
+        let mut qm = self.queues.lock()?;
+
+        Ok(if qm.delete(&request.queue_name) {
+            Status::Removed
+        } else {
+            Status::NotFound
+        })
     }
 }
 
-struct GetPropertiesHandler {}
+struct GetPropertiesHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
 
 impl Handler<GetProperties> for GetPropertiesHandler {
     fn handle(
         &mut self,
         request: &GetProperties,
     ) -> Result<<GetProperties as Request>::Response, RequestError> {
-        todo!()
+        Ok(BufferProperties {
+            system_buffer: false,
+            dlx_preference: DLXPreference::Buffer,
+        })
     }
 }
 
 pub struct RequestDispatcher {
     list_queues: ListQueuesHandler,
+    check_queue: CheckQueueHandler,
+    create: CreateQueueHandler,
+    delete: DeleteQueueHandler,
+    get_props: GetPropertiesHandler,
 }
 
 impl RequestDispatcher {
     pub fn new(queue_store: Arc<Mutex<QueueStore>>) -> Self {
         Self {
             list_queues: ListQueuesHandler {
-                queues: queue_store,
+                queues: queue_store.clone(),
+            },
+            check_queue: CheckQueueHandler {
+                queues: queue_store.clone(),
+            },
+            create: CreateQueueHandler {
+                queues: queue_store.clone(),
+            },
+            delete: DeleteQueueHandler {
+                queues: queue_store.clone(),
+            },
+            get_props: GetPropertiesHandler {
+                queues: queue_store.clone(),
             },
         }
     }
@@ -114,10 +157,10 @@ impl RequestDispatcher {
     pub async fn dispatch(&mut self, request: SupportedRequest) -> Result<Vec<u8>, CodecError> {
         match request {
             SupportedRequest::ListQueues(r) => handle_and_send(r, &mut self.list_queues),
-            SupportedRequest::CheckQueue(r) => handle_and_send(r, &mut CheckQueueHandler {}),
-            SupportedRequest::CreateQueue(r) => handle_and_send(r, &mut CreateQueueHandler {}),
-            SupportedRequest::DeleteQueue(r) => handle_and_send(r, &mut DeleteQueueHandler {}),
-            SupportedRequest::GetProperties(r) => handle_and_send(r, &mut GetPropertiesHandler {}),
+            SupportedRequest::CheckQueue(r) => handle_and_send(r, &mut self.check_queue),
+            SupportedRequest::CreateQueue(r) => handle_and_send(r, &mut self.create),
+            SupportedRequest::DeleteQueue(r) => handle_and_send(r, &mut self.delete),
+            SupportedRequest::GetProperties(r) => handle_and_send(r, &mut self.get_props),
         }
     }
 }
