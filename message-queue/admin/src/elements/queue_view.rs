@@ -131,7 +131,10 @@ impl QueueView {
     async fn refresh(connector: Arc<Mutex<ServerConnector>>) -> UIMessage {
         UIMessage::NewTableData(match connector.lock().await.client().await {
             Ok(client) => client.transfer_admin_request(ListQueues {}).await.ok(),
-            Err(_) => None,
+            Err(err) => {
+                println!("{err:?}");
+                None
+            },
         })
     }
 }

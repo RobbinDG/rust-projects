@@ -27,8 +27,7 @@ impl RequestWorker {
                 Ok(r) => self
                     .dispatcher
                     .dispatch(r)
-                    .await
-                    .or(Err(RequestError::PayloadEncodeError)),
+                    .await,
                 Err(e) => Err(e),
             };
             println!("{:?}", response);

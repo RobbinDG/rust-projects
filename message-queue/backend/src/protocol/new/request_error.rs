@@ -3,6 +3,7 @@ use std::sync::PoisonError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RequestError {
+    CommunicationError,
     DecodeError,
     NotUnderstood,
     RequestHandlingError,

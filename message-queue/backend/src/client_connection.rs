@@ -1,9 +1,10 @@
 use std::fmt::Debug;
-use crate::protocol::request::{AdminRequest, RequestError, Request};
+use crate::protocol::request::{AdminRequest, Request};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
 use std::io;
 use tokio::net::{TcpStream, ToSocketAddrs};
+use crate::protocol::new::request_error::RequestError;
 
 pub struct ConnectionConfig<T>
 where
@@ -84,7 +85,12 @@ impl<T: ToSocketAddrs + Clone + Debug + Send> ConnectedClient<T> {
         R: Request + Serialize + for<'a> Deserialize<'a>,
         AdminRequest: From<R>,
     {
-        self.push_message(AdminRequest::from(request)).await?;
+        if let Err(e) = self.push_message(AdminRequest::from(request)).await {
+               return Err(match e{
+                   StreamIOError::Stream(_) => RequestError:: CommunicationError,
+                   StreamIOError::Codec(_) => RequestError::PayloadEncodeError,
+               })
+        }
         self.pull_admin_response().await
     }
 
@@ -128,7 +134,7 @@ impl<T: ToSocketAddrs + Clone + Debug + Send> ConnectedClient<T> {
                         self.pipe_broken = true;
                     }
                 }
-                Err(RequestError::IO(err))
+                Err(RequestError::CommunicationError)
             }
         }
     }

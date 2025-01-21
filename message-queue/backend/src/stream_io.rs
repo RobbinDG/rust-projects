@@ -1,10 +1,10 @@
 use crate::protocol::new::codec::{encode, CodecError};
-use crate::protocol::RequestError;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::time::SystemTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use crate::protocol::new::request_error::RequestError;
 
 const BUFFER_SIZE: usize = 1024;
 
@@ -121,6 +121,7 @@ impl StreamIO {
         T: Serialize + for<'a> Deserialize<'a>,
     {
         let response: Result<Vec<u8>, RequestError> = self.read().await?;
+        println!("{:?}", response);
         Ok(match response {
             Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
             Err(err) => Err(err),

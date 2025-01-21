@@ -154,7 +154,7 @@ impl RequestDispatcher {
         }
     }
 
-    pub async fn dispatch(&mut self, request: SupportedRequest) -> Result<Vec<u8>, CodecError> {
+    pub async fn dispatch(&mut self, request: SupportedRequest) -> Result<Vec<u8>, RequestError> {
         match request {
             SupportedRequest::ListQueues(r) => handle_and_send(r, &mut self.list_queues),
             SupportedRequest::CheckQueue(r) => handle_and_send(r, &mut self.check_queue),
@@ -165,16 +165,16 @@ impl RequestDispatcher {
     }
 }
 
-fn handle_and_send<R, H>(request: R, handler: &mut H) -> Result<Vec<u8>, CodecError>
+fn handle_and_send<R, H>(request: R, handler: &mut H) -> Result<Vec<u8>, RequestError>
 where
     R: Request,
     H: Handler<R>,
 {
     let x: Result<R, RequestError> = Ok(request);
-    let y = x.and_then(|lq| {
+    x.and_then(|lq| {
         handler
             .handle(&lq)
             .map_err(|_| RequestError::RequestHandlingError)
-    });
-    encode(&y)
+    })
+    .and_then(|response| encode(&response).or(Err(RequestError::PayloadEncodeError)))
 }
