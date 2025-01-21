@@ -27,16 +27,16 @@ impl RequestDispatcher {
 
     pub async fn dispatch(&mut self, request: SupportedRequest) -> Result<Vec<u8>, RequestError> {
         match request {
-            SupportedRequest::ListQueues(r) => handle_and_send(r, &mut self.list_queues),
-            SupportedRequest::CheckQueue(r) => handle_and_send(r, &mut self.check_queue),
-            SupportedRequest::CreateQueue(r) => handle_and_send(r, &mut self.create),
-            SupportedRequest::DeleteQueue(r) => handle_and_send(r, &mut self.delete),
-            SupportedRequest::GetProperties(r) => handle_and_send(r, &mut self.get_props),
+            SupportedRequest::ListQueues(r) => handle_and_encode(r, &mut self.list_queues),
+            SupportedRequest::CheckQueue(r) => handle_and_encode(r, &mut self.check_queue),
+            SupportedRequest::CreateQueue(r) => handle_and_encode(r, &mut self.create),
+            SupportedRequest::DeleteQueue(r) => handle_and_encode(r, &mut self.delete),
+            SupportedRequest::GetProperties(r) => handle_and_encode(r, &mut self.get_props),
         }
     }
 }
 
-fn handle_and_send<R, H>(request: R, handler: &mut H) -> Result<Vec<u8>, RequestError>
+fn handle_and_encode<R, H>(request: R, handler: &mut H) -> Result<Vec<u8>, RequestError>
 where
     R: Request,
     H: Handler<R>,
