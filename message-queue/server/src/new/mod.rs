@@ -6,3 +6,4 @@ pub mod publisher_manager;
 pub mod queue_store;
 pub mod request_worker;
 pub mod dispatcher;
+mod request_handler;
