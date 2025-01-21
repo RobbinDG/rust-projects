@@ -2,7 +2,7 @@ use crate::server_connector::ServerConnector;
 use backend::protocol::new::message::Message;
 use backend::protocol::new::queue_id::QueueId;
 use backend::protocol::new::routing_key::{DLXPreference, RoutingKey};
-use backend::protocol::request::Publish;
+use backend::protocol::request::{Publish, Receive};
 use backend::protocol::BufferProperties;
 use iced::widget::{button, column, row, text, text_input};
 use iced::{Alignment, Element, Length, Task};
@@ -18,11 +18,15 @@ pub enum InspectViewMessage {
     SendMessage,
     MessageSent,
     SendFailure,
+    ReceiveMessage,
+    MessageReceived(String),
+    NoMessageAvailable,
 }
 
 pub struct InspectView {
     pub buffer_info: Option<(QueueId, BufferProperties)>,
     message_body: String,
+    received_message: String,
     connector: Arc<Mutex<ServerConnector>>,
 }
 
@@ -31,6 +35,7 @@ impl InspectView {
         Self {
             buffer_info: None,
             message_body: String::new(),
+            received_message: String::new(),
             connector,
         }
     }
@@ -61,6 +66,10 @@ impl InspectView {
                             .on_input(InspectViewMessage::MessageBodyChanged),
                         button("Send Message").on_press(InspectViewMessage::SendMessage)
                     ],
+                    row![
+                        button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
+                        text(self.received_message.as_str())
+                    ],
                     delete_btn,
                 ]
                 .into();
@@ -86,8 +95,10 @@ impl InspectView {
                     return Task::perform(
                         async move {
                             let mut binding = connector.lock().await;
-                            let client = binding.client().await.ok()?;
-                            client
+                            binding
+                                .client()
+                                .await
+                                .ok()?
                                 .transfer_admin_request(Publish {
                                     message: Message {
                                         payload: body,
@@ -108,11 +119,37 @@ impl InspectView {
                                 InspectViewMessage::SendFailure
                             }
                         },
-                    ).map(Msg::from);
+                    )
+                    .map(Msg::from);
                 }
             }
             InspectViewMessage::MessageSent => {}
             InspectViewMessage::SendFailure => {}
+            InspectViewMessage::ReceiveMessage => {
+                if let Some((queue, _)) = &self.buffer_info {
+                    let queue = queue.clone();
+                    let connector = self.connector.clone();
+                    return Task::perform(
+                        async move {
+                            let mut binding = connector.lock().await;
+                            let client = binding.client().await.ok()?;
+                            client
+                                .transfer_admin_request(Receive { queue })
+                                .await
+                                .ok()?
+                        },
+                        move |result| match result {
+                            Some(Message { payload, .. }) => {
+                                InspectViewMessage::MessageReceived(payload)
+                            }
+                            _ => InspectViewMessage::NoMessageAvailable,
+                        },
+                    )
+                    .map(Msg::from);
+                }
+            }
+            InspectViewMessage::MessageReceived(m) => self.received_message = m,
+            InspectViewMessage::NoMessageAvailable => self.received_message.clear(),
         }
         Task::none()
     }
