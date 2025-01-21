@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Error;
 use std::str;
 use std::str::Utf8Error;
+use crate::protocol::new::routing_error::RoutingError;
 
 #[derive(Debug)]
 pub enum RequestError {
@@ -69,7 +70,6 @@ pub struct GetProperties {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Publish {
-    pub queue: QueueId,
     pub message: Message,
 }
 
@@ -99,7 +99,7 @@ impl Request for GetProperties {
 }
 
 impl Request for Publish {
-    type Response = Status;
+    type Response = Result<(), RoutingError>;
 }
 
 impl Request for Receive {

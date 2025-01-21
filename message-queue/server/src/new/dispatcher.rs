@@ -5,9 +5,11 @@ use backend::protocol::new::request_error::RequestError;
 use backend::protocol::request::SupportedRequest;
 use backend::protocol::Request;
 use std::sync::{Arc, Mutex};
+use crate::new::router::Router;
 
 /// A helper object to dispatch requests to a designated handler and encode their responses.
 pub struct RequestDispatcher {
+    router: Arc<Mutex<Router>>,
     list_queues: ListQueuesHandler,
     check_queue: CheckQueueHandler,
     create: CreateQueueHandler,
@@ -27,13 +29,15 @@ impl RequestDispatcher {
     ///
     /// returns: `RequestDispatcher`
     pub fn new(queue_store: Arc<Mutex<QueueStore>>) -> Self {
+        let router = Arc::new(Mutex::new(Router::new(queue_store.clone())));
         Self {
+            router: router.clone(),
             list_queues: ListQueuesHandler::new(queue_store.clone()),
             check_queue: CheckQueueHandler::new(queue_store.clone()),
             create: CreateQueueHandler::new(queue_store.clone()),
             delete: DeleteQueueHandler::new(queue_store.clone()),
             get_props: GetPropertiesHandler::new(queue_store.clone()),
-            publish: PublishHandler::new(queue_store.clone()),
+            publish: PublishHandler::new(router),
             receive: ReceiveHandler::new(queue_store),
         }
     }

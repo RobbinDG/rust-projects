@@ -11,6 +11,12 @@ pub enum DLXPreference {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RoutingKey {
-    id: QueueId,
-    dlx: DLXPreference,
+    pub id: QueueId,
+    pub dlx: DLXPreference,
+}
+
+impl RoutingKey {
+    pub fn new(id: QueueId, dlx: DLXPreference) -> Self {
+        RoutingKey { id, dlx }
+    }
 }

@@ -1,4 +1,5 @@
 use crate::new::queue_store::QueueStore;
+use crate::new::router::Router;
 use backend::protocol::new::request_error::RequestError;
 use backend::protocol::request::{
     CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive,
@@ -125,26 +126,19 @@ impl Handler<GetProperties> for GetPropertiesHandler {
 }
 
 pub struct PublishHandler {
-    queues: Arc<Mutex<QueueStore>>,
+    router: Arc<Mutex<Router>>,
 }
 
 impl PublishHandler {
-    pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
-        Self { queues }
+    pub fn new(router: Arc<Mutex<Router>>) -> Self {
+        Self { router }
     }
 }
 
 impl Handler<Publish> for PublishHandler {
     fn handle(&mut self, request: Publish) -> Result<<Publish as Request>::Response, RequestError> {
-        let mut binding = self.queues.lock()?;
-        let mut publisher = binding.publisher(&request.queue);
-        Ok(match publisher {
-            None => Status::NotFound,
-            Some(mut p) => {
-                p.publish(request.message);
-                Status::Sent
-            }
-        })
+        let mut router = self.router.lock()?;
+        Ok(router.publish(request.message))
     }
 }
 

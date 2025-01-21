@@ -1,16 +1,12 @@
-use std::error::Error;
 use crate::connection_manager::ConnectionManager;
-use crate::new::queue_manager::QueueManager;
 use crate::new::queue_store::QueueStore;
-use crate::new::router::Router;
+use std::error::Error;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 
 pub struct Server {
     connection_manager: ConnectionManager,
     queues: Arc<Mutex<QueueStore>>,
-    router: Router,
-    // queue_manager: QueueManager,
 }
 
 impl Server {
@@ -20,8 +16,6 @@ impl Server {
         Self {
             connection_manager,
             queues,
-            router: Router {},
-            // queue_manager: QueueManager::new(),
         }
     }
 
