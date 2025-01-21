@@ -7,19 +7,19 @@ use tokio::net::{TcpStream, ToSocketAddrs};
 
 pub struct ConnectionConfig<T>
 where
-    T: ToSocketAddrs + Clone + Debug,
+    T: ToSocketAddrs + Clone + Debug + Send,
 {
     address: T,
 }
 pub struct DisconnectedClient<T>
 where
-    T: ToSocketAddrs + Clone + Debug,
+    T: ToSocketAddrs + Clone + Debug + Send,
 {
     config: ConnectionConfig<T>,
 }
 pub struct ConnectedClient<T>
 where
-    T: ToSocketAddrs + Clone + Debug,
+    T: ToSocketAddrs + Clone + Debug + Send,
 {
     config: ConnectionConfig<T>,
     stream: StreamIO,
@@ -28,13 +28,13 @@ where
 
 pub struct ConnectionError<T>
 where
-    T: ToSocketAddrs + Clone + Debug,
+    T: ToSocketAddrs + Clone + Debug + Send,
 {
     pub error_body: Option<io::Error>,
     pub server: DisconnectedClient<T>,
 }
 
-impl<T: ToSocketAddrs + Clone + Debug> DisconnectedClient<T> {
+impl<T: ToSocketAddrs + Clone + Debug + Send> DisconnectedClient<T> {
     pub fn new(addr: T) -> DisconnectedClient<T> {
         DisconnectedClient {
             config: ConnectionConfig { address: addr },
@@ -70,7 +70,7 @@ impl<T: ToSocketAddrs + Clone + Debug> DisconnectedClient<T> {
     }
 }
 
-impl<T: ToSocketAddrs + Clone + Debug> ConnectedClient<T> {
+impl<T: ToSocketAddrs + Clone + Debug + Send> ConnectedClient<T> {
     pub async fn transfer_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
     where
         R: Request + Serialize + for<'a> Deserialize<'a>,

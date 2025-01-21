@@ -1,12 +1,12 @@
 use crate::elements::QueueTable;
 use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
-use backend::protocol::request::{CreateQueue, ListQueues};
-use backend::protocol::{BufferAddress, BufferType};
-use iced::widget::{button, column, radio, row, text_input};
-use iced::Element;
-use iced::futures::executor::block_on;
 use backend::protocol::new::queue_id::{QueueId, QueueType};
+use backend::protocol::request::{CreateQueue, ListQueues};
+use iced::widget::{button, column, radio, row, text_input};
+use iced::{Element, Task};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub struct QueueView {
     // Widget state
@@ -67,47 +67,71 @@ impl QueueView {
         element.map(Message::from)
     }
 
-    pub fn update(&mut self, message: UIMessage, connector: &mut ServerConnector) {
+    pub fn update<'a, Message>(
+        &mut self,
+        message: UIMessage,
+        connector: Arc<Mutex<ServerConnector>>,
+    ) -> Task<Message>
+    where
+        Message: From<UIMessage> + Clone + 'a + Send + 'static,
+    {
         match message {
-            UIMessage::Refresh => self.refresh(connector),
+            UIMessage::Refresh => {
+                Task::future(async move { Self::refresh(connector).await }).map(|m| m.into())
+            }
             UIMessage::NewQueueName(s) => {
                 self.new_queue_text = s;
+                Task::none()
             }
-            UIMessage::CreateQueue => {
-                self.create(connector);
-                self.refresh(connector);
-            }
+            UIMessage::CreateQueue => match self.selected_buffer_type {
+                Some(queue_type) => {
+                    let new_queue_name = self.new_queue_text.clone();
+                    Task::perform(async move {
+                        Self::create(connector.clone(), queue_type, new_queue_name).await
+                    }, |_| {UIMessage::Refresh})
+                    .map(|m| m.into())
+                }
+                None => Task::none(),
+            },
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
+                Task::none()
             }
-            UIMessage::InspectBuffer(_) => {}
-        }
-    }
-
-    fn create(&mut self, connector: &mut ServerConnector) {
-        if let Ok(client) = connector.client() {
-            if let Err(_) = block_on(client.transfer_admin_request(CreateQueue {
-                queue_address: match self.selected_buffer_type {
-                    Some(type_) => QueueId::new(self.new_queue_text.clone(), type_),
-                    _ => todo!("No buffer selected"),
-                },
-            })) {}
-        }
-    }
-
-    fn refresh(&mut self, connector: &mut ServerConnector) {
-        if let Ok(client) = connector.client() {
-            match block_on(client.transfer_admin_request(ListQueues {})) {
-                Ok(response) => {
-                    self.queue_table.clear();
-                    for queue_data in response {
-                        self.queue_table.push(queue_data);
+            UIMessage::InspectBuffer(_) => Task::none(),
+            UIMessage::NewTableData(data) => {
+                match data {
+                    Some(response) => {
+                        self.queue_table.clear();
+                        for queue_data in response {
+                            self.queue_table.push(queue_data);
+                        }
                     }
+                    None => println!("Failed to fetch queue data."),
                 }
-                Err(e) => {
-                    println!("err: {e:?}");
-                }
+                Task::none()
             }
         }
+    }
+
+    async fn create(
+        connector: Arc<Mutex<ServerConnector>>,
+        selected_buffer_type: QueueType,
+        new_queue_name: String,
+    ) {
+        if let Ok(client) = connector.lock().await.client().await {
+            if let Err(_) = client
+                .transfer_admin_request(CreateQueue {
+                    queue_address: QueueId::new(new_queue_name, selected_buffer_type),
+                })
+                .await
+            {}
+        }
+    }
+
+    async fn refresh(connector: Arc<Mutex<ServerConnector>>) -> UIMessage {
+        UIMessage::NewTableData(match connector.lock().await.client().await {
+            Ok(client) => client.transfer_admin_request(ListQueues {}).await.ok(),
+            Err(_) => None,
+        })
     }
 }

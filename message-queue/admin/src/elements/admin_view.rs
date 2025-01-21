@@ -2,19 +2,22 @@ use crate::elements::connection_interface::{ConnectionInterface, ConnectionInter
 use crate::elements::inspect_view::{InspectView, InspectViewMessage};
 use crate::elements::{QueueView, UIMessage};
 use crate::server_connector::ServerConnector;
-use backend::protocol::request::{DeleteQueue, GetProperties};
-use backend::protocol::BufferAddress;
-use iced::widget::{column, container, text, vertical_space};
-use iced::{Alignment, Element, Length};
-use iced::futures::executor::block_on;
 use backend::protocol::new::queue_id::QueueId;
+use backend::protocol::request::{DeleteQueue, GetProperties};
+use backend::protocol::{BufferProperties, Status};
+use iced::widget::{column, vertical_space};
+use iced::{Element, Task};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
     InspectBuffer(QueueId),
+    InspectInfo(QueueId, BufferProperties),
     BufferView(UIMessage),
     Inspector(InspectViewMessage),
     ConnectionUpdated(ConnectionInterfaceMessage),
+    Nothing,
 }
 
 impl From<ConnectionInterfaceMessage> for AdminViewMessage {
@@ -36,7 +39,7 @@ impl From<InspectViewMessage> for AdminViewMessage {
 }
 
 pub struct AdminView {
-    connector: ServerConnector,
+    connector: Arc<Mutex<ServerConnector>>,
 
     // Sub-widgets
     buffer_view: QueueView,
@@ -47,7 +50,7 @@ pub struct AdminView {
 impl Default for AdminView {
     fn default() -> Self {
         Self {
-            connector: ServerConnector::new(),
+            connector: Arc::new(Mutex::new(ServerConnector::new())),
             buffer_view: QueueView::default(),
             inspect_view: InspectView::new(),
             connection_interface: ConnectionInterface::new(),
@@ -70,52 +73,88 @@ impl AdminView {
                 ];
 
                 cols = cols.spacing(2).padding(10);
-                if !self.connector.connected() {
-                    cols = cols.push(
-                        container(
-                            text("Couldn't connect to server.")
-                                .width(Length::Fill)
-                                .align_x(Alignment::Center),
-                        )
-                        .width(Length::Fill)
-                        .align_x(Alignment::Center)
-                        .padding(10)
-                        .style(container::rounded_box),
-                    );
-                }
                 cols.into()
             }
         }
     }
 
-    pub fn update(&mut self, message: AdminViewMessage) {
+    pub fn update(&mut self, message: AdminViewMessage) -> Task<AdminViewMessage> {
         match message {
-            AdminViewMessage::BufferView(m) => self.buffer_view.update(m, &mut self.connector),
-            AdminViewMessage::Inspector(m) => {
-                println!("{m:?}");
+            AdminViewMessage::BufferView(m) => self.buffer_view.update(m, self.connector.clone()),
+            AdminViewMessage::Inspector(m) => Task::batch([
                 if let InspectViewMessage::Delete = m {
                     if let Some((addr, _)) = &self.inspect_view.buffer_info {
-                        self.delete_buffer(addr.clone());
-                        self.buffer_view.update(UIMessage::Refresh, &mut self.connector)
+                        let connector = self.connector.clone();
+                        let addr2 = addr.clone();
+                        Task::perform(
+                            async move { Self::delete_buffer(connector, addr2).await },
+                            move |result| {
+                                AdminViewMessage::ConnectionUpdated(
+                                    ConnectionInterfaceMessage::Connected(result.is_some()),
+                                )
+                            },
+                        )
+                        .chain(
+                            self.buffer_view
+                                .update(UIMessage::Refresh, self.connector.clone()),
+                        )
+                    } else {
+                        Task::none()
                     }
-                }
-                self.inspect_view.update(m)
-            }
+                } else {
+                    Task::none()
+                },
+                {
+                    self.inspect_view.update(m);
+                    Task::none()
+                },
+            ]),
             AdminViewMessage::InspectBuffer(address) => {
-                if let Ok(client) = self.connector.client() {
-                    let properties = block_on(client.transfer_admin_request(GetProperties { buffer: address.clone() })).unwrap();
-                    self.inspect_view.buffer_info = Some((address, properties));
-                }
+                let connection = self.connector.clone();
+
+                Task::perform(
+                    async move {
+                        if let Ok(client) = connection.lock().await.client().await {
+                            let address_2 = address.clone();
+                            Some((
+                                address_2,
+                                client
+                                    .transfer_admin_request(GetProperties { buffer: address })
+                                    .await,
+                            ))
+                        } else {
+                            None
+                        }
+                    },
+                    move |maybe_data| match maybe_data {
+                        Some((address, properties)) => {
+                            AdminViewMessage::InspectInfo(address, properties.unwrap())
+                        }
+                        None => AdminViewMessage::ConnectionUpdated(
+                            ConnectionInterfaceMessage::Connected(false),
+                        ),
+                    },
+                )
+            }
+            AdminViewMessage::InspectInfo(address, properties) => {
+                self.inspect_view.buffer_info = Some((address, properties));
+                Task::none()
             }
             AdminViewMessage::ConnectionUpdated(m) => {
-                self.connection_interface.update(m, &mut self.connector)
+                self.connection_interface.update(m, self.connector.clone())
             }
+            _ => Task::none(),
         }
     }
 
-    fn delete_buffer(&mut self, s: QueueId) {
-        if let Ok(client) = self.connector.client() {
-            block_on(client.transfer_admin_request(DeleteQueue { queue_name: s })).unwrap();
+    async fn delete_buffer(connector: Arc<Mutex<ServerConnector>>, s: QueueId) -> Option<Status> {
+        if let Ok(client) = connector.lock().await.client().await {
+            client
+                .transfer_admin_request(DeleteQueue { queue_name: s })
+                .await
+                .ok()
+        } else {
+            None
         }
     }
 }

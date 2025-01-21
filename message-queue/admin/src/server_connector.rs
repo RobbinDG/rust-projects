@@ -1,5 +1,3 @@
-use iced::futures::executor::block_on;
-use backend::protocol::{SetupRequest, SetupResponse};
 use backend::{ConnectedClient, DisconnectedClient};
 
 enum Client {
@@ -20,14 +18,14 @@ impl ServerConnector {
         }
     }
 
-    pub fn client(&mut self) -> Result<&mut ConnectedClient<String>, String> {
+    pub async fn client(&mut self) -> Result<&mut ConnectedClient<String>, String> {
         if let Some(client) = self.client.take() {
             let inserted = self.client.insert(match client {
-                Client::Disconnected(c) => Self::attempt_connect(c),
+                Client::Disconnected(c) => Self::attempt_connect(c).await,
                 Client::Connected(connected) => {
                     if connected.broken_pipe() {
                         let disconnected = connected.disconnect();
-                        match block_on(disconnected.connect()) {
+                        match disconnected.connect().await {
                             Ok(c) => Client::Connected(c),
                             Err(e) => Client::Disconnected(e.server),
                         }
@@ -43,26 +41,30 @@ impl ServerConnector {
         Err("Couldn't connect".to_string())
     }
 
-    pub fn connect_to(&mut self, addr: String) {
+    pub async fn connect_to(&mut self, addr: String) {
         if let Some(client) = self.client.take() {
             if let Client::Connected(c) = client {
                 c.disconnect();
             }
         }
         let new_client = DisconnectedClient::new(addr);
-        let _ = self.client.insert(match block_on(new_client.connect()) {
+        let _ = self.client.insert(match new_client.connect().await {
             Ok(c) => Client::Connected(c),
             Err(e) => Client::Disconnected(e.server),
         });
     }
 
-    fn attempt_connect(c: DisconnectedClient<String>) -> Client {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        match rt.block_on(c.connect()) {
-            Ok(mut connected) => match block_on(connected.transfer_request(SetupRequest::Admin)) {
-                Ok(SetupResponse::Admin) => Client::Connected(connected),
-                _ => Client::Disconnected(connected.disconnect()),
-            },
+    async fn attempt_connect(c: DisconnectedClient<String>) -> Client {
+        match c.connect().await {
+            Ok(connected) => Client::Connected(connected),
+            // Ok(mut connected) => match rt.block_on(connected.transfer_request(SetupRequest::Admin))
+            // {
+            //     Ok(SetupResponse::Admin) => Client::Connected(connected),
+            //     s => {
+            //         println!("Unexpected response: {:?}", s);
+            //         Client::Disconnected(connected.disconnect())
+            //     }
+            // },
             Err(err) => Client::Disconnected(err.server),
         }
     }
