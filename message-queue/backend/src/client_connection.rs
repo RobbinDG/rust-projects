@@ -1,10 +1,10 @@
-use std::fmt::Debug;
-use crate::protocol::request::{AdminRequest, Request};
+use crate::protocol::new::request_error::RequestError;
+use crate::protocol::request::{Request, SupportedRequest};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::io;
 use tokio::net::{TcpStream, ToSocketAddrs};
-use crate::protocol::new::request_error::RequestError;
 
 pub struct ConnectionConfig<T>
 where
@@ -83,9 +83,9 @@ impl<T: ToSocketAddrs + Clone + Debug + Send> ConnectedClient<T> {
     pub async fn transfer_admin_request<R>(&mut self, request: R) -> Result<R::Response, RequestError>
     where
         R: Request + Serialize + for<'a> Deserialize<'a>,
-        AdminRequest: From<R>,
+        SupportedRequest: From<R>,
     {
-        if let Err(e) = self.push_message(AdminRequest::from(request)).await {
+        if let Err(e) = self.push_message(SupportedRequest::from(request)).await {
                return Err(match e{
                    StreamIOError::Stream(_) => RequestError:: CommunicationError,
                    StreamIOError::Codec(_) => RequestError::PayloadEncodeError,

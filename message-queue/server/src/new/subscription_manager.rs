@@ -27,7 +27,7 @@ impl SubscriptionManager {
         for (_, (queue, state)) in &mut self.subscriptions {
             let element = state.take().map(|s| match s {
                 SubscriptionState::Ready => {
-                    let msg = queue_manager.get_queue_mut(queue).and_then(|q| q.pop());
+                    let msg = queue_manager.receiver(queue).and_then(|mut r| r.receive());
                     if let Some(message) = msg {
                         SubscriptionState::Completed(message)
                     } else {

@@ -1,10 +1,10 @@
 use crate::new::queue_store::QueueStore;
+use crate::new::request_handler::{CheckQueueHandler, CreateQueueHandler, DeleteQueueHandler, GetPropertiesHandler, Handler, ListQueuesHandler, PublishHandler, ReceiveHandler};
 use backend::protocol::new::codec::encode;
 use backend::protocol::new::request_error::RequestError;
 use backend::protocol::request::SupportedRequest;
 use backend::protocol::Request;
 use std::sync::{Arc, Mutex};
-use crate::new::request_handler::{CheckQueueHandler, CreateQueueHandler, DeleteQueueHandler, GetPropertiesHandler, Handler, ListQueuesHandler};
 
 /// A helper object to dispatch requests to a designated handler and encode their responses.
 pub struct RequestDispatcher {
@@ -13,6 +13,8 @@ pub struct RequestDispatcher {
     create: CreateQueueHandler,
     delete: DeleteQueueHandler,
     get_props: GetPropertiesHandler,
+    publish: PublishHandler,
+    receive: ReceiveHandler,
 }
 
 impl RequestDispatcher {
@@ -31,6 +33,8 @@ impl RequestDispatcher {
             create: CreateQueueHandler::new(queue_store.clone()),
             delete: DeleteQueueHandler::new(queue_store.clone()),
             get_props: GetPropertiesHandler::new(queue_store.clone()),
+            publish: PublishHandler::new(queue_store.clone()),
+            receive: ReceiveHandler::new(queue_store),
         }
     }
 
@@ -49,6 +53,8 @@ impl RequestDispatcher {
             SupportedRequest::CreateQueue(r) => handle_and_encode(r, &mut self.create),
             SupportedRequest::DeleteQueue(r) => handle_and_encode(r, &mut self.delete),
             SupportedRequest::GetProperties(r) => handle_and_encode(r, &mut self.get_props),
+            SupportedRequest::Publish(r) => handle_and_encode(r, &mut self.publish),
+            SupportedRequest::Receive(r) => handle_and_encode(r, &mut self.receive),
         }
     }
 }
@@ -70,7 +76,7 @@ where
     let x: Result<R, RequestError> = Ok(request);
     x.and_then(|lq| {
         handler
-            .handle(&lq)
+            .handle(lq)
             .map_err(|_| RequestError::RequestHandlingError)
     })
     .and_then(|response| encode(&response).or(Err(RequestError::PayloadEncodeError)))

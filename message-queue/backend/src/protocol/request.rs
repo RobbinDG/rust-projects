@@ -1,13 +1,13 @@
-use crate::protocol::buffer_address::BufferAddress;
+use crate::protocol::new::message::Message;
+use crate::protocol::new::queue_id::QueueId;
 use crate::protocol::response::RequestError as ResponseError;
 use crate::protocol::status_code::Status;
+use crate::protocol::BufferProperties;
 use crate::stream_io::StreamIOError;
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 use std::str;
 use std::str::Utf8Error;
-use crate::protocol::BufferProperties;
-use crate::protocol::new::queue_id::QueueId;
 
 #[derive(Debug)]
 pub enum RequestError {
@@ -67,6 +67,17 @@ pub struct GetProperties {
     pub buffer: QueueId,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Publish {
+    pub queue: QueueId,
+    pub message: Message,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Receive {
+    pub queue: QueueId,
+}
+
 impl Request for ListQueues {
     type Response = Vec<(QueueId, usize, usize, usize)>;
 }
@@ -87,47 +98,12 @@ impl Request for GetProperties {
     type Response = BufferProperties;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum AdminRequest {
-    ListQueues(ListQueues),
-    CheckQueue(CheckQueue),
-    CreateQueue(CreateQueue),
-    DeleteQueue(DeleteQueue),
-    GetProperties(GetProperties),
+impl Request for Publish {
+    type Response = Status;
 }
 
-impl From<ListQueues> for AdminRequest {
-    fn from(value: ListQueues) -> Self {
-        AdminRequest::ListQueues(value)
-    }
-}
-
-impl From<CheckQueue> for AdminRequest {
-    fn from(value: CheckQueue) -> Self {
-        AdminRequest::CheckQueue(value)
-    }
-}
-
-impl From<CreateQueue> for AdminRequest {
-    fn from(value: CreateQueue) -> Self {
-        AdminRequest::CreateQueue(value)
-    }
-}
-
-impl From<DeleteQueue> for AdminRequest {
-    fn from(value: DeleteQueue) -> Self {
-        AdminRequest::DeleteQueue(value)
-    }
-}
-
-impl From<GetProperties> for AdminRequest {
-    fn from(value: GetProperties) -> Self {
-        AdminRequest::GetProperties(value)
-    }
-}
-
-impl Request for AdminRequest {
-    type Response = Vec<u8>;
+impl Request for Receive {
+    type Response = Option<Message>;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -137,10 +113,49 @@ pub enum SupportedRequest {
     CreateQueue(CreateQueue),
     DeleteQueue(DeleteQueue),
     GetProperties(GetProperties),
+    Publish(Publish),
+    Receive(Receive),
+}
+
+impl From<ListQueues> for SupportedRequest {
+    fn from(value: ListQueues) -> Self {
+        SupportedRequest::ListQueues(value)
+    }
+}
+
+impl From<CheckQueue> for SupportedRequest {
+    fn from(value: CheckQueue) -> Self {
+        SupportedRequest::CheckQueue(value)
+    }
 }
 
 impl From<CreateQueue> for SupportedRequest {
-    fn from(r: CreateQueue) -> Self {
-        SupportedRequest::CreateQueue(r)
+    fn from(value: CreateQueue) -> Self {
+        SupportedRequest::CreateQueue(value)
     }
 }
+
+impl From<DeleteQueue> for SupportedRequest {
+    fn from(value: DeleteQueue) -> Self {
+        SupportedRequest::DeleteQueue(value)
+    }
+}
+
+impl From<GetProperties> for SupportedRequest {
+    fn from(value: GetProperties) -> Self {
+        SupportedRequest::GetProperties(value)
+    }
+}
+
+impl From<Publish> for SupportedRequest {
+    fn from(value: Publish) -> Self {
+        SupportedRequest::Publish(value)
+    }
+}
+
+impl From<Receive> for SupportedRequest {
+    fn from(value: Receive) -> Self {
+        SupportedRequest::Receive(value)
+    }
+}
+

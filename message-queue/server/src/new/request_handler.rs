@@ -1,6 +1,8 @@
 use crate::new::queue_store::QueueStore;
 use backend::protocol::new::request_error::RequestError;
-use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues};
+use backend::protocol::request::{
+    CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive,
+};
 use backend::protocol::{BufferProperties, DLXPreference, Request, Status};
 use std::sync::{Arc, Mutex};
 
@@ -8,7 +10,7 @@ pub trait Handler<R>
 where
     R: Request,
 {
-    fn handle(&mut self, request: &R) -> Result<R::Response, RequestError>;
+    fn handle(&mut self, request: R) -> Result<R::Response, RequestError>;
 }
 
 pub struct ListQueuesHandler {
@@ -22,10 +24,7 @@ impl ListQueuesHandler {
 }
 
 impl Handler<ListQueues> for ListQueuesHandler {
-    fn handle(
-        &mut self,
-        _: &ListQueues,
-    ) -> Result<<ListQueues as Request>::Response, RequestError> {
+    fn handle(&mut self, _: ListQueues) -> Result<<ListQueues as Request>::Response, RequestError> {
         Ok(self.queues.lock()?.list())
     }
 }
@@ -43,7 +42,7 @@ impl CheckQueueHandler {
 impl Handler<CheckQueue> for CheckQueueHandler {
     fn handle(
         &mut self,
-        request: &CheckQueue,
+        request: CheckQueue,
     ) -> Result<<CheckQueue as Request>::Response, RequestError> {
         Ok(if self.queues.lock()?.exists(&request.queue_address) {
             Status::Exists
@@ -66,7 +65,7 @@ impl CreateQueueHandler {
 impl Handler<CreateQueue> for CreateQueueHandler {
     fn handle(
         &mut self,
-        request: &CreateQueue,
+        request: CreateQueue,
     ) -> Result<<CreateQueue as Request>::Response, RequestError> {
         let mut queues = self.queues.lock()?;
         Ok(if queues.exists(&request.queue_address) {
@@ -91,7 +90,7 @@ impl DeleteQueueHandler {
 impl Handler<DeleteQueue> for DeleteQueueHandler {
     fn handle(
         &mut self,
-        request: &DeleteQueue,
+        request: DeleteQueue,
     ) -> Result<<DeleteQueue as Request>::Response, RequestError> {
         let mut qm = self.queues.lock()?;
 
@@ -103,24 +102,66 @@ impl Handler<DeleteQueue> for DeleteQueueHandler {
     }
 }
 
+pub struct GetPropertiesHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
+
 impl GetPropertiesHandler {
     pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
         Self { queues }
     }
 }
 
-pub struct GetPropertiesHandler {
-    queues: Arc<Mutex<QueueStore>>,
-}
-
 impl Handler<GetProperties> for GetPropertiesHandler {
     fn handle(
         &mut self,
-        _: &GetProperties,
+        _: GetProperties,
     ) -> Result<<GetProperties as Request>::Response, RequestError> {
         Ok(BufferProperties {
             system_buffer: false,
             dlx_preference: DLXPreference::Buffer,
         })
+    }
+}
+
+pub struct PublishHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
+
+impl PublishHandler {
+    pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
+        Self { queues }
+    }
+}
+
+impl Handler<Publish> for PublishHandler {
+    fn handle(&mut self, request: Publish) -> Result<<Publish as Request>::Response, RequestError> {
+        let mut binding = self.queues.lock()?;
+        let mut publisher = binding.publisher(&request.queue);
+        Ok(match publisher {
+            None => Status::NotFound,
+            Some(mut p) => {
+                p.publish(request.message);
+                Status::Sent
+            }
+        })
+    }
+}
+
+pub struct ReceiveHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
+
+impl ReceiveHandler {
+    pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
+        Self { queues }
+    }
+}
+
+impl Handler<Receive> for ReceiveHandler {
+    fn handle(&mut self, request: Receive) -> Result<<Receive as Request>::Response, RequestError> {
+        let mut binding = self.queues.lock()?;
+        let mut receiver = binding.receiver(&request.queue);
+        Ok(receiver.and_then(|mut r| r.receive()))
     }
 }
