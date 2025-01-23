@@ -4,7 +4,7 @@ use backend::protocol::new::request_error::RequestError;
 use backend::protocol::request::{
     CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive,
 };
-use backend::protocol::{BufferProperties, DLXPreference, Request, Status};
+use backend::protocol::{BufferProperties, Request, Status};
 use std::sync::{Arc, Mutex};
 
 pub trait Handler<R>
@@ -120,7 +120,6 @@ impl Handler<GetProperties> for GetPropertiesHandler {
     ) -> Result<<GetProperties as Request>::Response, RequestError> {
         Ok(BufferProperties {
             system_buffer: false,
-            dlx_preference: DLXPreference::Buffer,
         })
     }
 }

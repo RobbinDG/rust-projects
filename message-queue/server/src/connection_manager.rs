@@ -2,7 +2,6 @@ use crate::new::dispatcher::RequestDispatcher;
 use crate::new::publisher_manager::PublisherManager;
 use crate::new::queue_store::QueueStore;
 use crate::new::request_worker::RequestWorker;
-use backend::protocol::SetupResponse;
 use backend::stream_io::StreamIO;
 use log::{error, info};
 use std::net::SocketAddr;

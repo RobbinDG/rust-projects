@@ -1,18 +1,8 @@
-mod message;
-pub mod request;
-mod response;
-mod status_code;
-mod setup_request;
-mod setup_response;
-mod buffer_address;
-mod message_buffer;
+mod buffer_properties;
 pub mod new;
+pub mod request;
+mod status_code;
 
-pub use message_buffer::{MessageBuffer, BufferProperties};
-pub use message::{Message, DLXPreference};
+pub use buffer_properties::BufferProperties;
 pub use request::Request;
-pub use response::{RequestError, ServerResponse};
 pub use status_code::Status;
-pub use setup_request::SetupRequest;
-pub use setup_response::SetupResponse;
-pub use buffer_address::{BufferAddress, BufferType};
