@@ -1,14 +1,14 @@
-## TODO
-- Disconnect senders and receivers when queue is deleted.
-- Connect queues and apply filters, routers, etc to them.
-- Persist queues.
-- Support other stream types over `StreamIO`.
-- Monitor messages / sec (graph?).
-- Add customisation
-  - TTL
-  - Max capacity
-- Dead lettering
-- Reconnect on disconnect admin panel
-  - Better information on connection state
-- Filtering on topics on the receiving end
-- Messages with payloads other than strings.
+## Feature To-Do List
+- [ ] Disconnect senders and receivers when queue is deleted.
+- [ ] Connect queues and apply filters, routers, etc. to them.
+- [ ] Persist queues and queue configuration.
+- [ ] Support other stream types over `StreamIO`.
+- [ ] Monitor messages / sec (graph?).
+- [ ] Add customisation.
+  - [x] TTL.
+  - [ ] Max capacity.
+- [x] Dead lettering.
+- [ ] Reconnect on disconnect admin panel.
+  - [ ] Better information on connection state.
+- [ ] Filtering on topics on the receiving end, i.e. creating topics and subtopics.
+- [ ] Messages with payloads other than strings (JSON, YAML, XML, etc.).

@@ -1,10 +1,10 @@
 use crate::server_connector::ServerConnector;
 use backend::protocol::message::{Message, TTL};
 use backend::protocol::queue_id::QueueId;
-use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::request::{Publish, Receive};
+use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::BufferProperties;
-use iced::widget::{button, column, row, text, text_input};
+use iced::widget::{button, column, horizontal_rule, row, text, text_input, vertical_rule};
 use iced::{Alignment, Element, Length, Task};
 use std::sync::Arc;
 use std::time::Duration;
@@ -61,16 +61,27 @@ impl InspectView {
                         .width(Length::Fill)
                         .align_x(Alignment::Center),
                     ],
+                    horizontal_rule(1),
                     row![
-                        text_input("Message body", self.message_body.as_str())
-                            .on_input(InspectViewMessage::MessageBodyChanged),
-                        button("Send Message").on_press(InspectViewMessage::SendMessage)
-                    ],
-                    row![
-                        button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
-                        text(self.received_message.as_str())
-                    ],
-                    delete_btn,
+                        column![
+                            text("Administration").align_x(Alignment::Center),
+                            delete_btn,
+                        ],
+                        vertical_rule(1),
+                        column![
+                            text("Messaging").align_x(Alignment::Center),
+                            row![
+                                text_input("Message body", self.message_body.as_str())
+                                    .on_input(InspectViewMessage::MessageBodyChanged),
+                                button("Send Message").on_press(InspectViewMessage::SendMessage)
+                            ].spacing(10),
+                            row![
+                                button("Receive Message")
+                                    .on_press(InspectViewMessage::ReceiveMessage),
+                                text(self.received_message.as_str())
+                            ],
+                        ].spacing(10),
+                    ].spacing(10).padding(10),
                 ]
                 .into();
                 element.map(Message::from)
