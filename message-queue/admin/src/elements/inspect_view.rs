@@ -3,7 +3,7 @@ use backend::protocol::message::{Message, TTL};
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::request::{Publish, Receive};
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
-use backend::protocol::BufferProperties;
+use backend::protocol::QueueProperties;
 use iced::widget::{button, column, horizontal_rule, row, text, text_input, vertical_rule};
 use iced::{Alignment, Element, Length, Task};
 use std::sync::Arc;
@@ -24,7 +24,7 @@ pub enum InspectViewMessage {
 }
 
 pub struct InspectView {
-    pub buffer_info: Option<(QueueId, BufferProperties)>,
+    pub buffer_info: Option<(QueueId, QueueProperties)>,
     message_body: String,
     received_message: String,
     connector: Arc<Mutex<ServerConnector>>,
@@ -47,7 +47,7 @@ impl InspectView {
         match &self.buffer_info {
             Some((address, properties)) => {
                 let mut delete_btn = button("Delete");
-                if !properties.system_buffer {
+                if !properties.system.is_system {
                     delete_btn = delete_btn.on_press(InspectViewMessage::Delete);
                 }
                 let element: Element<InspectViewMessage> = column![

@@ -4,6 +4,7 @@ use backend::protocol::message::{Message, TTL};
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::routing_error::RoutingError;
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
+use backend::protocol::{QueueProperties, SystemQueueProperties, UserQueueProperties};
 use log::{debug, error, warn};
 use std::sync::{Arc, Mutex};
 
@@ -21,7 +22,16 @@ pub struct Router {
 impl Router {
     pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
         let default_dlx = QueueId::Queue(DEFAULT_DLX_NAME.into());
-        queues.lock().unwrap().create(default_dlx.clone());
+        queues.lock().unwrap().create(
+            default_dlx.clone(),
+            QueueProperties {
+                system: SystemQueueProperties { is_system: true },
+                user: UserQueueProperties {
+                    is_dlx: true,
+                    dlx: None,
+                },
+            },
+        );
         Self {
             queues,
             default_dlx,
@@ -103,7 +113,7 @@ impl Router {
             routing_key,
             ..
         } = message;
-        let RoutingKey { dlx, .. } = routing_key;
+        let RoutingKey { dlx, id } = routing_key;
 
         // Derive the new routing key from the DLX preference.
         let new_routing_key = match dlx {
@@ -111,7 +121,11 @@ impl Router {
                 RoutingKey::new(self.default_dlx.clone(), DLXPreference::Drop)
             }
             DLXPreference::Queue => {
-                todo!()
+                let queue_dlx = match self.queues.lock()?.properties(&id) {
+                    None => self.default_dlx.clone(),
+                    Some(properties) => properties.user.dlx.clone().unwrap_or(self.default_dlx.clone()),
+                };
+                RoutingKey::new(queue_dlx, DLXPreference::Drop)
             }
             DLXPreference::Override(dlx) => RoutingKey::new(dlx, DLXPreference::Drop),
             DLXPreference::Drop => {

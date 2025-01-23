@@ -1,10 +1,10 @@
 use crate::queue_store::QueueStore;
 use crate::router::Router;
-use backend::protocol::request_error::RequestError;
 use backend::protocol::request::{
     CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive,
 };
-use backend::protocol::{BufferProperties, Request, Status};
+use backend::protocol::request_error::RequestError;
+use backend::protocol::{QueueProperties, Request, Status, SystemQueueProperties};
 use std::sync::{Arc, Mutex};
 
 pub trait Handler<R>
@@ -72,7 +72,11 @@ impl Handler<CreateQueue> for CreateQueueHandler {
         Ok(if queues.exists(&request.queue_address) {
             Status::Exists
         } else {
-            queues.create(request.queue_address.clone());
+            let properties = QueueProperties {
+                system: SystemQueueProperties { is_system: false },
+                user: request.properties,
+            };
+            queues.create(request.queue_address.clone(), properties);
             Status::Created
         })
     }
@@ -116,11 +120,9 @@ impl GetPropertiesHandler {
 impl Handler<GetProperties> for GetPropertiesHandler {
     fn handle(
         &mut self,
-        _: GetProperties,
+        request: GetProperties,
     ) -> Result<<GetProperties as Request>::Response, RequestError> {
-        Ok(BufferProperties {
-            system_buffer: false,
-        })
+        Ok(self.queues.lock()?.properties(&request.queue).map(Clone::clone))
     }
 }
 

@@ -1,16 +1,19 @@
 use crate::queue::{DequeuedMessage, Queue};
 use backend::protocol::message::Message;
 use backend::protocol::queue_id::QueueId;
+use backend::protocol::QueueProperties;
 use std::collections::HashMap;
 
 pub struct MessageQueue {
     queue: Queue,
+    properties: QueueProperties,
 }
 
 impl MessageQueue {
-    pub fn new() -> Self {
+    pub fn new(properties: QueueProperties) -> Self {
         Self {
             queue: Queue::new(),
+            properties,
         }
     }
 
@@ -23,11 +26,13 @@ impl MessageQueue {
     }
 }
 
-pub struct MessageTopic {}
+pub struct MessageTopic {
+    properties: QueueProperties,
+}
 
 impl MessageTopic {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(properties: QueueProperties) -> Self {
+        Self { properties }
     }
 
     pub fn publish(&mut self, message: Message) {}
@@ -87,19 +92,26 @@ impl QueueStore {
             .collect()
     }
 
-    pub fn create(&mut self, queue_id: QueueId) {
+    pub fn create(&mut self, queue_id: QueueId, properties: QueueProperties) {
         match &queue_id {
             QueueId::Queue(_) => self
                 .queues
-                .insert(queue_id, QueueType::Queue(MessageQueue::new())),
+                .insert(queue_id, QueueType::Queue(MessageQueue::new(properties))),
             QueueId::Topic(_) => self
                 .queues
-                .insert(queue_id, QueueType::Topic(MessageTopic::new())),
+                .insert(queue_id, QueueType::Topic(MessageTopic::new(properties))),
         };
     }
 
     pub fn exists(&self, queue_id: &QueueId) -> bool {
         self.queues.contains_key(queue_id)
+    }
+
+    pub fn properties(&self, queue_id: &QueueId) -> Option<&QueueProperties> {
+        Some(match self.queues.get(queue_id)? {
+            QueueType::Queue(q) => &q.properties,
+            QueueType::Topic(t) => &t.properties,
+        })
     }
 
     pub fn delete(&mut self, queue_id: &QueueId) -> bool {

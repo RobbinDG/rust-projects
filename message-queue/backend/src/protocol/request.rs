@@ -1,8 +1,9 @@
 use crate::protocol::message::Message;
 use crate::protocol::queue_id::QueueId;
+use crate::protocol::queue_properties::UserQueueProperties;
 use crate::protocol::routing_error::RoutingError;
 use crate::protocol::status_code::Status;
-use crate::protocol::BufferProperties;
+use crate::protocol::QueueProperties;
 use serde::{Deserialize, Serialize};
 use std::str;
 
@@ -21,6 +22,7 @@ pub struct CheckQueue {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateQueue {
     pub queue_address: QueueId,
+    pub properties: UserQueueProperties,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -30,7 +32,7 @@ pub struct DeleteQueue {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProperties {
-    pub buffer: QueueId,
+    pub queue: QueueId,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -60,7 +62,7 @@ impl Request for DeleteQueue {
 }
 
 impl Request for GetProperties {
-    type Response = BufferProperties;
+    type Response = Option<QueueProperties>;
 }
 
 impl Request for Publish {
@@ -123,4 +125,3 @@ impl From<Receive> for SupportedRequest {
         SupportedRequest::Receive(value)
     }
 }
-

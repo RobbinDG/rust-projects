@@ -4,7 +4,7 @@ use crate::elements::{QueueView, UIMessage};
 use crate::server_connector::ServerConnector;
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::request::{DeleteQueue, GetProperties};
-use backend::protocol::{BufferProperties, Status};
+use backend::protocol::{QueueProperties, Status};
 use iced::widget::{column, vertical_space};
 use iced::{Element, Task};
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use tokio::sync::Mutex;
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
     InspectBuffer(QueueId),
-    InspectInfo(QueueId, BufferProperties),
+    InspectInfo(QueueId, QueueProperties),
     BufferView(UIMessage),
     Inspector(InspectViewMessage),
     ConnectionUpdated(ConnectionInterfaceMessage),
@@ -119,7 +119,7 @@ impl AdminView {
                             Some((
                                 address_2,
                                 client
-                                    .transfer_admin_request(GetProperties { buffer: address })
+                                    .transfer_admin_request(GetProperties { queue: address })
                                     .await,
                             ))
                         } else {
@@ -128,7 +128,7 @@ impl AdminView {
                     },
                     move |maybe_data| match maybe_data {
                         Some((address, properties)) => {
-                            AdminViewMessage::InspectInfo(address, properties.unwrap())
+                            AdminViewMessage::InspectInfo(address, properties.unwrap().unwrap())
                         }
                         None => AdminViewMessage::ConnectionUpdated(
                             ConnectionInterfaceMessage::Connected(false),

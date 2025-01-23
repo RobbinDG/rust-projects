@@ -3,6 +3,7 @@ use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
 use backend::protocol::queue_id::{QueueId, QueueType};
 use backend::protocol::request::{CreateQueue, ListQueues};
+use backend::protocol::UserQueueProperties;
 use iced::widget::{button, column, radio, row, text_input};
 use iced::{Element, Task};
 use std::sync::Arc;
@@ -88,8 +89,8 @@ impl QueueView {
                     let new_queue_name = self.new_queue_text.clone();
                     Task::perform(async move {
                         Self::create(connector.clone(), queue_type, new_queue_name).await
-                    }, |_| {UIMessage::Refresh})
-                    .map(|m| m.into())
+                    }, |_| { UIMessage::Refresh })
+                        .map(|m| m.into())
                 }
                 None => Task::none(),
             },
@@ -122,6 +123,10 @@ impl QueueView {
             if let Err(_) = client
                 .transfer_admin_request(CreateQueue {
                     queue_address: QueueId::new(new_queue_name, selected_buffer_type),
+                    properties: UserQueueProperties {
+                        is_dlx: false, // TODO create UI element to configure
+                        dlx: None,     // TODO create UI element to configure
+                    },
                 })
                 .await
             {}
@@ -134,7 +139,7 @@ impl QueueView {
             Err(err) => {
                 println!("{err:?}");
                 None
-            },
+            }
         })
     }
 }
