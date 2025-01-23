@@ -1,5 +1,5 @@
 use crate::server_connector::ServerConnector;
-use backend::protocol::new::message::Message;
+use backend::protocol::new::message::{Message, TTL};
 use backend::protocol::new::queue_id::QueueId;
 use backend::protocol::new::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::request::{Publish, Receive};
@@ -106,7 +106,7 @@ impl InspectView {
                                             id: queue,
                                             dlx: DLXPreference::Default,
                                         },
-                                        ttl: Duration::from_secs(100),
+                                        ttl: TTL::Duration(Duration::from_secs(5)),
                                     },
                                 })
                                 .await

@@ -143,19 +143,18 @@ impl Handler<Publish> for PublishHandler {
 }
 
 pub struct ReceiveHandler {
-    queues: Arc<Mutex<QueueStore>>,
+    router: Arc<Mutex<Router>>,
 }
 
 impl ReceiveHandler {
-    pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
-        Self { queues }
+    pub fn new(router: Arc<Mutex<Router>>) -> Self {
+        Self { router }
     }
 }
 
 impl Handler<Receive> for ReceiveHandler {
     fn handle(&mut self, request: Receive) -> Result<<Receive as Request>::Response, RequestError> {
-        let mut binding = self.queues.lock()?;
-        let mut receiver = binding.receiver(&request.queue);
-        Ok(receiver.and_then(|mut r| r.receive()))
+        let mut binding = self.router.lock()?;
+        Ok(binding.receive_valid(&request.queue))
     }
 }

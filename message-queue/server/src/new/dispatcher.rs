@@ -37,8 +37,8 @@ impl RequestDispatcher {
             create: CreateQueueHandler::new(queue_store.clone()),
             delete: DeleteQueueHandler::new(queue_store.clone()),
             get_props: GetPropertiesHandler::new(queue_store.clone()),
-            publish: PublishHandler::new(router),
-            receive: ReceiveHandler::new(queue_store),
+            publish: PublishHandler::new(router.clone()),
+            receive: ReceiveHandler::new(router),
         }
     }
 

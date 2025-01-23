@@ -30,7 +30,6 @@ impl RequestWorker {
                     .await,
                 Err(e) => Err(e),
             };
-            println!("{:?}", response);
             if let Err(e) = self.stream_io.write_encode(&response).await {
                 match e {
                     StreamIOError::Stream(err) => return Err(err),

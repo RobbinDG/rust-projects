@@ -1,4 +1,4 @@
-use crate::new::queue::Queue;
+use crate::new::queue::{DequeuedMessage, Queue};
 use backend::protocol::new::message::Message;
 use backend::protocol::new::queue_id::QueueId;
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ impl MessageQueue {
         self.queue.push(message);
     }
 
-    pub fn receive(&mut self) -> Option<Message> {
+    pub fn receive(&mut self) -> Option<DequeuedMessage> {
         self.queue.pop()
     }
 }
@@ -32,7 +32,7 @@ impl MessageTopic {
 
     pub fn publish(&mut self, message: Message) {}
 
-    pub fn receive(&mut self) -> Option<Message> {
+    pub fn receive(&mut self) -> Option<DequeuedMessage> {
         None
     }
 }
@@ -64,7 +64,7 @@ pub struct Receiver<'a> {
 }
 
 impl<'a> Receiver<'a> {
-    pub fn receive(&mut self) -> Option<Message> {
+    pub fn receive(&mut self) -> Option<DequeuedMessage> {
         match self.queue {
             QueueType::Queue(q) => q.receive(),
             QueueType::Topic(t) => t.receive(),

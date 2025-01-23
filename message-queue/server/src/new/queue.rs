@@ -1,9 +1,19 @@
-use backend::protocol::new::message::Message;
+use backend::protocol::new::message::{Message, TTL};
 use std::time::SystemTime;
 
 struct QueuedMessage {
     message: Message,
     inserted_at: SystemTime,
+}
+
+pub enum MessageState {
+    Valid,
+    Dead,
+}
+
+pub struct DequeuedMessage {
+    pub message: Message,
+    pub state: MessageState,
 }
 
 pub struct Queue {
@@ -24,9 +34,25 @@ impl Queue {
         });
     }
 
-    pub fn pop(&mut self) -> Option<Message> {
+    pub fn pop(&mut self) -> Option<DequeuedMessage> {
         match self.messages.pop() {
-            Some(QueuedMessage { message, .. }) => Some(message),
+            Some(QueuedMessage {
+                message,
+                inserted_at,
+            }) => {
+                let valid = match message.ttl {
+                    TTL::Duration(d) => SystemTime::now() < inserted_at + d,
+                    TTL::Permanent => true,
+                } ;
+                Some(DequeuedMessage {
+                    message,
+                    state: if valid {
+                        MessageState::Valid
+                    } else {
+                        MessageState::Dead
+                    },
+                })
+            }
             _ => None,
         }
     }
