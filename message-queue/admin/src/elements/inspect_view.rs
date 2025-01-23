@@ -65,6 +65,9 @@ impl InspectView {
                     row![
                         column![
                             text("Administration").align_x(Alignment::Center),
+                            text(format!("DLX: {:?}", properties.user.dlx)),
+                            text(format!("Is DLX: {:?}", properties.user.is_dlx)),
+                            text(format!("Is System Managed: {:?}", properties.system.is_system)),
                             delete_btn,
                         ],
                         vertical_rule(1),

@@ -1,6 +1,6 @@
 use crate::elements::connection_interface::{ConnectionInterface, ConnectionInterfaceMessage};
 use crate::elements::inspect_view::{InspectView, InspectViewMessage};
-use crate::elements::{QueueView, UIMessage};
+use crate::elements::QueueView;
 use crate::server_connector::ServerConnector;
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::request::{DeleteQueue, GetProperties};
@@ -9,6 +9,7 @@ use iced::widget::{column, vertical_space};
 use iced::{Element, Task};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::elements::queue_view::UIMessage;
 
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
