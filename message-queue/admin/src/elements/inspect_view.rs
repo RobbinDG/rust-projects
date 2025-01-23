@@ -9,6 +9,7 @@ use iced::{Alignment, Element, Length, Task};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
+use crate::util::pretty_print_queue_dlx;
 
 #[derive(Clone, Debug)]
 pub enum InspectViewMessage {
@@ -65,9 +66,9 @@ impl InspectView {
                     row![
                         column![
                             text("Administration").align_x(Alignment::Center),
-                            text(format!("DLX: {:?}", properties.user.dlx)),
-                            text(format!("Is DLX: {:?}", properties.user.is_dlx)),
-                            text(format!("Is System Managed: {:?}", properties.system.is_system)),
+                            text(format!("DLX: {}", pretty_print_queue_dlx(&properties.user.dlx))),
+                            text(format!("Is DLX: {}", properties.user.is_dlx)),
+                            text(format!("Is System Managed: {}", properties.system.is_system)),
                             delete_btn,
                         ],
                         vertical_rule(1),

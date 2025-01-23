@@ -1,9 +1,10 @@
 use crate::elements::QueueTable;
 use crate::server_connector::ServerConnector;
+use crate::util::pretty_print_queue_dlx;
 use backend::protocol::queue_id::{QueueId, QueueType};
 use backend::protocol::request::{CreateQueue, ListQueues};
 use backend::protocol::UserQueueProperties;
-use iced::widget::{button, column, combo_box, radio, row, text_input};
+use iced::widget::{button, checkbox, column, combo_box, radio, row, text_input};
 use iced::{Element, Task};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
@@ -22,15 +23,13 @@ pub enum UIMessage {
     CreateQueue,
     SelectBufferType(QueueType),
     InspectBuffer(QueueId),
-    SetDLX(DLXChoice),
+    SetDLXChoice(DLXChoice),
+    SetIsDLX(bool),
 }
 
 impl Display for DLXChoice {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self.value {
-            None => write!(f, "System Default"),
-            Some(id) => write!(f, "{}", id.to_string()),
-        }
+        write!(f, "{}", pretty_print_queue_dlx(&self.value))
     }
 }
 
@@ -41,6 +40,7 @@ pub struct QueueView {
     selected_buffer_type: Option<QueueType>,
     dlx_state: combo_box::State<DLXChoice>,
     current_dlx: DLXChoice,
+    is_dlx: bool,
 }
 
 impl Default for QueueView {
@@ -54,6 +54,7 @@ impl Default for QueueView {
             selected_buffer_type: Some(QueueType::Queue),
             dlx_state: combo_box::State::new(vec![]),
             current_dlx: DLXChoice { value: None },
+            is_dlx: false,
         }
     }
 }
@@ -90,8 +91,9 @@ impl QueueView {
                     &self.dlx_state,
                     "Choose DLX",
                     Some(&self.current_dlx),
-                    UIMessage::SetDLX
+                    UIMessage::SetDLXChoice
                 ),
+                checkbox("Is DLX", self.is_dlx).on_toggle(UIMessage::SetIsDLX),
                 text_input(placeholder.as_str(), &self.new_queue_text)
                     .on_input(|s| UIMessage::NewQueueName(s)),
                 button("Create").on_press(UIMessage::CreateQueue),
@@ -123,10 +125,21 @@ impl QueueView {
                 Some(queue_type) => {
                     let new_queue_name = self.new_queue_text.clone();
                     let dlx_choice = self.current_dlx.clone();
-                    return Task::perform(async move {
-                        Self::create(connector.clone(), queue_type, new_queue_name, dlx_choice).await
-                    }, |_| { UIMessage::Refresh })
-                        .map(|m| m.into());
+                    let is_dlx = self.is_dlx;
+                    return Task::perform(
+                        async move {
+                            Self::create(
+                                connector.clone(),
+                                queue_type,
+                                new_queue_name,
+                                dlx_choice,
+                                is_dlx,
+                            )
+                            .await
+                        },
+                        |_| UIMessage::Refresh,
+                    )
+                    .map(|m| m.into());
                 }
                 None => {}
             },
@@ -148,7 +161,8 @@ impl QueueView {
                 }
                 None => println!("Failed to fetch queue data."),
             },
-            UIMessage::SetDLX(choice) => self.current_dlx = choice,
+            UIMessage::SetDLXChoice(choice) => self.current_dlx = choice,
+            UIMessage::SetIsDLX(toggle) => self.is_dlx = toggle,
         }
         Task::none()
     }
@@ -157,14 +171,15 @@ impl QueueView {
         connector: Arc<Mutex<ServerConnector>>,
         selected_buffer_type: QueueType,
         new_queue_name: String,
-        dlx: DLXChoice
+        dlx: DLXChoice,
+        is_dlx: bool,
     ) {
         if let Ok(client) = connector.lock().await.client().await {
             if let Err(_) = client
                 .transfer_admin_request(CreateQueue {
                     queue_address: QueueId::new(new_queue_name, selected_buffer_type),
                     properties: UserQueueProperties {
-                        is_dlx: false, // TODO create UI element to configure
+                        is_dlx, // TODO create UI element to configure
                         dlx: dlx.value,
                     },
                 })
