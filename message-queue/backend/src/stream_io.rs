@@ -137,6 +137,6 @@ impl StreamIO {
     }
 
     pub fn client_id(&self) -> tokio::io::Result<ClientID> {
-        Ok(ClientID::TcpSocket(self.stream.local_addr()?))
+        Ok(ClientID::TcpSocket(self.stream.peer_addr()?))
     }
 }

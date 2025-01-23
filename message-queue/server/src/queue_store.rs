@@ -3,6 +3,7 @@ use backend::protocol::message::Message;
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::QueueProperties;
 use std::collections::HashMap;
+use log::{debug, info};
 use backend::protocol::client_id::ClientID;
 
 pub struct MessageQueue {
@@ -47,8 +48,10 @@ impl MessageTopic {
     }
 
     pub fn receive(&mut self, client: &ClientID) -> Option<DequeuedMessage> {
+        debug!("Receiving message for {:?}", client);
         match self.client_queues.get_mut(client) {
             None => {
+                info!("Creating topic buffer for {:?}", client);
                 self.client_queues.insert(client.clone(), Queue::new());
                 None
             }
