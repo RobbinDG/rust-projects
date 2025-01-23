@@ -179,7 +179,7 @@ impl QueueView {
                 .transfer_admin_request(CreateQueue {
                     queue_address: QueueId::new(new_queue_name, selected_buffer_type),
                     properties: UserQueueProperties {
-                        is_dlx, // TODO create UI element to configure
+                        is_dlx,
                         dlx: dlx.value,
                     },
                 })

@@ -8,6 +8,7 @@
   - [x] TTL.
   - [ ] Max capacity.
 - [x] Dead lettering.
+- [ ] Send messages in queue to DLX on deletion.
 - [ ] Reconnect on disconnect admin panel.
   - [ ] Better information on connection state.
 - [ ] Filtering on topics on the receiving end, i.e. creating topics and subtopics.

@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use backend::protocol::message::{Message, TTL};
 use std::time::SystemTime;
 
@@ -17,25 +18,25 @@ pub struct DequeuedMessage {
 }
 
 pub struct Queue {
-    messages: Vec<QueuedMessage>,
+    messages: VecDeque<QueuedMessage>,
 }
 
 impl Queue {
     pub fn new() -> Self {
         Self {
-            messages: Vec::new(),
+            messages: VecDeque::new(),
         }
     }
 
     pub fn push(&mut self, message: Message) {
-        self.messages.push(QueuedMessage {
+        self.messages.push_back(QueuedMessage {
             message,
             inserted_at: SystemTime::now(),
         });
     }
 
     pub fn pop(&mut self) -> Option<DequeuedMessage> {
-        match self.messages.pop() {
+        match self.messages.pop_front() {
             Some(QueuedMessage {
                 message,
                 inserted_at,
