@@ -1,6 +1,6 @@
 use crate::queue_store::QueueStore;
 use crate::router::Router;
-use backend::protocol::new::request_error::RequestError;
+use backend::protocol::request_error::RequestError;
 use backend::protocol::request::{
     CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive,
 };

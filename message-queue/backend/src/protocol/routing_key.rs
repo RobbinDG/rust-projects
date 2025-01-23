@@ -1,4 +1,4 @@
-use crate::protocol::new::queue_id::QueueId;
+use crate::protocol::queue_id::QueueId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]

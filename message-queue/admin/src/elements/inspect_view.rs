@@ -1,7 +1,7 @@
 use crate::server_connector::ServerConnector;
-use backend::protocol::new::message::{Message, TTL};
-use backend::protocol::new::queue_id::QueueId;
-use backend::protocol::new::routing_key::{DLXPreference, RoutingKey};
+use backend::protocol::message::{Message, TTL};
+use backend::protocol::queue_id::QueueId;
+use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::request::{Publish, Receive};
 use backend::protocol::BufferProperties;
 use iced::widget::{button, column, row, text, text_input};

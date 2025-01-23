@@ -1,6 +1,6 @@
-use crate::protocol::new::message::Message;
-use crate::protocol::new::queue_id::QueueId;
-use crate::protocol::new::routing_error::RoutingError;
+use crate::protocol::message::Message;
+use crate::protocol::queue_id::QueueId;
+use crate::protocol::routing_error::RoutingError;
 use crate::protocol::status_code::Status;
 use crate::protocol::BufferProperties;
 use serde::{Deserialize, Serialize};

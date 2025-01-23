@@ -1,7 +1,7 @@
 use crate::queue_store::QueueStore;
 use crate::request_handler::{CheckQueueHandler, CreateQueueHandler, DeleteQueueHandler, GetPropertiesHandler, Handler, ListQueuesHandler, PublishHandler, ReceiveHandler};
-use backend::protocol::new::codec::encode;
-use backend::protocol::new::request_error::RequestError;
+use backend::protocol::codec::encode;
+use backend::protocol::request_error::RequestError;
 use backend::protocol::request::SupportedRequest;
 use backend::protocol::Request;
 use std::sync::{Arc, Mutex};

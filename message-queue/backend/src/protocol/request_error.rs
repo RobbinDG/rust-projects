@@ -11,7 +11,7 @@ pub enum RequestError {
 }
 
 impl<T> From<PoisonError<T>> for RequestError {
-    fn from(value: PoisonError<T>) -> Self {
+    fn from(_: PoisonError<T>) -> Self {
         RequestError::RequestHandlingError
     }
 }

@@ -2,7 +2,7 @@ use crate::elements::connection_interface::{ConnectionInterface, ConnectionInter
 use crate::elements::inspect_view::{InspectView, InspectViewMessage};
 use crate::elements::{QueueView, UIMessage};
 use crate::server_connector::ServerConnector;
-use backend::protocol::new::queue_id::QueueId;
+use backend::protocol::queue_id::QueueId;
 use backend::protocol::request::{DeleteQueue, GetProperties};
 use backend::protocol::{BufferProperties, Status};
 use iced::widget::{column, vertical_space};

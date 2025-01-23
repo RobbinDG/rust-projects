@@ -1,9 +1,9 @@
 use crate::queue::MessageState;
 use crate::queue_store::QueueStore;
-use backend::protocol::new::message::{Message, TTL};
-use backend::protocol::new::queue_id::QueueId;
-use backend::protocol::new::routing_error::RoutingError;
-use backend::protocol::new::routing_key::{DLXPreference, RoutingKey};
+use backend::protocol::message::{Message, TTL};
+use backend::protocol::queue_id::QueueId;
+use backend::protocol::routing_error::RoutingError;
+use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use log::{debug, error, warn};
 use std::sync::{Arc, Mutex};
 

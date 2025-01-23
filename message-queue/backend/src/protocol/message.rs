@@ -1,4 +1,4 @@
-use crate::protocol::new::routing_key::RoutingKey;
+use crate::protocol::routing_key::RoutingKey;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

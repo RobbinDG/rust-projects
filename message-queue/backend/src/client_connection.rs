@@ -1,4 +1,4 @@
-use crate::protocol::new::request_error::RequestError;
+use crate::protocol::request_error::RequestError;
 use crate::protocol::request::{Request, SupportedRequest};
 use crate::stream_io::{StreamIO, StreamIOError};
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,4 @@
-use backend::protocol::new::queue_id::{QueueId, QueueType};
+use backend::protocol::queue_id::{QueueId, QueueType};
 
 #[derive(Debug, Clone)]
 pub enum UIMessage {

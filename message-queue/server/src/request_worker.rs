@@ -1,5 +1,5 @@
 use crate::dispatcher::RequestDispatcher;
-use backend::protocol::new::request_error::RequestError;
+use backend::protocol::request_error::RequestError;
 use backend::protocol::request::SupportedRequest;
 use backend::stream_io::{StreamIO, StreamIOError};
 use log::error;

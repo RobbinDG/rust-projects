@@ -1,7 +1,7 @@
 use crate::elements::QueueTable;
 use crate::elements::UIMessage;
 use crate::server_connector::ServerConnector;
-use backend::protocol::new::queue_id::{QueueId, QueueType};
+use backend::protocol::queue_id::{QueueId, QueueType};
 use backend::protocol::request::{CreateQueue, ListQueues};
 use iced::widget::{button, column, radio, row, text_input};
 use iced::{Element, Task};

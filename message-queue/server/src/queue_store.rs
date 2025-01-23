@@ -1,6 +1,6 @@
 use crate::queue::{DequeuedMessage, Queue};
-use backend::protocol::new::message::Message;
-use backend::protocol::new::queue_id::QueueId;
+use backend::protocol::message::Message;
+use backend::protocol::queue_id::QueueId;
 use std::collections::HashMap;
 
 pub struct MessageQueue {

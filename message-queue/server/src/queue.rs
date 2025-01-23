@@ -1,4 +1,4 @@
-use backend::protocol::new::message::{Message, TTL};
+use backend::protocol::message::{Message, TTL};
 use std::time::SystemTime;
 
 struct QueuedMessage {

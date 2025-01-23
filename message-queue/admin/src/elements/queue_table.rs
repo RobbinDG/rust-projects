@@ -1,5 +1,5 @@
 use crate::elements::UIMessage;
-use backend::protocol::new::queue_id::QueueId;
+use backend::protocol::queue_id::QueueId;
 use iced::widget::{
     column, container, horizontal_rule, hover, mouse_area, row, scrollable, text, Column,
     Row,
