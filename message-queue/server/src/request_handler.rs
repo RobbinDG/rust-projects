@@ -1,5 +1,6 @@
 use crate::queue_store::QueueStore;
 use crate::router::Router;
+use backend::protocol::client_id::ClientID;
 use backend::protocol::request::{
     CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive,
 };
@@ -11,7 +12,7 @@ pub trait Handler<R>
 where
     R: Request,
 {
-    fn handle(&mut self, request: R) -> Result<R::Response, RequestError>;
+    fn handle(&mut self, request: R, _: ClientID) -> Result<R::Response, RequestError>;
 }
 
 pub struct ListQueuesHandler {
@@ -25,7 +26,11 @@ impl ListQueuesHandler {
 }
 
 impl Handler<ListQueues> for ListQueuesHandler {
-    fn handle(&mut self, _: ListQueues) -> Result<<ListQueues as Request>::Response, RequestError> {
+    fn handle(
+        &mut self,
+        _: ListQueues,
+        _: ClientID,
+    ) -> Result<<ListQueues as Request>::Response, RequestError> {
         Ok(self.queues.lock()?.list())
     }
 }
@@ -44,6 +49,7 @@ impl Handler<CheckQueue> for CheckQueueHandler {
     fn handle(
         &mut self,
         request: CheckQueue,
+        _: ClientID,
     ) -> Result<<CheckQueue as Request>::Response, RequestError> {
         Ok(if self.queues.lock()?.exists(&request.queue_address) {
             Status::Exists
@@ -67,6 +73,7 @@ impl Handler<CreateQueue> for CreateQueueHandler {
     fn handle(
         &mut self,
         request: CreateQueue,
+        _: ClientID,
     ) -> Result<<CreateQueue as Request>::Response, RequestError> {
         let mut queues = self.queues.lock()?;
         Ok(if queues.exists(&request.queue_address) {
@@ -96,6 +103,7 @@ impl Handler<DeleteQueue> for DeleteQueueHandler {
     fn handle(
         &mut self,
         request: DeleteQueue,
+        _: ClientID,
     ) -> Result<<DeleteQueue as Request>::Response, RequestError> {
         let mut qm = self.queues.lock()?;
 
@@ -121,8 +129,13 @@ impl Handler<GetProperties> for GetPropertiesHandler {
     fn handle(
         &mut self,
         request: GetProperties,
+        _: ClientID,
     ) -> Result<<GetProperties as Request>::Response, RequestError> {
-        Ok(self.queues.lock()?.properties(&request.queue).map(Clone::clone))
+        Ok(self
+            .queues
+            .lock()?
+            .properties(&request.queue)
+            .map(Clone::clone))
     }
 }
 
@@ -137,7 +150,11 @@ impl PublishHandler {
 }
 
 impl Handler<Publish> for PublishHandler {
-    fn handle(&mut self, request: Publish) -> Result<<Publish as Request>::Response, RequestError> {
+    fn handle(
+        &mut self,
+        request: Publish,
+        _: ClientID,
+    ) -> Result<<Publish as Request>::Response, RequestError> {
         let mut router = self.router.lock()?;
         Ok(router.publish(request.message))
     }
@@ -154,8 +171,12 @@ impl ReceiveHandler {
 }
 
 impl Handler<Receive> for ReceiveHandler {
-    fn handle(&mut self, request: Receive) -> Result<<Receive as Request>::Response, RequestError> {
+    fn handle(
+        &mut self,
+        request: Receive,
+        client: ClientID,
+    ) -> Result<<Receive as Request>::Response, RequestError> {
         let mut binding = self.router.lock()?;
-        Ok(binding.receive_valid(&request.queue))
+        Ok(binding.receive_valid(&request.queue, client))
     }
 }

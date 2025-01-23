@@ -24,7 +24,7 @@ impl RequestWorker {
             let response = match request {
                 Ok(r) => self
                     .dispatcher
-                    .dispatch(r)
+                    .dispatch(r, self.stream_io.client_id()?)
                     .await,
                 Err(e) => Err(e),
             };

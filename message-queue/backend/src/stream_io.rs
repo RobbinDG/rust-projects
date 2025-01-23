@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use crate::protocol::client_id::ClientID;
 use crate::protocol::request_error::RequestError;
 
 const BUFFER_SIZE: usize = 1024;
@@ -37,11 +38,6 @@ impl From<StreamIOError> for String {
     }
 }
 
-// impl From<tokio::io::Error> for StreamIOError {
-//     fn from(value: tokio::io::Error) -> Self {
-//         StreamIOError::Codec(value.into())
-//     }
-// }
 
 impl From<std::io::Error> for StreamIOError {
     fn from(value: std::io::Error) -> Self {
@@ -138,5 +134,9 @@ impl StreamIO {
     pub fn reset(&mut self) {
         self.last_write = None;
         self.last_read = None;
+    }
+
+    pub fn client_id(&self) -> tokio::io::Result<ClientID> {
+        Ok(ClientID::TcpSocket(self.stream.local_addr()?))
     }
 }

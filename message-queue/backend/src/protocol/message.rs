@@ -8,7 +8,7 @@ pub enum TTL {
     Permanent,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Message {
     pub payload: String,
     pub routing_key: RoutingKey,

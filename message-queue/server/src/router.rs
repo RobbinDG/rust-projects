@@ -7,6 +7,7 @@ use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, SystemQueueProperties, UserQueueProperties};
 use log::{debug, error, warn};
 use std::sync::{Arc, Mutex};
+use backend::protocol::client_id::ClientID;
 
 const DEFAULT_DLX_NAME: &'static str = "default_dlx";
 
@@ -65,8 +66,8 @@ impl Router {
     /// * `queue_id`: the queue of which to request a message.
     ///
     /// returns: `Option<Message>` the received message, if there is one.
-    pub fn receive_valid(&mut self, queue_id: &QueueId) -> Option<Message> {
-        let (message, to_dlx) = self.receive_until_valid(queue_id);
+    pub fn receive_valid(&mut self, queue_id: &QueueId, for_client: ClientID) -> Option<Message> {
+        let (message, to_dlx) = self.receive_until_valid(queue_id, for_client);
         for m in to_dlx {
             if let Err(err) = self.send_to_dlx(m) {
                 match err {
@@ -82,12 +83,12 @@ impl Router {
         message
     }
 
-    fn receive_until_valid(&mut self, queue_id: &QueueId) -> (Option<Message>, Vec<Message>) {
+    fn receive_until_valid(&mut self, queue_id: &QueueId, for_client: ClientID) -> (Option<Message>, Vec<Message>) {
         // TODO the starting capacity can be chosen intelligently if we track i.e. the shortest
         //  ttl of all messages currently in the queue.
         let mut dlx_messages = vec![];
         match self.queues.lock() {
-            Ok(mut binding) => match binding.receiver(queue_id) {
+            Ok(mut binding) => match binding.receiver(&for_client, queue_id) {
                 Some(mut receiver) => {
                     while let Some(message) = receiver.receive() {
                         if let MessageState::Dead = message.state {

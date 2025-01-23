@@ -7,6 +7,7 @@ pub mod queue_id;
 pub mod request_error;
 pub mod routing_error;
 pub mod routing_key;
+pub mod client_id;
 
 pub use queue_properties::{QueueProperties, SystemQueueProperties, UserQueueProperties};
 pub use request::Request;

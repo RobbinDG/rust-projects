@@ -1,7 +1,7 @@
 use crate::protocol::queue_id::QueueId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum DLXPreference {
     Default,
     Queue,
@@ -9,7 +9,7 @@ pub enum DLXPreference {
     Drop,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RoutingKey {
     pub id: QueueId,
     pub dlx: DLXPreference,

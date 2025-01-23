@@ -3,6 +3,7 @@ use backend::protocol::message::Message;
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::QueueProperties;
 use std::collections::HashMap;
+use backend::protocol::client_id::ClientID;
 
 pub struct MessageQueue {
     queue: Queue,
@@ -28,17 +29,35 @@ impl MessageQueue {
 
 pub struct MessageTopic {
     properties: QueueProperties,
+    client_queues: HashMap<ClientID, Queue>,
 }
 
 impl MessageTopic {
     pub fn new(properties: QueueProperties) -> Self {
-        Self { properties }
+        Self {
+            properties,
+            client_queues: HashMap::new(),
+        }
     }
 
-    pub fn publish(&mut self, message: Message) {}
+    pub fn publish(&mut self, message: Message) {
+        for queue in self.client_queues.values_mut() {
+            queue.push(message.clone());
+        }
+    }
 
-    pub fn receive(&mut self) -> Option<DequeuedMessage> {
-        None
+    pub fn receive(&mut self, client: &ClientID) -> Option<DequeuedMessage> {
+        match self.client_queues.get_mut(client) {
+            None => {
+                self.client_queues.insert(client.clone(), Queue::new());
+                None
+            }
+            Some(queue) => queue.pop(),
+        }
+    }
+
+    pub fn deregister_client(&mut self, client: &ClientID) {
+        self.client_queues.remove(client);
     }
 }
 
@@ -65,6 +84,7 @@ impl<'a> Publisher<'a> {
 }
 
 pub struct Receiver<'a> {
+    client: &'a ClientID,
     queue: &'a mut QueueType,
 }
 
@@ -72,7 +92,7 @@ impl<'a> Receiver<'a> {
     pub fn receive(&mut self) -> Option<DequeuedMessage> {
         match self.queue {
             QueueType::Queue(q) => q.receive(),
-            QueueType::Topic(t) => t.receive(),
+            QueueType::Topic(t) => t.receive(self.client),
         }
     }
 }
@@ -125,10 +145,13 @@ impl QueueStore {
         }
     }
 
-    pub fn receiver(&mut self, for_queue: &QueueId) -> Option<Receiver> {
+    pub fn receiver<'a>(&'a mut self, for_client: &'a ClientID, for_queue: &QueueId) -> Option<Receiver<'a>> {
         match self.queues.get_mut(for_queue) {
             None => None,
-            Some(queue) => Some(Receiver { queue }),
+            Some(queue) => Some(Receiver {
+                queue,
+                client: for_client,
+            }),
         }
     }
 }
