@@ -8,6 +8,12 @@ use log::{debug, error, warn};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+const DEFAULT_DLX_NAME: &'static str = "default_dlx";
+
+/// A struct responsible for sending messages to the correct destination queue given its
+/// routing key. By extension, the Router will also handle sending messages to
+/// dead-letter exchanges (DLX) and updating their routing keys when conditions change.
+/// Additionally, the router will define and create the default DLX.
 pub struct Router {
     queues: Arc<Mutex<QueueStore>>,
     default_dlx: QueueId,
@@ -15,7 +21,7 @@ pub struct Router {
 
 impl Router {
     pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
-        let default_dlx = QueueId::Queue("default_dlx".into());
+        let default_dlx = QueueId::Queue(DEFAULT_DLX_NAME.into());
         queues.lock().unwrap().create(default_dlx.clone());
         Self {
             queues,
@@ -23,8 +29,17 @@ impl Router {
         }
     }
 
+    /// Publish a message to its intended destination queue, regardless of queue implementation
+    /// type (Queue/Topic).
+    ///
+    /// # Arguments
+    ///
+    /// * `message`: the message to publish, including the routing key according to which it
+    ///     will be routed.
+    ///
+    /// returns: `Result<(), RoutingError>` a potential routing error if it occurs
+    ///     during publishing.
     pub fn publish(&mut self, message: Message) -> Result<(), RoutingError> {
-        /// Publish message to its intended destination queue.
         self.queues
             .lock()?
             .publisher(&message.routing_key.id)
@@ -32,6 +47,15 @@ impl Router {
             .map(|mut p| p.publish(message))
     }
 
+    /// Receive a message that is valid at the time of calling. During this call, invalid
+    /// messages received at the head of the requested queue will be sent to their
+    /// set DLX preference.
+    ///
+    /// # Arguments
+    ///
+    /// * `queue_id`: the queue of which to request a message.
+    ///
+    /// returns: `Option<Message>` the received message, if there is one.
     pub fn receive_valid(&mut self, queue_id: &QueueId) -> Option<Message> {
         let (message, to_dlx) = self.receive_until_valid(queue_id);
         for m in to_dlx {
