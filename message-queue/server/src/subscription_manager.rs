@@ -1,4 +1,4 @@
-use crate::new::queue_store::QueueStore;
+use crate::queue_store::QueueStore;
 use backend::protocol::new::message::Message;
 use backend::protocol::new::queue_id::QueueId;
 use backend::stream_io::StreamIO;

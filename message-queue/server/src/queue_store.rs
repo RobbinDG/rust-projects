@@ -1,4 +1,4 @@
-use crate::new::queue::{DequeuedMessage, Queue};
+use crate::queue::{DequeuedMessage, Queue};
 use backend::protocol::new::message::Message;
 use backend::protocol::new::queue_id::QueueId;
 use std::collections::HashMap;
@@ -89,10 +89,10 @@ impl QueueStore {
 
     pub fn create(&mut self, queue_id: QueueId) {
         match &queue_id {
-            QueueId::Queue(name) => self
+            QueueId::Queue(_) => self
                 .queues
                 .insert(queue_id, QueueType::Queue(MessageQueue::new())),
-            QueueId::Topic(name) => self
+            QueueId::Topic(_) => self
                 .queues
                 .insert(queue_id, QueueType::Topic(MessageTopic::new())),
         };

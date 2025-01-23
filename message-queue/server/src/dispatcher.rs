@@ -1,15 +1,14 @@
-use crate::new::queue_store::QueueStore;
-use crate::new::request_handler::{CheckQueueHandler, CreateQueueHandler, DeleteQueueHandler, GetPropertiesHandler, Handler, ListQueuesHandler, PublishHandler, ReceiveHandler};
+use crate::queue_store::QueueStore;
+use crate::request_handler::{CheckQueueHandler, CreateQueueHandler, DeleteQueueHandler, GetPropertiesHandler, Handler, ListQueuesHandler, PublishHandler, ReceiveHandler};
 use backend::protocol::new::codec::encode;
 use backend::protocol::new::request_error::RequestError;
 use backend::protocol::request::SupportedRequest;
 use backend::protocol::Request;
 use std::sync::{Arc, Mutex};
-use crate::new::router::Router;
+use crate::router::Router;
 
 /// A helper object to dispatch requests to a designated handler and encode their responses.
 pub struct RequestDispatcher {
-    router: Arc<Mutex<Router>>,
     list_queues: ListQueuesHandler,
     check_queue: CheckQueueHandler,
     create: CreateQueueHandler,
@@ -31,7 +30,6 @@ impl RequestDispatcher {
     pub fn new(queue_store: Arc<Mutex<QueueStore>>) -> Self {
         let router = Arc::new(Mutex::new(Router::new(queue_store.clone())));
         Self {
-            router: router.clone(),
             list_queues: ListQueuesHandler::new(queue_store.clone()),
             check_queue: CheckQueueHandler::new(queue_store.clone()),
             create: CreateQueueHandler::new(queue_store.clone()),

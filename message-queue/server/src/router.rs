@@ -1,12 +1,11 @@
-use crate::new::queue::MessageState;
-use crate::new::queue_store::QueueStore;
+use crate::queue::MessageState;
+use crate::queue_store::QueueStore;
 use backend::protocol::new::message::{Message, TTL};
 use backend::protocol::new::queue_id::QueueId;
 use backend::protocol::new::routing_error::RoutingError;
 use backend::protocol::new::routing_key::{DLXPreference, RoutingKey};
 use log::{debug, error, warn};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 const DEFAULT_DLX_NAME: &'static str = "default_dlx";
 
@@ -95,10 +94,10 @@ impl Router {
         }
     }
 
-    fn send_to_dlx(&mut self, mut message: Message) -> Result<(), RoutingError> {
+    fn send_to_dlx(&mut self, message: Message) -> Result<(), RoutingError> {
         debug!("Sending message to DLX {:?}", message.routing_key.dlx);
 
-        /// Deconstruct message into its components.
+        // Deconstruct message into its components.
         let Message {
             payload,
             routing_key,
@@ -106,7 +105,7 @@ impl Router {
         } = message;
         let RoutingKey { dlx, .. } = routing_key;
 
-        /// Derive the new routing key from the DLX preference.
+        // Derive the new routing key from the DLX preference.
         let new_routing_key = match dlx {
             DLXPreference::Default => {
                 RoutingKey::new(self.default_dlx.clone(), DLXPreference::Drop)
@@ -120,7 +119,7 @@ impl Router {
             }
         };
 
-        /// Construct the new message with updated routing key.
+        // Construct the new message with updated routing key.
         let new_message = Message::new(payload, new_routing_key, TTL::Permanent);
 
         self.publish(new_message)
