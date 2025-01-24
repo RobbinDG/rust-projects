@@ -66,7 +66,7 @@ impl QueueStore {
             QueueId::Queue(_) => self
                 .queues
                 .insert(queue_id, QueueType::Queue(MessageQueue::new(properties))),
-            QueueId::Topic(_) => self
+            QueueId::Topic(_, _, _) => self
                 .queues
                 .insert(queue_id, QueueType::Topic(MessageTopic::new(properties))),
         };
