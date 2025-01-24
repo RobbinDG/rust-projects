@@ -2,7 +2,7 @@ use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
 use backend::protocol::queue_id::QueueId;
-use backend::protocol::request::{Publish, Receive};
+use backend::protocol::request::{Publish, Receive, Subscribe};
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::QueueProperties;
 use iced::widget::{
@@ -21,6 +21,8 @@ pub enum InspectViewMessage {
     SendMessage,
     MessageSent,
     SendFailure,
+    Subscribe,
+    Subscribed,
     ReceiveMessage,
     MessageReceived(String),
     NoMessageAvailable,
@@ -103,6 +105,7 @@ impl InspectView {
                             ]
                             .spacing(10),
                             row![
+                                button("Subscribe").on_press(InspectViewMessage::Subscribe),
                                 button("Receive Message")
                                     .on_press(InspectViewMessage::ReceiveMessage),
                                 text(self.received_message.as_str())
@@ -171,18 +174,33 @@ impl InspectView {
             }
             InspectViewMessage::MessageSent => {}
             InspectViewMessage::SendFailure => {}
-            InspectViewMessage::ReceiveMessage => {
+            InspectViewMessage::Subscribe => {
                 if let Some((queue, _)) = &self.buffer_info {
-                    let queue = queue.clone();
                     let connector = self.connector.clone();
+                    let queue = queue.clone();
                     return Task::perform(
                         async move {
                             let mut binding = connector.lock().await;
                             let client = binding.client().await.ok()?;
                             client
-                                .transfer_admin_request(Receive { queue })
+                                .transfer_admin_request(Subscribe { queue })
                                 .await
-                                .ok()?
+                                .ok()
+                        },
+                        move |result| InspectViewMessage::Subscribed,
+                    )
+                    .map(Msg::from);
+                }
+            }
+            InspectViewMessage::Subscribed => {}
+            InspectViewMessage::ReceiveMessage => {
+                if self.buffer_info.is_some() {
+                    let connector = self.connector.clone();
+                    return Task::perform(
+                        async move {
+                            let mut binding = connector.lock().await;
+                            let client = binding.client().await.ok()?;
+                            client.transfer_admin_request(Receive {}).await.ok()?
                         },
                         move |result| match result {
                             Some(Message { payload, .. }) => {

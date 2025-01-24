@@ -6,6 +6,7 @@ pub mod queue_store;
 pub mod request_worker;
 pub mod dispatcher;
 mod request_handler;
+mod subscription_manager;
 
 use server::Server;
 use std::error::Error;

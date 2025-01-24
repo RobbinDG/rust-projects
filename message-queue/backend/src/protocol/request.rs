@@ -41,9 +41,12 @@ pub struct Publish {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Receive {
+pub struct Subscribe {
     pub queue: QueueId,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Receive {}
 
 impl Request for ListQueues {
     type Response = Vec<(QueueId, usize, usize, usize)>;
@@ -69,6 +72,10 @@ impl Request for Publish {
     type Response = Result<(), RoutingError>;
 }
 
+impl Request for Subscribe {
+    type Response = Status;
+}
+
 impl Request for Receive {
     type Response = Option<Message>;
 }
@@ -81,6 +88,7 @@ pub enum SupportedRequest {
     DeleteQueue(DeleteQueue),
     GetProperties(GetProperties),
     Publish(Publish),
+    Subscribe(Subscribe),
     Receive(Receive),
 }
 
@@ -117,6 +125,12 @@ impl From<GetProperties> for SupportedRequest {
 impl From<Publish> for SupportedRequest {
     fn from(value: Publish) -> Self {
         SupportedRequest::Publish(value)
+    }
+}
+
+impl From<Subscribe> for SupportedRequest {
+    fn from(value: Subscribe) -> Self {
+        SupportedRequest::Subscribe(value)
     }
 }
 

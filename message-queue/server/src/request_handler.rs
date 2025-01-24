@@ -1,8 +1,9 @@
 use crate::queue_store::QueueStore;
 use crate::router::Router;
+use crate::subscription_manager::SubscriptionManager;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::request::{
-    CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive,
+    CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive, Subscribe,
 };
 use backend::protocol::request_error::RequestError;
 use backend::protocol::{QueueProperties, Request, Status, SystemQueueProperties};
@@ -160,23 +161,67 @@ impl Handler<Publish> for PublishHandler {
     }
 }
 
+pub struct SubscribeHandler {
+    subscription_manager: Arc<Mutex<SubscriptionManager>>,
+}
+
+impl SubscribeHandler {
+    pub fn new(subscription_manager: Arc<Mutex<SubscriptionManager>>) -> Self {
+        Self {
+            subscription_manager,
+        }
+    }
+}
+
+impl Handler<Subscribe> for SubscribeHandler {
+    fn handle(
+        &mut self,
+        request: Subscribe,
+        client_id: ClientID,
+    ) -> Result<<Subscribe as Request>::Response, RequestError> {
+        Ok(
+            if self
+                .subscription_manager
+                .lock()?
+                .subscribe(client_id, request.queue)
+            {
+                Status::Created
+            } else {
+                Status::NotFound
+            },
+        )
+    }
+}
+
 pub struct ReceiveHandler {
+    subscription_manager: Arc<Mutex<SubscriptionManager>>,
     router: Arc<Mutex<Router>>,
 }
 
 impl ReceiveHandler {
-    pub fn new(router: Arc<Mutex<Router>>) -> Self {
-        Self { router }
+    pub fn new(
+        subscription_manager: Arc<Mutex<SubscriptionManager>>,
+        router: Arc<Mutex<Router>>,
+    ) -> Self {
+        Self {
+            subscription_manager,
+            router,
+        }
     }
 }
 
 impl Handler<Receive> for ReceiveHandler {
     fn handle(
         &mut self,
-        request: Receive,
+        _: Receive,
         client: ClientID,
     ) -> Result<<Receive as Request>::Response, RequestError> {
-        let mut binding = self.router.lock()?;
-        Ok(binding.receive_valid(&request.queue, client))
+        let mut router = self.router.lock()?;
+        let subscriptions = self.subscription_manager.lock()?;
+        let queue = match subscriptions.subscription(&client) {
+            Some(queue) => queue,
+            None => return Ok(None),
+        };
+        Ok(router.receive_valid(queue, client))
     }
 }

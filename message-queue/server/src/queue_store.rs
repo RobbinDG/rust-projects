@@ -1,10 +1,10 @@
 use crate::queue::{DequeuedMessage, Queue};
+use backend::protocol::client_id::ClientID;
 use backend::protocol::message::Message;
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::QueueProperties;
-use std::collections::HashMap;
 use log::{debug, info};
-use backend::protocol::client_id::ClientID;
+use std::collections::HashMap;
 
 pub struct MessageQueue {
     queue: Queue,
@@ -49,14 +49,14 @@ impl MessageTopic {
 
     pub fn receive(&mut self, client: &ClientID) -> Option<DequeuedMessage> {
         debug!("Receiving message for {:?}", client);
-        match self.client_queues.get_mut(client) {
-            None => {
-                info!("Creating topic buffer for {:?}", client);
-                self.client_queues.insert(client.clone(), Queue::new());
-                None
-            }
-            Some(queue) => queue.pop(),
-        }
+        self.client_queues
+            .get_mut(client)
+            .and_then(|queue| queue.pop())
+    }
+
+    pub fn register_client(&mut self, client: ClientID) {
+        info!("Creating topic buffer for {:?}", client);
+        self.client_queues.insert(client.clone(), Queue::new());
     }
 
     pub fn deregister_client(&mut self, client: &ClientID) {
@@ -69,6 +69,9 @@ enum QueueType {
     Topic(MessageTopic),
 }
 
+/// An interface to a set of queues to be managed. This object provides accessors and modifiers
+/// to predictably handle everything one could do with a queue, whilst limiting the access
+/// to the individual queues themselves to only reasonable actions.
 pub struct QueueStore {
     queues: HashMap<QueueId, QueueType>,
 }
@@ -148,13 +151,63 @@ impl QueueStore {
         }
     }
 
-    pub fn receiver<'a>(&'a mut self, for_client: &'a ClientID, for_queue: &QueueId) -> Option<Receiver<'a>> {
+    pub fn receiver<'a>(
+        &'a mut self,
+        for_client: &'a ClientID,
+        for_queue: &QueueId,
+    ) -> Option<Receiver<'a>> {
         match self.queues.get_mut(for_queue) {
             None => None,
             Some(queue) => Some(Receiver {
                 queue,
                 client: for_client,
             }),
+        }
+    }
+
+    /// Forwards resource allocation required for a client to receive messages from the provided
+    /// queue. This method is not checked, so in poor use of this method might lead to large
+    /// quantities of unused or under-utilised memory. The implementation is dependent
+    /// on the target queue type. No allocation will be done if there exists no queue
+    /// with the given identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `queue_id`: the queue to forward allocation for.
+    /// * `client`: the client to allocate for.
+    ///
+    /// returns: `()`
+    pub fn register_client(&mut self, queue_id: &QueueId, client: ClientID) {
+        if let Some(queue) = self.queues.get_mut(queue_id) {
+            match queue {
+                QueueType::Queue(_) => {
+                    // Not currently allocating anything for queues.
+                }
+                QueueType::Topic(t) => {
+                    t.register_client(client);
+                }
+            }
+        }
+    }
+
+    /// Forwards resource de-allocation; the inverse of `register_client()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `queue_id`: the queue to forward allocation for.
+    /// * `client`: the client to allocate for.
+    ///
+    /// returns: `()`
+    pub fn deregister_client(&mut self, queue_id: &QueueId, client: &ClientID) {
+        if let Some(queue) = self.queues.get_mut(queue_id) {
+            match queue {
+                QueueType::Queue(_) => {
+                    // Not currently allocating anything for queues.
+                }
+                QueueType::Topic(t) => {
+                    t.deregister_client(client);
+                }
+            }
         }
     }
 }

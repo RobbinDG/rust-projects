@@ -1,9 +1,10 @@
 use crate::queue_store::QueueStore;
 use crate::request_handler::{
     CheckQueueHandler, CreateQueueHandler, DeleteQueueHandler, GetPropertiesHandler, Handler,
-    ListQueuesHandler, PublishHandler, ReceiveHandler,
+    ListQueuesHandler, PublishHandler, ReceiveHandler, SubscribeHandler,
 };
 use crate::router::Router;
+use crate::subscription_manager::SubscriptionManager;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::codec::encode;
 use backend::protocol::request::SupportedRequest;
@@ -19,6 +20,7 @@ pub struct RequestDispatcher {
     delete: DeleteQueueHandler,
     get_props: GetPropertiesHandler,
     publish: PublishHandler,
+    subscribe: SubscribeHandler,
     receive: ReceiveHandler,
 }
 
@@ -33,6 +35,8 @@ impl RequestDispatcher {
     /// returns: `RequestDispatcher`
     pub fn new(queue_store: Arc<Mutex<QueueStore>>) -> Self {
         let router = Arc::new(Mutex::new(Router::new(queue_store.clone())));
+        let subscription_manager =
+            Arc::new(Mutex::new(SubscriptionManager::new(queue_store.clone())));
         Self {
             list_queues: ListQueuesHandler::new(queue_store.clone()),
             check_queue: CheckQueueHandler::new(queue_store.clone()),
@@ -40,7 +44,8 @@ impl RequestDispatcher {
             delete: DeleteQueueHandler::new(queue_store.clone()),
             get_props: GetPropertiesHandler::new(queue_store.clone()),
             publish: PublishHandler::new(router.clone()),
-            receive: ReceiveHandler::new(router),
+            subscribe: SubscribeHandler::new(subscription_manager.clone()),
+            receive: ReceiveHandler::new(subscription_manager, router),
         }
     }
 
@@ -64,6 +69,7 @@ impl RequestDispatcher {
             SupportedRequest::DeleteQueue(r) => handle_and_encode(r, &mut self.delete, client),
             SupportedRequest::GetProperties(r) => handle_and_encode(r, &mut self.get_props, client),
             SupportedRequest::Publish(r) => handle_and_encode(r, &mut self.publish, client),
+            SupportedRequest::Subscribe(r) => handle_and_encode(r, &mut self.subscribe, client),
             SupportedRequest::Receive(r) => handle_and_encode(r, &mut self.receive, client),
         }
     }
