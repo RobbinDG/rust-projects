@@ -7,6 +7,8 @@ pub mod request_worker;
 pub mod dispatcher;
 mod request_handler;
 mod subscription_manager;
+mod message_queue;
+mod message_topic;
 
 use server::Server;
 use std::error::Error;

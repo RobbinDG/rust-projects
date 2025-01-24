@@ -1,68 +1,11 @@
-use crate::queue::{DequeuedMessage, Queue};
+use crate::message_queue::MessageQueue;
+use crate::message_topic::MessageTopic;
+use crate::queue::DequeuedMessage;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::message::Message;
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::QueueProperties;
-use log::{debug, info};
 use std::collections::HashMap;
-
-pub struct MessageQueue {
-    queue: Queue,
-    properties: QueueProperties,
-}
-
-impl MessageQueue {
-    pub fn new(properties: QueueProperties) -> Self {
-        Self {
-            queue: Queue::new(),
-            properties,
-        }
-    }
-
-    pub fn publish(&mut self, message: Message) {
-        self.queue.push(message);
-    }
-
-    pub fn receive(&mut self) -> Option<DequeuedMessage> {
-        self.queue.pop()
-    }
-}
-
-pub struct MessageTopic {
-    properties: QueueProperties,
-    client_queues: HashMap<ClientID, Queue>,
-}
-
-impl MessageTopic {
-    pub fn new(properties: QueueProperties) -> Self {
-        Self {
-            properties,
-            client_queues: HashMap::new(),
-        }
-    }
-
-    pub fn publish(&mut self, message: Message) {
-        for queue in self.client_queues.values_mut() {
-            queue.push(message.clone());
-        }
-    }
-
-    pub fn receive(&mut self, client: &ClientID) -> Option<DequeuedMessage> {
-        debug!("Receiving message for {:?}", client);
-        self.client_queues
-            .get_mut(client)
-            .and_then(|queue| queue.pop())
-    }
-
-    pub fn register_client(&mut self, client: ClientID) {
-        info!("Creating topic buffer for {:?}", client);
-        self.client_queues.insert(client.clone(), Queue::new());
-    }
-
-    pub fn deregister_client(&mut self, client: &ClientID) {
-        self.client_queues.remove(client);
-    }
-}
 
 enum QueueType {
     Queue(MessageQueue),
@@ -135,8 +78,8 @@ impl QueueStore {
 
     pub fn properties(&self, queue_id: &QueueId) -> Option<&QueueProperties> {
         Some(match self.queues.get(queue_id)? {
-            QueueType::Queue(q) => &q.properties,
-            QueueType::Topic(t) => &t.properties,
+            QueueType::Queue(q) => q.properties(),
+            QueueType::Topic(t) => t.properties(),
         })
     }
 
