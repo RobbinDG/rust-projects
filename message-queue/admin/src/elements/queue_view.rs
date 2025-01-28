@@ -128,8 +128,8 @@ impl QueueView {
                             QueueType::Queue => QueueId::Queue(self.new_queue_text.clone()),
                             QueueType::Topic => QueueId::Topic(
                                 self.new_queue_text.clone(),
-                                TopicLiteral::Wildcard,
-                                TopicLiteral::Wildcard,
+                                "a".into(),
+                                "b".into(),
                             ),
                         };
                         let dlx_choice = self.current_dlx.clone();

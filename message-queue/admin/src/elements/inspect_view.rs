@@ -183,7 +183,7 @@ impl InspectView {
                             let mut binding = connector.lock().await;
                             let client = binding.client().await.ok()?;
                             client
-                                .transfer_admin_request(Subscribe { queue })
+                                .transfer_admin_request(Subscribe { queue: queue.into() })
                                 .await
                                 .ok()
                         },

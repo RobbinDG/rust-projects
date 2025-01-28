@@ -9,6 +9,7 @@ mod request_handler;
 mod subscription_manager;
 mod message_queue;
 mod message_topic;
+mod topic_filter_tree;
 
 use server::Server;
 use std::error::Error;

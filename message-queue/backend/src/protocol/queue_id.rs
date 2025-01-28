@@ -32,10 +32,31 @@ impl TopicLiteral {
     }
 }
 
+/// A generalised form of [QueueId], used for receiving from queues using
+/// generic path arguments.
+#[derive(Serialize, Deserialize, Debug, Eq, Hash, PartialEq, Clone)]
+pub enum QueueFilter {
+    Queue(String),
+    Topic(String, TopicLiteral, TopicLiteral),
+}
+
+/// A key to uniquely identify a queue implementation, used to send messages one and
+/// only one target. To receive using e.g. topic filters, use [QueueFilter].
 #[derive(Serialize, Deserialize, Debug, Eq, Hash, PartialEq, Clone)]
 pub enum QueueId {
     Queue(String),
-    Topic(String, TopicLiteral, TopicLiteral),
+    Topic(String, String, String),
+}
+
+impl From<QueueId> for QueueFilter {
+    fn from(value: QueueId) -> Self {
+        match value {
+            QueueId::Queue(q) => QueueFilter::Queue(q),
+            QueueId::Topic(t, f1, f2) => {
+                QueueFilter::Topic(t, TopicLiteral::Name(f1), TopicLiteral::Name(f2))
+            }
+        }
+    }
 }
 
 impl QueueId {

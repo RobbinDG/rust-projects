@@ -1,12 +1,15 @@
-use backend::protocol::QueueProperties;
-use std::collections::HashMap;
+use crate::queue::{DequeuedMessage, Queue};
+use crate::topic_filter_tree::TopicFilterTree;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::message::Message;
+use backend::protocol::queue_id::TopicLiteral;
+use backend::protocol::QueueProperties;
 use log::{debug, info};
-use crate::queue::{DequeuedMessage, Queue};
+use std::collections::HashMap;
 
 pub struct MessageTopic {
     properties: QueueProperties,
+    clients_by_filter: TopicFilterTree,
     client_queues: HashMap<ClientID, Queue>,
 }
 
@@ -14,14 +17,32 @@ impl MessageTopic {
     pub fn new(properties: QueueProperties) -> Self {
         Self {
             properties,
+            clients_by_filter: TopicFilterTree::new(),
             client_queues: HashMap::new(),
         }
     }
 
-    pub fn publish(&mut self, message: Message) {
-        for queue in self.client_queues.values_mut() {
-            queue.push(message.clone());
+    pub fn get_subtopics(&self) -> Vec<(&String, &String)> {
+        let mut result = Vec::new();
+        for (subtopic, subsubtopics) in self.clients_by_filter.subtopics() {
+            for subsubtopic in subsubtopics {
+                result.push((subtopic, subsubtopic));
+            }
         }
+        result
+    }
+
+    pub fn create_subtopic(&mut self, filter: (String, String)) {
+        self.clients_by_filter.create_subtopic(filter.1)
+    }
+
+    pub fn subtopic_exists(&self, filter: (String, String)) -> bool {
+        // TODO this is really inefficient (but quick)
+        self.get_subtopics().contains(&(&filter.0, &filter.1))
+    }
+
+    pub fn filter_valid(&self, filter: (&TopicLiteral, &TopicLiteral)) -> bool {
+       self.clients_by_filter.filter_nonempty(filter)
     }
 
     pub fn receive(&mut self, client: &ClientID) -> Option<DequeuedMessage> {
@@ -31,16 +52,31 @@ impl MessageTopic {
             .and_then(|queue| queue.pop())
     }
 
-    pub fn register_client(&mut self, client: ClientID) {
+    pub fn register_client(
+        &mut self,
+        client: ClientID,
+        topic_filter: (TopicLiteral, TopicLiteral),
+    ) {
         info!("Creating topic buffer for {:?}", client);
-        self.client_queues.insert(client.clone(), Queue::new());
+        self.clients_by_filter.insert(client.clone(), topic_filter);
+        self.client_queues.insert(client, Queue::new());
     }
 
     pub fn deregister_client(&mut self, client: &ClientID) {
+        self.clients_by_filter.remove(client);
         self.client_queues.remove(client);
     }
 
     pub fn properties(&self) -> &QueueProperties {
         &self.properties
+    }
+
+    pub fn publish(&mut self, message: Message, f1: String, f2: String) {
+        let clients = self.clients_by_filter.get_clients((f1, f2));
+        for client in clients {
+            if let Some(queue) = self.client_queues.get_mut(client) {
+                queue.push(message.clone());
+            }
+        }
     }
 }

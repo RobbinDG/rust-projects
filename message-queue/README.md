@@ -13,3 +13,4 @@
   - [ ] Better information on connection state.
 - [ ] Filtering on topics on the receiving end, i.e. creating topics and subtopics.
 - [ ] Messages with payloads other than strings (JSON, YAML, XML, etc.).
+- [ ] Logs are (also) messages onto a topic.

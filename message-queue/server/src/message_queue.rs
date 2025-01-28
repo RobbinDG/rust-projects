@@ -1,6 +1,7 @@
+use crate::queue::{DequeuedMessage, Queue};
+use crate::queue_store::Publishable;
 use backend::protocol::message::Message;
 use backend::protocol::QueueProperties;
-use crate::queue::{DequeuedMessage, Queue};
 
 pub struct MessageQueue {
     queue: Queue,
@@ -15,15 +16,17 @@ impl MessageQueue {
         }
     }
 
-    pub fn publish(&mut self, message: Message) {
-        self.queue.push(message);
-    }
-
     pub fn receive(&mut self) -> Option<DequeuedMessage> {
         self.queue.pop()
     }
 
     pub fn properties(&self) -> &QueueProperties {
         &self.properties
+    }
+}
+
+impl Publishable for MessageQueue {
+    fn publish(&mut self, message: Message) {
+        self.queue.push(message);
     }
 }
