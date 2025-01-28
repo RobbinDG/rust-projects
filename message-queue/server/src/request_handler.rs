@@ -1,10 +1,9 @@
+use std::collections::{HashMap, HashSet};
 use crate::queue_store::QueueStore;
 use crate::router::Router;
 use crate::subscription_manager::SubscriptionManager;
 use backend::protocol::client_id::ClientID;
-use backend::protocol::request::{
-    CheckQueue, CreateQueue, DeleteQueue, GetProperties, ListQueues, Publish, Receive, Subscribe,
-};
+use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, GetProperties, GetTopicBreakdown, ListQueues, Publish, Receive, Subscribe};
 use backend::protocol::request_error::RequestError;
 use backend::protocol::{QueueProperties, Request, Status, SystemQueueProperties};
 use std::sync::{Arc, Mutex};
@@ -223,5 +222,30 @@ impl Handler<Receive> for ReceiveHandler {
             None => return Ok(None),
         };
         Ok(router.receive_valid(queue, client))
+    }
+}
+
+pub struct GetTopicBreakdownHandler {
+    queues: Arc<Mutex<QueueStore>>,
+}
+
+impl GetTopicBreakdownHandler {
+    pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
+        Self { queues }
+    }
+}
+
+impl Handler<GetTopicBreakdown> for GetTopicBreakdownHandler {
+    fn handle(&mut self, request: GetTopicBreakdown, _: ClientID) -> Result<<GetTopicBreakdown as Request>::Response, RequestError> {
+        let binding = self.queues.lock()?;
+        let subtopics = binding.get_topic(&request.topic_name).map(|t| t.get_subtopics());
+        Ok(match subtopics {
+            None => None,
+            Some(subtopics) => {
+                Some(subtopics.into_iter().map(|(k, v)| {
+                    (k.clone(), v.into_iter().cloned().collect())
+                }).collect())
+            }
+        })
     }
 }

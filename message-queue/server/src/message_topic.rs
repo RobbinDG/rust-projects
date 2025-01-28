@@ -5,7 +5,7 @@ use backend::protocol::message::Message;
 use backend::protocol::queue_id::TopicLiteral;
 use backend::protocol::QueueProperties;
 use log::{debug, info};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub struct MessageTopic {
     properties: QueueProperties,
@@ -22,14 +22,8 @@ impl MessageTopic {
         }
     }
 
-    pub fn get_subtopics(&self) -> Vec<(&String, &String)> {
-        let mut result = Vec::new();
-        for (subtopic, subsubtopics) in self.clients_by_filter.subtopics() {
-            for subsubtopic in subsubtopics {
-                result.push((subtopic, subsubtopic));
-            }
-        }
-        result
+    pub fn get_subtopics(&self) -> HashMap<&String, HashSet<&String>> {
+        self.clients_by_filter.subtopic_tree()
     }
 
     pub fn create_subtopic(&mut self, filter: (String, String)) {
@@ -39,7 +33,7 @@ impl MessageTopic {
 
     pub fn subtopic_exists(&self, filter: (String, String)) -> bool {
         // TODO this is really inefficient (but quick)
-        self.get_subtopics().contains(&(&filter.0, &filter.1))
+        self.get_subtopics().get(&filter.0).and_then(|sub| sub.get(&filter.1)).is_some()
     }
 
     pub fn filter_valid(&self, filter: (&TopicLiteral, &TopicLiteral)) -> bool {

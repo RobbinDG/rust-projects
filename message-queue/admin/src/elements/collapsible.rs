@@ -51,9 +51,3 @@ impl Collapsible {
         }
     }
 }
-
-impl From<Collapsible> for Element<'_, Message<Collapsible>> {
-    fn from(value: Collapsible) -> Self {
-        todo!()
-    }
-}

@@ -1,13 +1,10 @@
 use crate::queue_store::QueueStore;
-use crate::request_handler::{
-    CheckQueueHandler, CreateQueueHandler, DeleteQueueHandler, GetPropertiesHandler, Handler,
-    ListQueuesHandler, PublishHandler, ReceiveHandler, SubscribeHandler,
-};
+use crate::request_handler::{CheckQueueHandler, CreateQueueHandler, DeleteQueueHandler, GetPropertiesHandler, GetTopicBreakdownHandler, Handler, ListQueuesHandler, PublishHandler, ReceiveHandler, SubscribeHandler};
 use crate::router::Router;
 use crate::subscription_manager::SubscriptionManager;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::codec::encode;
-use backend::protocol::request::SupportedRequest;
+use backend::protocol::request::{GetTopicBreakdown, SupportedRequest};
 use backend::protocol::request_error::RequestError;
 use backend::protocol::Request;
 use std::sync::{Arc, Mutex};
@@ -22,6 +19,7 @@ pub struct RequestDispatcher {
     publish: PublishHandler,
     subscribe: SubscribeHandler,
     receive: ReceiveHandler,
+    get_topic_breakdown: GetTopicBreakdownHandler,
 }
 
 impl RequestDispatcher {
@@ -46,6 +44,7 @@ impl RequestDispatcher {
             publish: PublishHandler::new(router.clone()),
             subscribe: SubscribeHandler::new(subscription_manager.clone()),
             receive: ReceiveHandler::new(subscription_manager, router),
+            get_topic_breakdown: GetTopicBreakdownHandler::new(queue_store),
         }
     }
 
@@ -71,6 +70,7 @@ impl RequestDispatcher {
             SupportedRequest::Publish(r) => handle_and_encode(r, &mut self.publish, client),
             SupportedRequest::Subscribe(r) => handle_and_encode(r, &mut self.subscribe, client),
             SupportedRequest::Receive(r) => handle_and_encode(r, &mut self.receive, client),
+            SupportedRequest::GetTopicBreakdown(r) => handle_and_encode(r, &mut self.get_topic_breakdown, client),
         }
     }
 }

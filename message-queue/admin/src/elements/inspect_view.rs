@@ -1,3 +1,4 @@
+use crate::elements::collapsible::Collapsible;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
@@ -12,6 +13,7 @@ use iced::{Alignment, Element, Length, Task};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
+use crate::elements::collapsible;
 
 #[derive(Clone, Debug)]
 pub enum InspectViewMessage {
@@ -28,6 +30,7 @@ pub enum InspectViewMessage {
     NoMessageAvailable,
     TTLValueChanged(u16),
     TTLPermanentToggle(bool),
+    ToggleBreakdown,
 }
 
 pub struct InspectView {
@@ -37,6 +40,7 @@ pub struct InspectView {
     connector: Arc<Mutex<ServerConnector>>,
     ttl_value: u16,
     ttl_permanent: bool,
+    topic_breakdown: Collapsible,
 }
 
 impl InspectView {
@@ -48,6 +52,7 @@ impl InspectView {
             connector,
             ttl_value: 50,
             ttl_permanent: false,
+            topic_breakdown: Collapsible::new("Breakdown".into(), false),
         }
     }
 
@@ -89,6 +94,15 @@ impl InspectView {
                         ],
                         vertical_rule(1),
                         column![
+                            self
+                                .topic_breakdown
+                                .view::<()>(|| { text("test").into() })
+                                .map(|msg| {
+                                    match msg {
+                                        collapsible::Message::Toggle => InspectViewMessage::ToggleBreakdown,
+                                        collapsible::Message::Body(()) => InspectViewMessage::ToggleBreakdown,
+                                    }
+                                }),
                             text("Messaging").align_x(Alignment::Center),
                             text_input("Message body", self.message_body.as_str())
                                 .on_input(InspectViewMessage::MessageBodyChanged),
@@ -183,7 +197,9 @@ impl InspectView {
                             let mut binding = connector.lock().await;
                             let client = binding.client().await.ok()?;
                             client
-                                .transfer_admin_request(Subscribe { queue: queue.into() })
+                                .transfer_admin_request(Subscribe {
+                                    queue: queue.into(),
+                                })
                                 .await
                                 .ok()
                         },
@@ -216,6 +232,7 @@ impl InspectView {
             InspectViewMessage::NoMessageAvailable => self.received_message.clear(),
             InspectViewMessage::TTLValueChanged(val) => self.ttl_value = val,
             InspectViewMessage::TTLPermanentToggle(toggle) => self.ttl_permanent = toggle,
+            InspectViewMessage::ToggleBreakdown => self.topic_breakdown.toggle()
         }
         Task::none()
     }

@@ -3,7 +3,7 @@ use crate::message_topic::MessageTopic;
 use crate::queue::DequeuedMessage;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::message::Message;
-use backend::protocol::queue_id::{QueueFilter, QueueId};
+use backend::protocol::queue_id::{QueueFilter, QueueId, TopicLiteral};
 use backend::protocol::QueueProperties;
 use std::collections::HashMap;
 
@@ -111,16 +111,16 @@ impl QueueStore {
             .cloned()
             .map(|id| (QueueId::Queue(id), 0, 0, 0))
             .collect();
-        for (topic_name, topic) in &self.primary_topics {
-            let x = topic.get_subtopics().into_iter().map(|(f1, f2)| {
+        for (topic_name, _) in &self.primary_topics {
+            let x =
                 (
-                    QueueId::Topic(topic_name.clone(), f1.clone(), f2.clone()),
+                    QueueId::Topic(topic_name.clone(), "".into(), "".into()),
                     0usize,
                     0usize,
                     0usize,
                 )
-            });
-            result.extend(x);
+            ;
+            result.push(x);
         }
         result
     }
@@ -157,6 +157,10 @@ impl QueueStore {
                 .get(name)
                 .map_or(false, |t| t.filter_valid((f1, f2))),
         }
+    }
+
+    pub fn get_topic(&self, name: &String) -> Option<&MessageTopic> {
+        self.primary_topics.get(name)
     }
 
     pub fn properties(&self, queue_id: &QueueId) -> Option<&QueueProperties> {

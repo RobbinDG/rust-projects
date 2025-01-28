@@ -32,7 +32,7 @@ impl TopicFilterTree {
         }
     }
 
-    pub fn subtopics(&self) -> HashMap<&String, Vec<&String>> {
+    pub fn subtopic_tree(&self) -> HashMap<&String, HashSet<&String>> {
         self.topics
             .sub
             .iter()

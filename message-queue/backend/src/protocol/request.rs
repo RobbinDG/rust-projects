@@ -48,6 +48,11 @@ pub struct Subscribe {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Receive {}
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetTopicBreakdown {
+    pub topic_name: String,
+}
+
 impl Request for ListQueues {
     type Response = Vec<(QueueId, usize, usize, usize)>;
 }
@@ -80,6 +85,10 @@ impl Request for Receive {
     type Response = Option<Message>;
 }
 
+impl Request for GetTopicBreakdown {
+    type Response = Option<Vec<(String, Vec<String>)>>;
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SupportedRequest {
     ListQueues(ListQueues),
@@ -90,6 +99,7 @@ pub enum SupportedRequest {
     Publish(Publish),
     Subscribe(Subscribe),
     Receive(Receive),
+    GetTopicBreakdown(GetTopicBreakdown),
 }
 
 impl From<ListQueues> for SupportedRequest {
@@ -137,5 +147,11 @@ impl From<Subscribe> for SupportedRequest {
 impl From<Receive> for SupportedRequest {
     fn from(value: Receive) -> Self {
         SupportedRequest::Receive(value)
+    }
+}
+
+impl From<GetTopicBreakdown> for SupportedRequest {
+    fn from(value: GetTopicBreakdown) -> Self {
+        SupportedRequest::GetTopicBreakdown(value)
     }
 }
