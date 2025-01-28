@@ -1,9 +1,10 @@
+use crate::elements::collapsible;
 use crate::elements::collapsible::Collapsible;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
 use backend::protocol::queue_id::QueueId;
-use backend::protocol::request::{Publish, Receive, Subscribe};
+use backend::protocol::request::{GetTopicBreakdown, Publish, Receive, Subscribe};
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::QueueProperties;
 use iced::widget::{
@@ -13,7 +14,6 @@ use iced::{Alignment, Element, Length, Task};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use crate::elements::collapsible;
 
 #[derive(Clone, Debug)]
 pub enum InspectViewMessage {
@@ -30,7 +30,9 @@ pub enum InspectViewMessage {
     NoMessageAvailable,
     TTLValueChanged(u16),
     TTLPermanentToggle(bool),
-    ToggleBreakdown,
+    ToggleBreakdown(Option<usize>),
+    LoadBreakdown,
+    BreakdownLoaded(Option<Vec<(String, Vec<String>)>>),
 }
 
 pub struct InspectView {
@@ -40,7 +42,8 @@ pub struct InspectView {
     connector: Arc<Mutex<ServerConnector>>,
     ttl_value: u16,
     ttl_permanent: bool,
-    topic_breakdown: Collapsible,
+    breakdown_view: Collapsible,
+    sub_breakdown_views: Vec<(Collapsible, Vec<String>)>,
 }
 
 impl InspectView {
@@ -52,7 +55,8 @@ impl InspectView {
             connector,
             ttl_value: 50,
             ttl_permanent: false,
-            topic_breakdown: Collapsible::new("Breakdown".into(), false),
+            breakdown_view: Collapsible::new("Breakdown".into(), false),
+            sub_breakdown_views: Vec::new(),
         }
     }
 
@@ -94,13 +98,34 @@ impl InspectView {
                         ],
                         vertical_rule(1),
                         column![
-                            self
-                                .topic_breakdown
-                                .view::<()>(|| { text("test").into() })
+                            button("get breakdown").on_press(InspectViewMessage::LoadBreakdown),
+                            self.breakdown_view
+                                .view(|| {
+                                    let mut rowabc = row![];
+                                    let mut e = self.sub_breakdown_views.iter().enumerate();
+                                    while let Some((i, (c, s))) = e.next() {
+                                        rowabc =
+                                            rowabc.push(
+                                                c.view::<()>(|| {
+                                                    let mut row = row![];
+                                                    for ss in s {
+                                                        row = row.push(text(ss));
+                                                    }
+                                                    row.into()
+                                                })
+                                                .map(move |_| {
+                                                    InspectViewMessage::ToggleBreakdown(Some(i))
+                                                }),
+                                            );
+                                    }
+                                    rowabc.into()
+                                })
                                 .map(|msg| {
                                     match msg {
-                                        collapsible::Message::Toggle => InspectViewMessage::ToggleBreakdown,
-                                        collapsible::Message::Body(()) => InspectViewMessage::ToggleBreakdown,
+                                        collapsible::Message::Toggle => {
+                                            InspectViewMessage::ToggleBreakdown(None)
+                                        }
+                                        collapsible::Message::Body(msg) => msg,
                                     }
                                 }),
                             text("Messaging").align_x(Alignment::Center),
@@ -232,7 +257,41 @@ impl InspectView {
             InspectViewMessage::NoMessageAvailable => self.received_message.clear(),
             InspectViewMessage::TTLValueChanged(val) => self.ttl_value = val,
             InspectViewMessage::TTLPermanentToggle(toggle) => self.ttl_permanent = toggle,
-            InspectViewMessage::ToggleBreakdown => self.topic_breakdown.toggle()
+            InspectViewMessage::ToggleBreakdown(menu) => match menu {
+                None => self.breakdown_view.toggle(),
+                Some(i) => {
+                    if let Some((c, _)) = self.sub_breakdown_views.get_mut(i) {
+                        c.toggle();
+                    }
+                }
+            },
+            InspectViewMessage::LoadBreakdown => {
+                if let Some((QueueId::Topic(topic_name, _, _), _)) = &self.buffer_info {
+                    let connector = self.connector.clone();
+                    let topic_name = topic_name.clone();
+                    return Task::perform(
+                        async move {
+                            let mut binding = connector.lock().await;
+                            let client = binding.client().await.ok()?;
+                            client
+                                .transfer_admin_request(GetTopicBreakdown { topic_name })
+                                .await
+                                .ok()?
+                        },
+                        move |payload| InspectViewMessage::BreakdownLoaded(payload),
+                    )
+                    .map(Msg::from);
+                }
+            }
+            InspectViewMessage::BreakdownLoaded(breakdown) => {
+                self.sub_breakdown_views.clear();
+                if let Some(breakdown) = breakdown {
+                    for (s, ss) in breakdown {
+                        self.sub_breakdown_views
+                            .push((Collapsible::new(s, false), ss))
+                    }
+                }
+            }
         }
         Task::none()
     }
