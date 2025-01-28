@@ -1,7 +1,7 @@
 use crate::elements::QueueTable;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
-use backend::protocol::queue_id::{QueueId, QueueType, TopicLiteral};
+use backend::protocol::queue_id::{NewQueueId, QueueId, QueueType};
 use backend::protocol::request::{CreateQueue, ListQueues};
 use backend::protocol::UserQueueProperties;
 use iced::widget::{button, checkbox, column, combo_box, radio, row, text_input};
@@ -121,30 +121,24 @@ impl QueueView {
             UIMessage::NewQueueName(s) => {
                 self.new_queue_text = s;
             }
-            UIMessage::CreateQueue => {
-                match self.selected_buffer_type {
-                    Some(queue_type) => {
-                        let queue = match queue_type {
-                            QueueType::Queue => QueueId::Queue(self.new_queue_text.clone()),
-                            QueueType::Topic => QueueId::Topic(
-                                self.new_queue_text.clone(),
-                                "a".into(),
-                                "b".into(),
-                            ),
-                        };
-                        let dlx_choice = self.current_dlx.clone();
-                        let is_dlx = self.is_dlx;
-                        return Task::perform(
+            UIMessage::CreateQueue => match self.selected_buffer_type {
+                Some(queue_type) => {
+                    let queue = match queue_type {
+                        QueueType::Queue => NewQueueId::Queue(self.new_queue_text.clone()),
+                        QueueType::Topic => NewQueueId::Topic(self.new_queue_text.clone(), None),
+                    };
+                    let dlx_choice = self.current_dlx.clone();
+                    let is_dlx = self.is_dlx;
+                    return Task::perform(
                             async move {
                                 Self::create(connector.clone(), queue, dlx_choice, is_dlx).await
                             },
                             |_| UIMessage::Refresh,
                         )
                         .map(|m| m.into());
-                    }
-                    None => {}
                 }
-            }
+                None => {}
+            },
             UIMessage::SelectBufferType(t) => {
                 self.selected_buffer_type = Some(t);
             }
@@ -171,7 +165,7 @@ impl QueueView {
 
     async fn create(
         connector: Arc<Mutex<ServerConnector>>,
-        queue_id: QueueId,
+        queue_id: NewQueueId,
         dlx: DLXChoice,
         is_dlx: bool,
     ) {

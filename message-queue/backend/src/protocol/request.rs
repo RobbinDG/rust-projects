@@ -1,5 +1,5 @@
 use crate::protocol::message::Message;
-use crate::protocol::queue_id::{QueueFilter, QueueId};
+use crate::protocol::queue_id::{NewQueueId, QueueFilter, QueueId};
 use crate::protocol::queue_properties::UserQueueProperties;
 use crate::protocol::routing_error::RoutingError;
 use crate::protocol::status_code::Status;
@@ -21,7 +21,7 @@ pub struct CheckQueue {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateQueue {
-    pub queue_address: QueueId,
+    pub queue_address: NewQueueId,
     pub properties: UserQueueProperties,
 }
 

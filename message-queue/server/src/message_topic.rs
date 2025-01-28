@@ -26,9 +26,11 @@ impl MessageTopic {
         self.clients_by_filter.subtopic_tree()
     }
 
-    pub fn create_subtopic(&mut self, filter: (String, String)) {
+    pub fn create_subtopic(&mut self, filter: (String, Option<String>)) {
         self.clients_by_filter.create_subtopic(filter.0.clone());
-        self.clients_by_filter.create_subsubtopic(filter.0, filter.1)
+        if let Some(f) = filter.1 {
+            self.clients_by_filter.create_subsubtopic(filter.0, f)
+        }
     }
 
     pub fn subtopic_exists(&self, filter: (String, String)) -> bool {

@@ -1,9 +1,11 @@
-use std::collections::{HashMap, HashSet};
 use crate::queue_store::QueueStore;
 use crate::router::Router;
 use crate::subscription_manager::SubscriptionManager;
 use backend::protocol::client_id::ClientID;
-use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, GetProperties, GetTopicBreakdown, ListQueues, Publish, Receive, Subscribe};
+use backend::protocol::request::{
+    CheckQueue, CreateQueue, DeleteQueue, GetProperties, GetTopicBreakdown, ListQueues, Publish,
+    Receive, Subscribe,
+};
 use backend::protocol::request_error::RequestError;
 use backend::protocol::{QueueProperties, Request, Status, SystemQueueProperties};
 use std::sync::{Arc, Mutex};
@@ -76,16 +78,13 @@ impl Handler<CreateQueue> for CreateQueueHandler {
         _: ClientID,
     ) -> Result<<CreateQueue as Request>::Response, RequestError> {
         let mut queues = self.queues.lock()?;
-        Ok(if queues.exists(&request.queue_address) {
-            Status::Exists
-        } else {
-            let properties = QueueProperties {
-                system: SystemQueueProperties { is_system: false },
-                user: request.properties,
-            };
-            queues.create(request.queue_address.clone(), properties);
-            Status::Created
-        })
+
+        let properties = QueueProperties {
+            system: SystemQueueProperties { is_system: false },
+            user: request.properties,
+        };
+        queues.create(request.queue_address.clone(), properties);
+        Ok(Status::Created)
     }
 }
 
@@ -236,16 +235,23 @@ impl GetTopicBreakdownHandler {
 }
 
 impl Handler<GetTopicBreakdown> for GetTopicBreakdownHandler {
-    fn handle(&mut self, request: GetTopicBreakdown, _: ClientID) -> Result<<GetTopicBreakdown as Request>::Response, RequestError> {
+    fn handle(
+        &mut self,
+        request: GetTopicBreakdown,
+        _: ClientID,
+    ) -> Result<<GetTopicBreakdown as Request>::Response, RequestError> {
         let binding = self.queues.lock()?;
-        let subtopics = binding.get_topic(&request.topic_name).map(|t| t.get_subtopics());
+        let subtopics = binding
+            .get_topic(&request.topic_name)
+            .map(|t| t.get_subtopics());
         Ok(match subtopics {
             None => None,
-            Some(subtopics) => {
-                Some(subtopics.into_iter().map(|(k, v)| {
-                    (k.clone(), v.into_iter().cloned().collect())
-                }).collect())
-            }
+            Some(subtopics) => Some(
+                subtopics
+                    .into_iter()
+                    .map(|(k, v)| (k.clone(), v.into_iter().cloned().collect()))
+                    .collect(),
+            ),
         })
     }
 }

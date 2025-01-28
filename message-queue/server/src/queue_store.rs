@@ -3,7 +3,7 @@ use crate::message_topic::MessageTopic;
 use crate::queue::DequeuedMessage;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::message::Message;
-use backend::protocol::queue_id::{QueueFilter, QueueId, TopicLiteral};
+use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopicLiteral};
 use backend::protocol::QueueProperties;
 use std::collections::HashMap;
 
@@ -112,29 +112,30 @@ impl QueueStore {
             .map(|id| (QueueId::Queue(id), 0, 0, 0))
             .collect();
         for (topic_name, _) in &self.primary_topics {
-            let x =
-                (
-                    QueueId::Topic(topic_name.clone(), "".into(), "".into()),
-                    0usize,
-                    0usize,
-                    0usize,
-                )
-            ;
+            let x = (
+                QueueId::Topic(topic_name.clone(), "".into(), "".into()),
+                0usize,
+                0usize,
+                0usize,
+            );
             result.push(x);
         }
         result
     }
 
-    pub fn create(&mut self, queue_id: QueueId, properties: QueueProperties) {
+    pub fn create(&mut self, queue_id: NewQueueId, properties: QueueProperties) {
         match queue_id {
-            QueueId::Queue(name) => {
+            NewQueueId::Queue(name) => {
                 self.directs.insert(name, MessageQueue::new(properties));
             }
-            QueueId::Topic(name, f1, f2) => {
-                self.primary_topics
+            NewQueueId::Topic(name, sub) => {
+                let topic = self
+                    .primary_topics
                     .entry(name)
-                    .or_insert_with(|| MessageTopic::new(properties))
-                    .create_subtopic((f1, f2));
+                    .or_insert_with(|| MessageTopic::new(properties));
+                if let Some(sub) = sub {
+                    topic.create_subtopic(sub)
+                }
             }
         };
     }

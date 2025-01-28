@@ -81,3 +81,18 @@ impl QueueId {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, Eq, Hash, PartialEq, Clone)]
+pub enum NewQueueId {
+    Queue(String),
+    Topic(String, Option<(String, Option<String>)>),
+}
+
+impl From<QueueId> for NewQueueId {
+    fn from(value: QueueId) -> Self {
+        match value {
+            QueueId::Queue(name) => NewQueueId::Queue(name),
+            QueueId::Topic(name, f1, f2) => NewQueueId::Topic(name, Some((f1, Some(f2)))),
+        }
+    }
+}

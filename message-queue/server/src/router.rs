@@ -24,7 +24,7 @@ impl Router {
     pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
         let default_dlx = QueueId::Queue(DEFAULT_DLX_NAME.into());
         queues.lock().unwrap().create(
-            default_dlx.clone(),
+            default_dlx.clone().into(),
             QueueProperties {
                 system: SystemQueueProperties { is_system: true },
                 user: UserQueueProperties {
