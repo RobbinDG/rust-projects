@@ -3,10 +3,10 @@ use crate::elements::collapsible::Collapsible;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
-use backend::protocol::queue_id::QueueId;
-use backend::protocol::request::{GetTopicBreakdown, Publish, Receive, Subscribe};
+use backend::protocol::queue_id::{NewQueueId, QueueId};
+use backend::protocol::request::{CreateQueue, GetTopicBreakdown, Publish, Receive, Subscribe};
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
-use backend::protocol::QueueProperties;
+use backend::protocol::{QueueProperties, UserQueueProperties};
 use iced::widget::{
     button, checkbox, column, horizontal_rule, row, slider, text, text_input, vertical_rule,
 };
@@ -33,6 +33,9 @@ pub enum InspectViewMessage {
     ToggleBreakdown(Option<usize>),
     LoadBreakdown,
     BreakdownLoaded(Option<Vec<(String, Vec<String>)>>),
+    CreateSubtopic(Option<usize>),
+    NewSubtopicNameChanged(String),
+    SubtopicCreated,
 }
 
 pub struct InspectView {
@@ -43,7 +46,8 @@ pub struct InspectView {
     ttl_value: u16,
     ttl_permanent: bool,
     breakdown_view: Collapsible,
-    sub_breakdown_views: Vec<(Collapsible, Vec<String>)>,
+    sub_breakdown_views: Vec<(String, Collapsible, Vec<String>)>,
+    new_subtopic_name: String,
 }
 
 impl InspectView {
@@ -57,6 +61,7 @@ impl InspectView {
             ttl_permanent: false,
             breakdown_view: Collapsible::new("Breakdown".into(), false),
             sub_breakdown_views: Vec::new(),
+            new_subtopic_name: String::new(),
         }
     }
 
@@ -101,24 +106,42 @@ impl InspectView {
                             button("get breakdown").on_press(InspectViewMessage::LoadBreakdown),
                             self.breakdown_view
                                 .view(|| {
-                                    let mut rowabc = row![];
+                                    let mut col = column![];
                                     let mut e = self.sub_breakdown_views.iter().enumerate();
-                                    while let Some((i, (c, s))) = e.next() {
-                                        rowabc =
-                                            rowabc.push(
-                                                c.view::<()>(|| {
-                                                    let mut row = row![];
+                                    while let Some((i, (_, c, s))) = e.next() {
+                                        col =
+                                            col.push(
+                                                c.view(|| {
+                                                    let mut col = column![];
                                                     for ss in s {
-                                                        row = row.push(text(ss));
+                                                        col = col.push(text(ss));
                                                     }
-                                                    row.into()
+                                                    col = col.push(row![
+                                                    text_input(
+                                                        "New subtopic",
+                                                        &self.new_subtopic_name
+                                                    )
+                                                    .on_input(
+                                                        InspectViewMessage::NewSubtopicNameChanged
+                                                    ),
+                                                    button("Create").on_press(
+                                                        InspectViewMessage::CreateSubtopic(Some(i))
+                                                    ),
+                                                ]);
+                                                    col.into()
                                                 })
                                                 .map(move |_| {
                                                     InspectViewMessage::ToggleBreakdown(Some(i))
                                                 }),
                                             );
                                     }
-                                    rowabc.into()
+                                    col = col.push(row![
+                                        text_input("New subtopic", &self.new_subtopic_name)
+                                            .on_input(InspectViewMessage::NewSubtopicNameChanged),
+                                        button("Create")
+                                            .on_press(InspectViewMessage::CreateSubtopic(None))
+                                    ]);
+                                    col.into()
                                 })
                                 .map(|msg| {
                                     match msg {
@@ -260,7 +283,7 @@ impl InspectView {
             InspectViewMessage::ToggleBreakdown(menu) => match menu {
                 None => self.breakdown_view.toggle(),
                 Some(i) => {
-                    if let Some((c, _)) = self.sub_breakdown_views.get_mut(i) {
+                    if let Some((_, c, _)) = self.sub_breakdown_views.get_mut(i) {
                         c.toggle();
                     }
                 }
@@ -288,11 +311,56 @@ impl InspectView {
                 if let Some(breakdown) = breakdown {
                     for (s, ss) in breakdown {
                         self.sub_breakdown_views
-                            .push((Collapsible::new(s, false), ss))
+                            .push((s.clone(), Collapsible::new(s, false), ss))
                     }
                 }
             }
+            InspectViewMessage::CreateSubtopic(menu) => {
+                if let Some((QueueId::Topic(topic, _, _), _)) = &self.buffer_info {
+                    let connector = self.connector.clone();
+                    let topic = match menu {
+                        None => NewQueueId::Topic(
+                            topic.clone(),
+                            Some((self.new_subtopic_name.clone(), None)),
+                        ),
+                        Some(i) => {
+                            if let Some((name, _, _)) = self.sub_breakdown_views.get(i) {
+                                NewQueueId::Topic(
+                                    topic.clone(),
+                                    Some((name.clone(), Some(self.new_subtopic_name.clone()))),
+                                )
+                            } else {
+                                return Task::none();
+                            }
+                        }
+                    };
+                    return Task::perform(
+                        async move { Self::create(connector.clone(), topic).await },
+                        |_| InspectViewMessage::SubtopicCreated,
+                    )
+                    .map(Msg::from);
+                }
+            }
+            InspectViewMessage::NewSubtopicNameChanged(text) => {
+                self.new_subtopic_name = text;
+            }
+            InspectViewMessage::SubtopicCreated => {}
         }
         Task::none()
+    }
+
+    async fn create(connector: Arc<Mutex<ServerConnector>>, queue_id: NewQueueId) {
+        if let Ok(client) = connector.lock().await.client().await {
+            if let Err(_) = client
+                .transfer_admin_request(CreateQueue {
+                    queue_address: queue_id,
+                    properties: UserQueueProperties {
+                        is_dlx: false,
+                        dlx: None,
+                    },
+                })
+                .await
+            {}
+        }
     }
 }
