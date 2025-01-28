@@ -3,7 +3,7 @@ mod queue_view;
 mod connection_interface;
 mod inspect_view;
 pub mod admin_view;
-
+mod collapsible;
 
 pub use queue_view::UIMessage;
 pub use queue_table::QueueTable;

@@ -33,7 +33,8 @@ impl MessageTopic {
     }
 
     pub fn create_subtopic(&mut self, filter: (String, String)) {
-        self.clients_by_filter.create_subtopic(filter.1)
+        self.clients_by_filter.create_subtopic(filter.0.clone());
+        self.clients_by_filter.create_subsubtopic(filter.0, filter.1)
     }
 
     pub fn subtopic_exists(&self, filter: (String, String)) -> bool {

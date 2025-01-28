@@ -48,9 +48,12 @@ impl SubscriptionManager {
             .and_modify(|existing| {
                 queues.deregister_client(existing, &client);
                 *existing = queue_id.clone();
-                queues.register_client(&queue_id, client);
+                queues.register_client(&queue_id, client.clone());
             })
-            .or_insert(queue_id);
+            .or_insert_with(|| {
+                queues.register_client(&queue_id, client);
+                queue_id
+            });
         true
     }
 
