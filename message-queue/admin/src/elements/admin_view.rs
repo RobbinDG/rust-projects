@@ -1,12 +1,13 @@
 use crate::elements::collapsible::Collapsible;
 use crate::elements::connection_interface::{ConnectionInterface, ConnectionInterfaceMessage};
 use crate::elements::inspect_view::{InspectView, InspectViewMessage};
+use crate::elements::overlay_dialog::{Message, OverlayDialog};
 use crate::elements::queue_view::UIMessage;
 use crate::elements::{collapsible, QueueView};
 use crate::server_connector::ServerConnector;
 use backend::protocol::queue_id::QueueId;
-use backend::protocol::request::{DeleteQueue, GetProperties};
-use backend::protocol::{QueueProperties, Status};
+use backend::protocol::request::GetProperties;
+use backend::protocol::QueueProperties;
 use iced::widget::{column, text, vertical_space};
 use iced::{Element, Task};
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use tokio::sync::Mutex;
 pub enum AdminViewMessage {
     InspectBuffer(QueueId),
     InspectInfo(QueueId, QueueProperties),
+    CloseInspect,
     BufferView(UIMessage),
     Inspector(InspectViewMessage),
     ConnectionUpdated(ConnectionInterfaceMessage),
@@ -47,7 +49,7 @@ pub struct AdminView {
     // Sub-widgets
     collapsible: Collapsible,
     buffer_view: QueueView,
-    inspect_view: InspectView,
+    inspect_view: Option<OverlayDialog<InspectView>>,
     connection_interface: ConnectionInterface,
 }
 
@@ -58,7 +60,7 @@ impl Default for AdminView {
             collapsible: Collapsible::new("test".into(), false),
             connector: connector.clone(),
             buffer_view: QueueView::default(),
-            inspect_view: InspectView::new(connector),
+            inspect_view: None,
             connection_interface: ConnectionInterface::new(),
         }
     }
@@ -66,8 +68,14 @@ impl Default for AdminView {
 
 impl AdminView {
     pub fn view(&self) -> Element<AdminViewMessage> {
-        match &self.inspect_view.buffer_info {
-            Some(_) => self.inspect_view.view(),
+        match &self.inspect_view {
+            Some(inspect_view) => inspect_view
+                .view(|inspect| inspect.view())
+                .map(|msg| match msg {
+                    Message::Close => AdminViewMessage::CloseInspect,
+                    Message::Dialog(msg) => AdminViewMessage::from(msg),
+                })
+                .into(),
             None => {
                 let mut cols = column![
                     self.collapsible
@@ -93,31 +101,13 @@ impl AdminView {
     pub fn update(&mut self, message: AdminViewMessage) -> Task<AdminViewMessage> {
         match message {
             AdminViewMessage::BufferView(m) => self.buffer_view.update(m, self.connector.clone()),
-            AdminViewMessage::Inspector(m) => Task::batch([
-                if let InspectViewMessage::Delete = m {
-                    if let Some((addr, _)) = &self.inspect_view.buffer_info {
-                        let connector = self.connector.clone();
-                        let addr2 = addr.clone();
-                        Task::perform(
-                            async move { Self::delete_buffer(connector, addr2).await },
-                            move |result| {
-                                AdminViewMessage::ConnectionUpdated(
-                                    ConnectionInterfaceMessage::Connected(result.is_some()),
-                                )
-                            },
-                        )
-                        .chain(
-                            self.buffer_view
-                                .update(UIMessage::Refresh, self.connector.clone()),
-                        )
-                    } else {
-                        Task::none()
-                    }
+            AdminViewMessage::Inspector(m) => {
+                if let Some(inspect_view) = &mut self.inspect_view {
+                    inspect_view.update(|inspect| inspect.update(m)).map(AdminViewMessage::from)
                 } else {
                     Task::none()
-                },
-                { self.inspect_view.update(m) },
-            ]),
+                }
+            }
             AdminViewMessage::InspectBuffer(address) => {
                 let connection = self.connector.clone();
 
@@ -146,7 +136,10 @@ impl AdminView {
                 )
             }
             AdminViewMessage::InspectInfo(address, properties) => {
-                self.inspect_view.buffer_info = Some((address, properties));
+                self.inspect_view = Some(OverlayDialog::new(
+                    "bla".into(),
+                    InspectView::new(self.connector.clone(), address, properties),
+                ));
                 Task::none()
             }
             AdminViewMessage::ConnectionUpdated(m) => {
@@ -156,18 +149,13 @@ impl AdminView {
                 self.collapsible.toggle();
                 Task::none()
             }
+            AdminViewMessage::CloseInspect => {
+                if let Some(inspect_view) = self.inspect_view.take() {
+                    inspect_view.close();
+                }
+                Task::none()
+            }
             _ => Task::none(),
-        }
-    }
-
-    async fn delete_buffer(connector: Arc<Mutex<ServerConnector>>, s: QueueId) -> Option<Status> {
-        if let Ok(client) = connector.lock().await.client().await {
-            client
-                .transfer_admin_request(DeleteQueue { queue_name: s })
-                .await
-                .ok()
-        } else {
-            None
         }
     }
 }
