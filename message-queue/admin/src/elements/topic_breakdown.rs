@@ -1,19 +1,22 @@
 use crate::elements::collapsible;
 use crate::elements::collapsible::Collapsible;
-use iced::widget::{button, row, text, text_input, Row};
-use iced::{Element, Padding};
+use backend::protocol::queue_id::TopicLiteral;
+use iced::widget::{button, container, hover, mouse_area, row, text, text_input, Container, Row};
+use iced::{color, Background, Border, Element, Length, Padding};
 
 #[derive(Debug, Clone)]
 pub enum Message {
     CreateSubtopic(String, Option<String>),
     NewSubtopicNameChanged(String),
     ToggleBreakdown(Option<usize>),
+    SubSubSelected(usize, usize),
 }
 
 pub struct TopicBreakdown {
     breakdown_view: Collapsible,
     sub_breakdown_views: Vec<(String, Collapsible, Vec<String>)>,
     new_subtopic_name: String,
+    subsub_selection: Option<(usize, usize)>,
 }
 
 impl TopicBreakdown {
@@ -22,6 +25,7 @@ impl TopicBreakdown {
             breakdown_view: Collapsible::new(title, false),
             sub_breakdown_views: Vec::new(),
             new_subtopic_name: String::new(),
+            subsub_selection: None,
         }
     }
 
@@ -47,7 +51,17 @@ impl TopicBreakdown {
                     }
                 }
             },
+            Message::SubSubSelected(i, j) => self.subsub_selection = Some((i, j)),
         }
+    }
+
+    pub fn selected_topic(&self) -> Option<(TopicLiteral, TopicLiteral)> {
+        let (i, j) = self.subsub_selection?;
+        let (name, _, subs) = self.sub_breakdown_views.get(i)?;
+        Some((
+            TopicLiteral::Name(name.clone()),
+            TopicLiteral::Name(subs.get(j)?.clone()),
+        ))
     }
 
     pub fn set_data(&mut self, data: Vec<(String, Vec<String>)>) {
@@ -100,10 +114,35 @@ impl TopicBreakdown {
 
     fn build_subsubtopic_view<'a>(&'a self, s: &'a Vec<String>, i: usize) -> Element<'a, Message> {
         let mut col = iced::widget::column![].padding(Padding::ZERO.left(10));
-        for ss in s {
-            col = col.push(text(ss));
+        for (i_sub, ss) in s.iter().enumerate() {
+            let text_elem: Element<Message> = if Some((i, i_sub)) == self.subsub_selection {
+                Self::format_container(container(text(ss))).into()
+            } else {
+                text(ss).into()
+            };
+            col = col.push(
+                mouse_area(hover(
+                    text_elem,
+                    Self::format_container(container(""))
+                        .width(Length::Fill)
+                        .height(Length::Fill),
+                ))
+                .on_press(Message::SubSubSelected(i, i_sub)),
+            );
         }
         col = col.push(self.build_create_prompt(Some(i)));
         col.into()
+    }
+
+    fn format_container<M>(container: Container<M>) -> Container<M> {
+        container.style(|t| {
+            container::rounded_box(t)
+                .border(Border {
+                    color: color![0.1, 0.1, 1.0, 0.8],
+                    width: 2.0,
+                    radius: Default::default(),
+                })
+                .background(Background::Color(color![0.1, 0.1, 1.0, 0.5]))
+        })
     }
 }

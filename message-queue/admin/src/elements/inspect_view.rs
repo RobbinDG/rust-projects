@@ -3,7 +3,7 @@ use crate::elements::topic_breakdown::TopicBreakdown;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
-use backend::protocol::queue_id::{NewQueueId, QueueId};
+use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopicLiteral};
 use backend::protocol::request::{
     CreateQueue, DeleteQueue, GetTopicBreakdown, Publish, Receive, Subscribe,
 };
@@ -133,7 +133,18 @@ impl InspectView {
             }
             InspectViewMessage::MessageBodyChanged(s) => self.message_body = s,
             InspectViewMessage::SendMessage => {
-                let queue = self.queue_id.clone();
+                let queue = match self.queue_id.clone() {
+                    QueueId::Topic(name, _, _) => match self.breakdown_view.selected_topic() {
+                        Some((TopicLiteral::Name(f1), TopicLiteral::Name(f2))) => {
+                            QueueId::Topic(name, f1, f2)
+                        }
+                        _ => {
+                            println!("No topic selected, couldn't send message!");
+                            return Task::none()
+                        },
+                    },
+                    q => q,
+                };
                 let connector = self.connector.clone();
                 let body = self.message_body.clone();
                 let ttl = if self.ttl_permanent {
@@ -174,7 +185,13 @@ impl InspectView {
             InspectViewMessage::SendFailure => {}
             InspectViewMessage::Subscribe => {
                 let connector = self.connector.clone();
-                let queue = self.queue_id.clone();
+                let queue = match self.queue_id.clone() {
+                    QueueId::Topic(name, _, _) => match self.breakdown_view.selected_topic() {
+                        None => return Task::none(),
+                        Some((f1, f2)) => QueueFilter::Topic(name, f1, f2),
+                    },
+                    q => QueueFilter::from(q),
+                };
                 return Task::perform(
                     async move {
                         let mut binding = connector.lock().await;

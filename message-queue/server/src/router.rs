@@ -6,7 +6,7 @@ use backend::protocol::queue_id::{QueueFilter, QueueId};
 use backend::protocol::routing_error::RoutingError;
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, SystemQueueProperties, UserQueueProperties};
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use std::sync::{Arc, Mutex};
 
 const DEFAULT_DLX_NAME: &'static str = "default_dlx";
@@ -50,16 +50,12 @@ impl Router {
     /// returns: `Result<(), RoutingError>` a potential routing error if it occurs
     ///     during publishing.
     pub fn publish(&mut self, message: Message) -> Result<(), RoutingError> {
-        // self.queues
-        //     .lock()?
-        //     .publisher(&message.routing_key.id.clone())
-        //     .ok_or(RoutingError::NotFound)
-        //     .map(|mut p| p.publish(message))
         let mut binding = self.queues.lock()?;
         let publisher = binding.publisher(&message.routing_key.id.clone());
         match publisher {
             None => Err(RoutingError::NotFound),
             Some(mut p) => {
+                info!("Publishing to {:?}", &message.routing_key.id);
                 p.publish(message);
                 Ok(())
             }
