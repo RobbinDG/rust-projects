@@ -45,8 +45,8 @@ impl MessageTopic {
     pub fn receive(&mut self, client: &ClientID) -> Option<DequeuedMessage> {
         debug!("Receiving message for {:?}", client);
         self.client_queues
-            .get_mut(client)
-            .and_then(|queue| queue.pop())
+            .get_mut(client)?
+            .pop()
     }
 
     pub fn register_client(
