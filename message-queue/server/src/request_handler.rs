@@ -2,10 +2,7 @@ use crate::queue_store::QueueStore;
 use crate::router::Router;
 use crate::subscription_manager::SubscriptionManager;
 use backend::protocol::client_id::ClientID;
-use backend::protocol::request::{
-    CheckQueue, CreateQueue, DeleteQueue, GetProperties, GetTopicBreakdown, ListQueues, Publish,
-    Receive, Subscribe,
-};
+use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, GetProperties, GetSubscription, GetTopicBreakdown, ListQueues, Publish, Receive, Subscribe};
 use backend::protocol::request_error::RequestError;
 use backend::protocol::{QueueProperties, Request, Status, SystemQueueProperties};
 use std::sync::{Arc, Mutex};
@@ -253,5 +250,21 @@ impl Handler<GetTopicBreakdown> for GetTopicBreakdownHandler {
                     .collect(),
             ),
         })
+    }
+}
+
+pub struct GetSubscriptionHandler {
+    subscription_manager: Arc<Mutex<SubscriptionManager>>,
+}
+
+impl GetSubscriptionHandler {
+    pub fn new(subscription_manager: Arc<Mutex<SubscriptionManager>>) -> Self {
+        Self { subscription_manager }
+    }
+}
+
+impl Handler<GetSubscription> for GetSubscriptionHandler {
+    fn handle(&mut self, _: GetSubscription, client: ClientID) -> Result<<GetSubscription as Request>::Response, RequestError> {
+        Ok(self.subscription_manager.lock()?.subscription(&client).cloned())
     }
 }

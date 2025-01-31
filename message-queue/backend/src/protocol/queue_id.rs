@@ -40,6 +40,22 @@ pub enum QueueFilter {
     Topic(String, TopicLiteral, TopicLiteral),
 }
 
+impl QueueFilter {
+    pub fn to_string(&self) -> String {
+        match self {
+            QueueFilter::Queue(name) => name.clone(),
+            QueueFilter::Topic(a, b, c) => format!(
+                "{}{}{}{}{}",
+                a.to_string(),
+                TOPIC_DELIMITER,
+                b.to_string(),
+                TOPIC_DELIMITER,
+                c.to_string()
+            ),
+        }
+    }
+}
+
 /// A key to uniquely identify a queue implementation, used to send messages one and
 /// only one target. To receive using e.g. topic filters, use [QueueFilter].
 #[derive(Serialize, Deserialize, Debug, Eq, Hash, PartialEq, Clone)]

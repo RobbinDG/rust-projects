@@ -53,6 +53,9 @@ pub struct GetTopicBreakdown {
     pub topic_name: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetSubscription {}
+
 impl Request for ListQueues {
     type Response = Vec<(QueueId, usize, usize, usize)>;
 }
@@ -89,6 +92,11 @@ impl Request for GetTopicBreakdown {
     type Response = Option<Vec<(String, Vec<String>)>>;
 }
 
+impl Request for GetSubscription {
+    type Response = Option<QueueFilter>;
+}
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SupportedRequest {
     ListQueues(ListQueues),
@@ -100,6 +108,7 @@ pub enum SupportedRequest {
     Subscribe(Subscribe),
     Receive(Receive),
     GetTopicBreakdown(GetTopicBreakdown),
+    GetSubscription(GetSubscription),
 }
 
 impl From<ListQueues> for SupportedRequest {
@@ -153,5 +162,11 @@ impl From<Receive> for SupportedRequest {
 impl From<GetTopicBreakdown> for SupportedRequest {
     fn from(value: GetTopicBreakdown) -> Self {
         SupportedRequest::GetTopicBreakdown(value)
+    }
+}
+
+impl From<GetSubscription> for SupportedRequest {
+    fn from(value: GetSubscription) -> Self {
+        SupportedRequest::GetSubscription(value)
     }
 }

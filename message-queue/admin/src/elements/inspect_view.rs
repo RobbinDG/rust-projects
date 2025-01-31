@@ -47,6 +47,7 @@ pub struct InspectView {
     ttl_value: u16,
     ttl_permanent: bool,
     breakdown_view: TopicBreakdown,
+    subscription: Option<QueueFilter>,
 }
 
 impl InspectView {
@@ -64,6 +65,7 @@ impl InspectView {
             ttl_value: 50,
             ttl_permanent: false,
             breakdown_view: TopicBreakdown::new("Breakdown".into()),
+            subscription: None,
         }
     }
 
@@ -113,6 +115,21 @@ impl InspectView {
                     button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
                     text(self.received_message.as_str())
                 ],
+                text(match &self.subscription {
+                    None => "Not subscribed to any queue.".to_string(),
+                    Some(queue) => {
+                        let is_this_queue = match (&queue, &self.queue_id) {
+                            (QueueFilter::Queue(a), QueueId::Queue(b)) => a == b,
+                            (QueueFilter::Topic(a, _, _), QueueId::Topic(b, _, _)) => a == b,
+                            _ => false,
+                        };
+                        if is_this_queue {
+                            queue.to_string()
+                        } else {
+                            "Not subscribed to this queue.".to_string()
+                        }
+                    }
+                })
             ]
             .spacing(10),
         ]
@@ -140,8 +157,8 @@ impl InspectView {
                         }
                         _ => {
                             println!("No topic selected, couldn't send message!");
-                            return Task::none()
-                        },
+                            return Task::none();
+                        }
                     },
                     q => q,
                 };
