@@ -5,7 +5,7 @@ use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
 use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopicLiteral};
 use backend::protocol::request::{
-    CreateQueue, DeleteQueue, GetTopicBreakdown, Publish, Receive, Subscribe,
+    CreateQueue, DeleteQueue, GetSubscription, GetTopicBreakdown, Publish, Receive, Subscribe,
 };
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, Status, UserQueueProperties};
@@ -36,6 +36,8 @@ pub enum InspectViewMessage {
     CreateSubtopic(String, Option<String>),
     SubtopicCreated,
     BreakdownMessage(topic_breakdown::Message),
+    GetSubscription,
+    Subscription(Option<QueueFilter>),
 }
 
 pub struct InspectView {
@@ -115,6 +117,7 @@ impl InspectView {
                     button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
                     text(self.received_message.as_str())
                 ],
+                button("Get subscription").on_press(InspectViewMessage::GetSubscription),
                 text(match &self.subscription {
                     None => "Not subscribed to any queue.".to_string(),
                     Some(queue) => {
@@ -129,7 +132,7 @@ impl InspectView {
                             "Not subscribed to this queue.".to_string()
                         }
                     }
-                })
+                }),
             ]
             .spacing(10),
         ]
@@ -279,6 +282,23 @@ impl InspectView {
             InspectViewMessage::SubtopicCreated => {}
             InspectViewMessage::BreakdownMessage(msg) => self.breakdown_view.update(msg),
             InspectViewMessage::Deleted => {}
+            InspectViewMessage::GetSubscription => {
+                let connector = self.connector.clone();
+                return Task::perform(
+                    async move {
+                        let mut binding = connector.lock().await;
+                        let client = binding.client().await.ok()?;
+                        client
+                            .transfer_admin_request(GetSubscription {})
+                            .await
+                            .ok()?
+                    },
+                    move |payload| InspectViewMessage::Subscription(payload),
+                );
+            }
+            InspectViewMessage::Subscription(subscription) => {
+                self.subscription = subscription;
+            }
         }
         Task::none()
     }
