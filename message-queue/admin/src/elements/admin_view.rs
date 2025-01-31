@@ -126,11 +126,12 @@ impl AdminView {
                 )
             }
             AdminViewMessage::InspectInfo(address, properties) => {
+                let (inspect_view, load_task) = InspectView::new(self.connector.clone(), address, properties);
                 self.inspect_view = Some(OverlayDialog::new(
                     "bla".into(),
-                    InspectView::new(self.connector.clone(), address, properties),
+                    inspect_view,
                 ));
-                Task::none()
+                load_task.map(AdminViewMessage::from)
             }
             AdminViewMessage::ConnectionUpdated(m) => {
                 self.connection_interface.update(m, self.connector.clone())

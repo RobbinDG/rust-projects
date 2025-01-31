@@ -57,18 +57,24 @@ impl InspectView {
         connector: Arc<Mutex<ServerConnector>>,
         queue_id: QueueId,
         props: QueueProperties,
-    ) -> Self {
-        Self {
-            queue_id,
-            props,
-            message_body: String::new(),
-            received_message: String::new(),
-            connector,
-            ttl_value: 50,
-            ttl_permanent: false,
-            breakdown_view: TopicBreakdown::new("Breakdown".into()),
-            subscription: None,
-        }
+    ) -> (Self, Task<InspectViewMessage>) {
+        let connector2 = connector.clone();
+        (
+            Self {
+                queue_id,
+                props,
+                message_body: String::new(),
+                received_message: String::new(),
+                connector,
+                ttl_value: 50,
+                ttl_permanent: false,
+                breakdown_view: TopicBreakdown::new("Breakdown".into()),
+                subscription: None,
+            },
+            Task::perform(Self::get_subscription(connector2), move |payload| {
+                InspectViewMessage::Subscription(payload)
+            }),
+        )
     }
 
     pub fn view(&self) -> Element<InspectViewMessage> {
@@ -117,7 +123,6 @@ impl InspectView {
                     button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
                     text(self.received_message.as_str())
                 ],
-                button("Get subscription").on_press(InspectViewMessage::GetSubscription),
                 text(match &self.subscription {
                     None => "Not subscribed to any queue.".to_string(),
                     Some(queue) => {
@@ -205,6 +210,7 @@ impl InspectView {
             InspectViewMessage::SendFailure => {}
             InspectViewMessage::Subscribe => {
                 let connector = self.connector.clone();
+                let connector2 = self.connector.clone();
                 let queue = match self.queue_id.clone() {
                     QueueId::Topic(name, _, _) => match self.breakdown_view.selected_topic() {
                         None => return Task::none(),
@@ -224,7 +230,11 @@ impl InspectView {
                             .ok()
                     },
                     move |result| InspectViewMessage::Subscribed,
-                );
+                )
+                .chain(Task::perform(
+                    Self::get_subscription(connector2),
+                    move |payload| InspectViewMessage::Subscription(payload),
+                ));
             }
             InspectViewMessage::Subscribed => {}
             InspectViewMessage::ReceiveMessage => {
@@ -284,23 +294,24 @@ impl InspectView {
             InspectViewMessage::Deleted => {}
             InspectViewMessage::GetSubscription => {
                 let connector = self.connector.clone();
-                return Task::perform(
-                    async move {
-                        let mut binding = connector.lock().await;
-                        let client = binding.client().await.ok()?;
-                        client
-                            .transfer_admin_request(GetSubscription {})
-                            .await
-                            .ok()?
-                    },
-                    move |payload| InspectViewMessage::Subscription(payload),
-                );
+                return Task::perform(Self::get_subscription(connector), move |payload| {
+                    InspectViewMessage::Subscription(payload)
+                });
             }
             InspectViewMessage::Subscription(subscription) => {
                 self.subscription = subscription;
             }
         }
         Task::none()
+    }
+
+    async fn get_subscription(connector: Arc<Mutex<ServerConnector>>) -> Option<QueueFilter> {
+        let mut binding = connector.lock().await;
+        let client = binding.client().await.ok()?;
+        client
+            .transfer_admin_request(GetSubscription {})
+            .await
+            .ok()?
     }
 
     async fn create(connector: Arc<Mutex<ServerConnector>>, queue_id: NewQueueId) {
