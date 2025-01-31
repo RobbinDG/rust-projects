@@ -12,13 +12,13 @@ use tokio::runtime::Handle;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::task;
 
-pub struct MyLogger {
+pub struct QueueLogger {
     log_sender: Sender<Message>,
     create_sender: Sender<CreateQueue>,
     currently_logging: Arc<AtomicBool>,
 }
 
-impl MyLogger {
+impl QueueLogger {
     pub fn new(address: &'static str) -> Self {
         let (tx, mut rx) = channel::<Message>(2);
         let (tx_c, mut rx_c) = channel::<CreateQueue>(2);
@@ -33,7 +33,6 @@ impl MyLogger {
             currently_logging3.store(false, Ordering::Relaxed);
 
             while let Some(msg) = rx_c.recv().await {
-                println!("logging {:?}", msg);
                 currently_logging3.store(true, Ordering::Relaxed);
                 stream
                     .write_encode(&SupportedRequest::CreateQueue(msg))
@@ -55,7 +54,6 @@ impl MyLogger {
             currently_logging.store(false, Ordering::Relaxed);
 
             while let Some(msg) = rx.recv().await {
-                println!("logging {:?}", msg);
                 currently_logging.store(true, Ordering::Relaxed);
                 stream
                     .write_encode(&SupportedRequest::Publish(Publish { message: msg }))
@@ -71,7 +69,7 @@ impl MyLogger {
             }
         });
 
-        MyLogger {
+        QueueLogger {
             log_sender: tx,
             create_sender: tx_c,
             currently_logging: currently_logging2,
@@ -79,7 +77,7 @@ impl MyLogger {
     }
 }
 
-impl log::Log for MyLogger {
+impl log::Log for QueueLogger {
     fn enabled(&self, _: &Metadata) -> bool {
         true
     }
@@ -124,8 +122,8 @@ impl log::Log for MyLogger {
     fn flush(&self) {}
 }
 
-static LOGGER: once_cell::sync::Lazy<MyLogger> =
-    once_cell::sync::Lazy::new(|| MyLogger::new("127.0.0.1:1234"));
+static LOGGER: once_cell::sync::Lazy<QueueLogger> =
+    once_cell::sync::Lazy::new(|| QueueLogger::new("127.0.0.1:1234"));
 
 pub fn init() {
     log::set_logger(&*LOGGER)

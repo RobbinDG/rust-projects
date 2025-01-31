@@ -1,14 +1,13 @@
-use crate::elements::collapsible::Collapsible;
 use crate::elements::connection_interface::{ConnectionInterface, ConnectionInterfaceMessage};
 use crate::elements::inspect_view::{InspectView, InspectViewMessage};
 use crate::elements::overlay_dialog::{Message, OverlayDialog};
 use crate::elements::queue_view::UIMessage;
-use crate::elements::{collapsible, QueueView};
+use crate::elements::QueueView;
 use crate::server_connector::ServerConnector;
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::request::GetProperties;
 use backend::protocol::QueueProperties;
-use iced::widget::{column, text, vertical_space};
+use iced::widget::{column, vertical_space};
 use iced::{Element, Task};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -22,7 +21,6 @@ pub enum AdminViewMessage {
     Inspector(InspectViewMessage),
     ConnectionUpdated(ConnectionInterfaceMessage),
     Nothing,
-    Toggled,
 }
 
 impl From<ConnectionInterfaceMessage> for AdminViewMessage {
@@ -47,7 +45,6 @@ pub struct AdminView {
     connector: Arc<Mutex<ServerConnector>>,
 
     // Sub-widgets
-    collapsible: Collapsible,
     buffer_view: QueueView,
     inspect_view: Option<OverlayDialog<InspectView>>,
     connection_interface: ConnectionInterface,
@@ -57,7 +54,6 @@ impl Default for AdminView {
     fn default() -> Self {
         let connector = Arc::new(Mutex::new(ServerConnector::new()));
         Self {
-            collapsible: Collapsible::new("test".into(), false),
             connector: connector.clone(),
             buffer_view: QueueView::default(),
             inspect_view: None,
@@ -78,12 +74,6 @@ impl AdminView {
                 .into(),
             None => {
                 let mut cols = column![
-                    self.collapsible
-                        .view::<()>(|| { text("collapsed").into() })
-                        .map(|m| match m {
-                            collapsible::Message::Toggle => AdminViewMessage::Toggled,
-                            collapsible::Message::Body(_) => AdminViewMessage::Nothing,
-                        }),
                     self.buffer_view.view().map(|message| match message {
                         UIMessage::InspectBuffer(t) => AdminViewMessage::InspectBuffer(t),
                         message => message.into(),
@@ -144,10 +134,6 @@ impl AdminView {
             }
             AdminViewMessage::ConnectionUpdated(m) => {
                 self.connection_interface.update(m, self.connector.clone())
-            }
-            AdminViewMessage::Toggled => {
-                self.collapsible.toggle();
-                Task::none()
             }
             AdminViewMessage::CloseInspect => {
                 if let Some(inspect_view) = self.inspect_view.take() {
