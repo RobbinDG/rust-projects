@@ -49,8 +49,10 @@ impl MyLogger {
         });
 
         tokio::spawn(async move {
+            currently_logging.store(true, Ordering::Relaxed);
             let stream = TcpStream::connect(address).await.unwrap();
             let mut stream = StreamIO::new(stream);
+            currently_logging.store(false, Ordering::Relaxed);
 
             while let Some(msg) = rx.recv().await {
                 println!("logging {:?}", msg);
@@ -122,7 +124,6 @@ impl log::Log for MyLogger {
     fn flush(&self) {}
 }
 
-// Global logger instance wrapped in a static reference
 static LOGGER: once_cell::sync::Lazy<MyLogger> =
     once_cell::sync::Lazy::new(|| MyLogger::new("127.0.0.1:1234"));
 
