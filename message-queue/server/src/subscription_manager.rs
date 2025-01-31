@@ -32,7 +32,7 @@ impl SubscriptionManager {
     pub fn subscribe(&mut self, client: ClientID, queue_id: QueueFilter) -> bool {
         let mut queues = match self.queue_store.lock() {
             Ok(binding) => {
-                if !binding.filter_valid(&queue_id) {
+                if !binding.is_filter_valid(&queue_id) {
                     self.subscriptions.remove(&client);
                     return false;
                 }

@@ -2,14 +2,47 @@ use backend::protocol::client_id::ClientID;
 use backend::protocol::queue_id::TopicLiteral;
 use std::collections::{HashMap, HashSet};
 
+trait ClientCollection {
+    fn insert_client(
+        &mut self,
+        client_id: ClientID,
+        filter_by_level: &Vec<TopicLiteral>,
+        depth: usize,
+    ) -> bool;
+
+    fn remove_client(
+        &mut self,
+        client_id: &ClientID,
+        filter_by_level: &Vec<TopicLiteral>,
+        depth: usize,
+    ) -> bool;
+    fn get_clients(&self, filter_by_level: &Vec<TopicLiteral>, depth: usize) -> HashSet<&ClientID>;
+}
+
 type TopicFilterTreeLeaf = HashSet<ClientID>;
 
-pub struct TopicFilterTreeNode<T> {
+impl ClientCollection for TopicFilterTreeLeaf {
+    fn insert_client(&mut self, client_id: ClientID, _: &Vec<TopicLiteral>, _: usize) -> bool {
+        self.insert(client_id);
+        true
+    }
+
+    fn remove_client(&mut self, client_id: &ClientID, _: &Vec<TopicLiteral>, _: usize) -> bool {
+        self.remove(&client_id);
+        true
+    }
+
+    fn get_clients(&self, _: &Vec<TopicLiteral>, _: usize) -> HashSet<&ClientID> {
+        self.iter().collect::<HashSet<&ClientID>>()
+    }
+}
+
+pub struct TopicFilterTreeNode<T: ClientCollection> {
     pub terminating: TopicFilterTreeLeaf,
     pub sub: HashMap<String, T>,
 }
 
-impl<T> TopicFilterTreeNode<T> {
+impl<T: ClientCollection> TopicFilterTreeNode<T> {
     pub fn new() -> Self {
         Self {
             terminating: HashSet::new(),
@@ -18,10 +51,76 @@ impl<T> TopicFilterTreeNode<T> {
     }
 }
 
+impl<T: ClientCollection> ClientCollection for TopicFilterTreeNode<T> {
+    fn insert_client(
+        &mut self,
+        client_id: ClientID,
+        filter_by_level: &Vec<TopicLiteral>,
+        depth: usize,
+    ) -> bool {
+        let filter = filter_by_level
+            .get(depth)
+            .unwrap_or(&TopicLiteral::Wildcard);
+
+        match filter {
+            TopicLiteral::Name(name) => match self.sub.get_mut(name) {
+                Some(sub) => sub.insert_client(client_id, filter_by_level, depth + 1),
+                None => false,
+            },
+            TopicLiteral::Wildcard => {
+                for sub in self.sub.values_mut() {
+                    sub.insert_client(client_id.clone(), filter_by_level, depth + 1);
+                }
+                true
+            }
+        }
+    }
+
+    fn remove_client(&mut self, client_id: &ClientID, filter_by_level: &Vec<TopicLiteral>, depth: usize) -> bool {
+        let filter = filter_by_level
+            .get(depth)
+            .unwrap_or(&TopicLiteral::Wildcard);
+
+        match filter {
+            TopicLiteral::Name(name) => match self.sub.get_mut(name) {
+                Some(sub) => sub.remove_client(client_id, filter_by_level, depth + 1),
+                None => false,
+            },
+            TopicLiteral::Wildcard => {
+                for sub in self.sub.values_mut() {
+                    sub.remove_client(client_id, filter_by_level, depth + 1);
+                }
+                true
+            }
+        }
+    }
+
+    fn get_clients(&self, filter_by_level: &Vec<TopicLiteral>, depth: usize) -> HashSet<&ClientID> {
+        let filter = filter_by_level
+            .get(depth)
+            .unwrap_or(&TopicLiteral::Wildcard);
+
+        let mut elements = self.terminating.iter().collect::<HashSet<&ClientID>>();
+        match filter {
+            TopicLiteral::Name(name) => {
+                if let Some(sub) = self.sub.get(name) {
+                    elements.extend(sub.get_clients(filter_by_level, depth + 1));
+                }
+            }
+            TopicLiteral::Wildcard => {
+                for sub in self.sub.values() {
+                    elements.extend(sub.get_clients(filter_by_level, depth + 1));
+                }
+            }
+        };
+        elements
+    }
+}
+
 /// A data structure to efficiently store subscribers under their desired filter.
 pub struct TopicFilterTree {
     topics: TopicFilterTreeNode<TopicFilterTreeNode<TopicFilterTreeLeaf>>,
-    filters: HashMap<ClientID, (TopicLiteral, TopicLiteral)>,
+    filters: HashMap<ClientID, Vec<TopicLiteral>>,
 }
 
 impl TopicFilterTree {
@@ -40,7 +139,7 @@ impl TopicFilterTree {
             .collect()
     }
 
-    pub fn filter_nonempty(&self, filter: (&TopicLiteral, &TopicLiteral)) -> bool {
+    pub fn is_filter_nonempty(&self, filter: (&TopicLiteral, &TopicLiteral)) -> bool {
         match filter.0 {
             TopicLiteral::Name(s) => self.topics.sub.get(s).map_or(false, |sub| match filter.1 {
                 TopicLiteral::Name(s) => sub.sub.contains_key(s),
@@ -72,18 +171,13 @@ impl TopicFilterTree {
     /// * `filter`: the filter under which they want to receive.
     ///
     /// returns: `bool` if the insertion failed due to the filter not yet existing.
-    pub fn insert(&mut self, client: ClientID, filter: (TopicLiteral, TopicLiteral)) -> bool {
-        let clients = self.get_client_set(filter);
-        clients
-            .and_then(|c| Some(c.insert(client)))
-            .unwrap_or(false)
+    pub fn insert(&mut self, client: ClientID, filter: &Vec<TopicLiteral>) -> bool {
+        self.topics.insert_client(client, &filter, 0)
     }
 
     pub fn remove(&mut self, client: &ClientID) -> bool {
         if let Some(filter) = self.filters.get(client) {
-            self.get_client_set(filter.clone())
-                .and_then(|clients| Some(clients.remove(client)))
-                .unwrap_or(false)
+            self.topics.remove_client(client, filter, 0)
         } else {
             false
         }
@@ -98,27 +192,20 @@ impl TopicFilterTree {
     /// returns: `Vec<&ClientID, Global>` a reference to all client ID's.
     pub fn get_clients(&self, address: (String, String)) -> Vec<&ClientID> {
         Self::get_clients_filter_tree(&self.topics, address)
+            .into_iter()
+            .collect()
     }
 
-    fn get_client_set(
-        &mut self,
-        filter: (TopicLiteral, TopicLiteral),
-    ) -> Option<&mut TopicFilterTreeLeaf> {
-        match filter.0 {
-            TopicLiteral::Name(s) => self.topics.sub.get_mut(&s).and_then(|sub| match filter.1 {
-                TopicLiteral::Name(s) => sub.sub.get_mut(&s),
-                TopicLiteral::Wildcard => Some(&mut sub.terminating),
-            }),
-            TopicLiteral::Wildcard => Some(&mut self.topics.terminating),
-        }
+    fn get_client_set(&mut self, filter: &Vec<TopicLiteral>) -> HashSet<&ClientID> {
+        self.topics.get_clients(filter, 0)
     }
 
     fn get_clients_filter_tree(
         tree: &TopicFilterTreeNode<TopicFilterTreeNode<TopicFilterTreeLeaf>>,
         address: (String, String),
-    ) -> Vec<&ClientID> {
+    ) -> HashSet<&ClientID> {
         let mut clients = match tree.sub.get(&address.0) {
-            None => vec![],
+            None => HashSet::new(),
             Some(subtree) => Self::get_clients_subtree(subtree, address.1.clone()),
         };
         clients.extend(&tree.terminating);
@@ -128,9 +215,9 @@ impl TopicFilterTree {
     fn get_clients_subtree(
         address: &TopicFilterTreeNode<TopicFilterTreeLeaf>,
         filter: String,
-    ) -> Vec<&ClientID> {
+    ) -> HashSet<&ClientID> {
         let mut clients = match address.sub.get(&filter) {
-            None => vec![],
+            None => HashSet::new(),
             Some(c) => c.iter().collect(),
         };
         clients.extend(&address.terminating);

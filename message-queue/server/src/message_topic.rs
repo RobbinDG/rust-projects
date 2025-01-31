@@ -38,8 +38,8 @@ impl MessageTopic {
         self.get_subtopics().get(&filter.0).and_then(|sub| sub.get(&filter.1)).is_some()
     }
 
-    pub fn filter_valid(&self, filter: (&TopicLiteral, &TopicLiteral)) -> bool {
-       self.clients_by_filter.filter_nonempty(filter)
+    pub fn is_filter_valid(&self, filter: (&TopicLiteral, &TopicLiteral)) -> bool {
+       self.clients_by_filter.is_filter_nonempty(filter)
     }
 
     pub fn receive(&mut self, client: &ClientID) -> Option<DequeuedMessage> {
@@ -55,7 +55,7 @@ impl MessageTopic {
         topic_filter: (TopicLiteral, TopicLiteral),
     ) {
         info!("Creating topic buffer for {:?}", client);
-        self.clients_by_filter.insert(client.clone(), topic_filter);
+        self.clients_by_filter.insert(client.clone(), &vec![topic_filter.0, topic_filter.1]);
         self.client_queues.insert(client, Queue::new());
     }
 

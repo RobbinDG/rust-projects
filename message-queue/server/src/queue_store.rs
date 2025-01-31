@@ -150,13 +150,13 @@ impl QueueStore {
         }
     }
 
-    pub fn filter_valid(&self, filter: &QueueFilter) -> bool {
+    pub fn is_filter_valid(&self, filter: &QueueFilter) -> bool {
         match filter {
             QueueFilter::Queue(name) => self.directs.contains_key(name),
             QueueFilter::Topic(name, f1, f2) => self
                 .primary_topics
                 .get(name)
-                .map_or(false, |t| t.filter_valid((f1, f2))),
+                .map_or(false, |t| t.is_filter_valid((f1, f2))),
         }
     }
 
