@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::elements::collapsible;
 use crate::elements::collapsible::Collapsible;
 use backend::protocol::queue_id::TopicLiteral;
@@ -17,6 +18,27 @@ pub struct TopicBreakdown {
     sub_breakdown_views: Vec<(String, Collapsible, Vec<String>)>,
     new_subtopic_name: String,
     subsub_selection: Option<(usize, usize)>,
+}
+
+impl TopicBreakdown {
+    pub fn subsubs(&self, sub: &TopicLiteral) -> Vec<TopicLiteral> {
+        let mut topics = HashSet::new();
+        match &sub {
+            TopicLiteral::Name(s) => {
+                for (a, _, b) in &self.sub_breakdown_views {
+                    if a == s {
+                        topics.extend(b.iter().map(|s| TopicLiteral::Name(s.clone())));
+                    }
+                }
+            }
+            TopicLiteral::Wildcard => {
+                for (_, _, b) in &self.sub_breakdown_views {
+                    topics.extend(b.iter().map(|s| TopicLiteral::Name(s.clone())));
+                }
+            }
+        };
+        topics.into_iter().collect()
+    }
 }
 
 impl TopicBreakdown {

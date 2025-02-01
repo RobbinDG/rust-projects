@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use serde::{Deserialize, Serialize};
 
 const TOPIC_DELIMITER: &str = ":";
@@ -29,6 +30,12 @@ impl TopicLiteral {
             TopicLiteral::Name(name) => name.clone(),
             TopicLiteral::Wildcard => "*".to_string(),
         }
+    }
+}
+
+impl Display for TopicLiteral {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }
 

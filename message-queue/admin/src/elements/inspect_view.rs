@@ -10,7 +10,9 @@ use backend::protocol::request::{
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, Status, UserQueueProperties};
 use iced::application::Update;
-use iced::widget::{button, checkbox, column, row, slider, text, text_input, vertical_rule};
+use iced::widget::{
+    button, checkbox, column, combo_box, row, slider, text, text_input, vertical_rule,
+};
 use iced::{Alignment, Element, Task};
 use std::sync::Arc;
 use std::time::Duration;
@@ -33,6 +35,8 @@ pub enum InspectViewMessage {
     TTLPermanentToggle(bool),
     LoadBreakdown,
     BreakdownLoaded(Option<Vec<(String, Vec<String>)>>),
+    SubtopicCreateSelectionChanged0(TopicLiteral),
+    SubtopicCreateSelectionChanged1(TopicLiteral),
     CreateSubtopic(String, Option<String>),
     SubtopicCreated,
     BreakdownMessage(topic_breakdown::Message),
@@ -50,6 +54,11 @@ pub struct InspectView {
     ttl_permanent: bool,
     breakdown_view: TopicBreakdown,
     subscription: Option<QueueFilter>,
+    new_filter_state: (
+        combo_box::State<TopicLiteral>,
+        combo_box::State<TopicLiteral>,
+    ),
+    new_filter_selection: (Option<TopicLiteral>, Option<TopicLiteral>),
 }
 
 impl InspectView {
@@ -58,7 +67,11 @@ impl InspectView {
         queue_id: QueueId,
         props: QueueProperties,
     ) -> (Self, Task<InspectViewMessage>) {
-        let connector2 = connector.clone();
+        let mut window_load_task = Self::get_subscription_task(connector.clone());
+        if let QueueId::Topic(name, _, _) = &queue_id {
+            window_load_task =
+                window_load_task.chain(Self::load_breakdown_task(connector.clone(), name.clone()));
+        }
         (
             Self {
                 queue_id,
@@ -70,10 +83,10 @@ impl InspectView {
                 ttl_permanent: false,
                 breakdown_view: TopicBreakdown::new("Breakdown".into()),
                 subscription: None,
+                new_filter_state: (combo_box::State::new(vec![]), combo_box::State::new(vec![])),
+                new_filter_selection: (None, None),
             },
-            Task::perform(Self::get_subscription(connector2), move |payload| {
-                InspectViewMessage::Subscription(payload)
-            }),
+            window_load_task,
         )
     }
 
@@ -119,7 +132,21 @@ impl InspectView {
                 ]
                 .spacing(10),
                 row![
+                    combo_box(
+                        &self.new_filter_state.0,
+                        "topic",
+                        self.new_filter_selection.0.as_ref(),
+                        InspectViewMessage::SubtopicCreateSelectionChanged0,
+                    ),
+                    combo_box(
+                        &self.new_filter_state.1,
+                        "topic",
+                        self.new_filter_selection.1.as_ref(),
+                        InspectViewMessage::SubtopicCreateSelectionChanged1,
+                    ),
                     button("Subscribe").on_press(InspectViewMessage::Subscribe),
+                ],
+                row![
                     button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
                     text(self.received_message.as_str())
                 ],
@@ -209,32 +236,9 @@ impl InspectView {
             InspectViewMessage::MessageSent => {}
             InspectViewMessage::SendFailure => {}
             InspectViewMessage::Subscribe => {
-                let connector = self.connector.clone();
-                let connector2 = self.connector.clone();
-                let queue = match self.queue_id.clone() {
-                    QueueId::Topic(name, _, _) => match self.breakdown_view.selected_topic() {
-                        None => return Task::none(),
-                        Some((f1, f2)) => QueueFilter::Topic(name, f1, f2),
-                    },
-                    q => QueueFilter::from(q),
-                };
-                return Task::perform(
-                    async move {
-                        let mut binding = connector.lock().await;
-                        let client = binding.client().await.ok()?;
-                        client
-                            .transfer_admin_request(Subscribe {
-                                queue: queue.into(),
-                            })
-                            .await
-                            .ok()
-                    },
-                    move |result| InspectViewMessage::Subscribed,
-                )
-                .chain(Task::perform(
-                    Self::get_subscription(connector2),
-                    move |payload| InspectViewMessage::Subscription(payload),
-                ));
+                return self
+                    .subscribe_task(self.connector.clone())
+                    .chain(Self::get_subscription_task(self.connector.clone()));
             }
             InspectViewMessage::Subscribed => {}
             InspectViewMessage::ReceiveMessage => {
@@ -259,24 +263,22 @@ impl InspectView {
             InspectViewMessage::TTLPermanentToggle(toggle) => self.ttl_permanent = toggle,
             InspectViewMessage::LoadBreakdown => {
                 if let QueueId::Topic(topic_name, _, _) = &self.queue_id {
-                    let connector = self.connector.clone();
-                    let topic_name = topic_name.clone();
-                    return Task::perform(
-                        async move {
-                            let mut binding = connector.lock().await;
-                            let client = binding.client().await.ok()?;
-                            client
-                                .transfer_admin_request(GetTopicBreakdown { topic_name })
-                                .await
-                                .ok()?
-                        },
-                        move |payload| InspectViewMessage::BreakdownLoaded(payload),
-                    );
+                    return Self::load_breakdown_task(self.connector.clone(), topic_name.clone());
                 }
             }
             InspectViewMessage::BreakdownLoaded(breakdown) => {
                 if let Some(data) = breakdown {
-                    self.breakdown_view.set_data(data)
+                    let topics: Vec<_> = data
+                        .iter()
+                        .map(|e| TopicLiteral::Name(e.0.clone()))
+                        .collect();
+                    let mut items = vec![TopicLiteral::Wildcard];
+                    items.extend(topics);
+                    self.new_filter_state = (
+                        combo_box::State::new(items),
+                        combo_box::State::new(vec![TopicLiteral::Wildcard]),
+                    );
+                    self.breakdown_view.set_data(data);
                 }
             }
             InspectViewMessage::CreateSubtopic(s, ss) => {
@@ -293,16 +295,79 @@ impl InspectView {
             InspectViewMessage::BreakdownMessage(msg) => self.breakdown_view.update(msg),
             InspectViewMessage::Deleted => {}
             InspectViewMessage::GetSubscription => {
-                let connector = self.connector.clone();
-                return Task::perform(Self::get_subscription(connector), move |payload| {
-                    InspectViewMessage::Subscription(payload)
-                });
+                return Self::get_subscription_task(self.connector.clone())
             }
             InspectViewMessage::Subscription(subscription) => {
                 self.subscription = subscription;
             }
+            InspectViewMessage::SubtopicCreateSelectionChanged0(choice) => {
+                let topics = self.breakdown_view.subsubs(&choice);
+                let mut items = vec![TopicLiteral::Wildcard];
+                items.extend(topics);
+                self.new_filter_state.1 = combo_box::State::new(items);
+                self.new_filter_selection = (Some(choice), None);
+            }
+            InspectViewMessage::SubtopicCreateSelectionChanged1(choice) => {
+                self.new_filter_selection.1 = Some(choice);
+            }
         }
         Task::none()
+    }
+
+    fn subscribe_task(
+        &mut self,
+        connector: Arc<Mutex<ServerConnector>>,
+    ) -> Task<InspectViewMessage> {
+        let queue = match self.queue_id.clone() {
+            QueueId::Topic(name, _, _) => {
+                let f1 = match &self.new_filter_selection.0 {
+                    None => TopicLiteral::Wildcard,
+                    Some(lit) => lit.clone(),
+                };
+                let f2 = match &self.new_filter_selection.1 {
+                    None => TopicLiteral::Wildcard,
+                    Some(lit) => lit.clone(),
+                };
+                QueueFilter::Topic(name, f1, f2)
+            }
+            q => QueueFilter::from(q),
+        };
+        Task::perform(
+            async move {
+                let mut binding = connector.lock().await;
+                let client = binding.client().await.ok()?;
+                client
+                    .transfer_admin_request(Subscribe {
+                        queue: queue.into(),
+                    })
+                    .await
+                    .ok()
+            },
+            move |result| InspectViewMessage::Subscribed,
+        )
+    }
+
+    fn load_breakdown_task(
+        connector: Arc<Mutex<ServerConnector>>,
+        topic_name: String,
+    ) -> Task<InspectViewMessage> {
+        Task::perform(
+            async move {
+                let mut binding = connector.lock().await;
+                let client = binding.client().await.ok()?;
+                client
+                    .transfer_admin_request(GetTopicBreakdown { topic_name })
+                    .await
+                    .ok()?
+            },
+            InspectViewMessage::BreakdownLoaded,
+        )
+    }
+
+    fn get_subscription_task(connector: Arc<Mutex<ServerConnector>>) -> Task<InspectViewMessage> {
+        Task::perform(Self::get_subscription(connector), move |payload| {
+            InspectViewMessage::Subscription(payload)
+        })
     }
 
     async fn get_subscription(connector: Arc<Mutex<ServerConnector>>) -> Option<QueueFilter> {
