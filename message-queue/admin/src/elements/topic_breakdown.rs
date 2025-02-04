@@ -1,8 +1,8 @@
 use crate::elements::collapsible;
 use crate::elements::collapsible::Collapsible;
 use backend::protocol::queue_id::TopicLiteral;
-use iced::widget::{button, container, hover, mouse_area, row, text, text_input, Container, Row};
-use iced::{color, Background, Border, Element, Length, Padding};
+use iced::widget::{button, row, text, text_input, Column, Row};
+use iced::{Element, Padding};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -10,7 +10,6 @@ pub enum Message {
     CreateSubtopic(String, Option<String>),
     NewSubtopicNameChanged(String),
     ToggleBreakdown(Option<usize>),
-    SubSubSelected(usize, usize),
 }
 
 pub struct TopicBreakdown {
@@ -53,7 +52,7 @@ impl TopicBreakdown {
 
     pub fn view(&self) -> Element<Message> {
         self.breakdown_view
-            .view(|| self.build_subtopic_view())
+            .view(|| self.build_subtopic_view().into())
             .map(|msg| match msg {
                 collapsible::Message::Toggle => Message::ToggleBreakdown(None),
                 collapsible::Message::Body(msg) => msg,
@@ -73,7 +72,6 @@ impl TopicBreakdown {
                     }
                 }
             },
-            Message::SubSubSelected(i, j) => self.subsub_selection = Some((i, j)),
         }
     }
 
@@ -85,11 +83,16 @@ impl TopicBreakdown {
         }
     }
 
-    fn build_subtopic_view(&self) -> Element<Message> {
-        let mut col = iced::widget::column![].padding(Padding::ZERO.left(10));
+    fn build_subtopic_view(&self) -> impl Into<Element<'_, Message>> {
+        let mut col = Column::new().spacing(2).padding(Padding {
+            top: 2.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 10.0,
+        });
         let mut e = self.sub_breakdown_views.iter().enumerate();
         while let Some((i, (_, c, s))) = e.next() {
-            col = col.push(c.view(|| self.build_subsubtopic_view(s, i)).map(
+            col = col.push(c.view(|| self.build_subsubtopic_view(s, i).into()).map(
                 move |msg| match msg {
                     collapsible::Message::Toggle => Message::ToggleBreakdown(Some(i)),
                     collapsible::Message::Body(m) => m,
@@ -97,7 +100,7 @@ impl TopicBreakdown {
             ));
         }
         col = col.push(self.build_create_prompt(None));
-        col.into()
+        col
     }
 
     fn build_create_prompt(&self, which: Option<usize>) -> Row<Message> {
@@ -125,37 +128,17 @@ impl TopicBreakdown {
         ]
     }
 
-    fn build_subsubtopic_view<'a>(&'a self, s: &'a Vec<String>, i: usize) -> Element<'a, Message> {
-        let mut col = iced::widget::column![].padding(Padding::ZERO.left(10));
-        for (i_sub, ss) in s.iter().enumerate() {
-            let text_elem: Element<Message> = if Some((i, i_sub)) == self.subsub_selection {
-                Self::format_container(container(text(ss))).into()
-            } else {
-                text(ss).into()
-            };
-            col = col.push(
-                mouse_area(hover(
-                    text_elem,
-                    Self::format_container(container(""))
-                        .width(Length::Fill)
-                        .height(Length::Fill),
-                ))
-                .on_press(Message::SubSubSelected(i, i_sub)),
-            );
+    fn build_subsubtopic_view<'a>(&'a self, s: &'a Vec<String>, i: usize) -> impl Into<Element<'a, Message>> {
+        let mut col = Column::new().spacing(2).padding(Padding {
+            top: 2.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 10.0,
+        });
+        for ss in s {
+            col = col.push(text(ss));
         }
         col = col.push(self.build_create_prompt(Some(i)));
-        col.into()
-    }
-
-    fn format_container<M>(container: Container<M>) -> Container<M> {
-        container.style(|t| {
-            container::rounded_box(t)
-                .border(Border {
-                    color: color![0.1, 0.1, 1.0, 0.8],
-                    width: 2.0,
-                    radius: Default::default(),
-                })
-                .background(Background::Color(color![0.1, 0.1, 1.0, 0.5]))
-        })
+        col
     }
 }
