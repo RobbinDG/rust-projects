@@ -1,5 +1,6 @@
 use crate::elements::queue_selector;
 use crate::elements::queue_selector::QueueSelector;
+use crate::elements::warning::Warning;
 use crate::fonts::{font_heading, ELEMENT_SPACING, SIZE_HEADING};
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
@@ -35,7 +36,6 @@ pub enum InspectViewMessage {
     TTLPermanentToggle(bool),
     LoadBreakdown,
     SubtopicCreated,
-    GetSubscription,
     Subscription(Option<QueueFilter>),
     Selector(queue_selector::Message),
 }
@@ -88,11 +88,15 @@ impl<T: QueueSelector + 'static> InspectView<T> {
         if !self.props.system.is_system {
             delete_btn = delete_btn.on_press(InspectViewMessage::Delete(self.queue_id.clone()));
         }
-        let mut send_message_btn = button("Send Message");
         let send_queue = self.queue_selector.selected();
-        if let Some(queue) = send_queue {
-            send_message_btn = send_message_btn.on_press(InspectViewMessage::SendMessage(queue));
-        }
+        let send_message_btn = match send_queue {
+            Some(queue) => {
+                button("Send Message").on_press(InspectViewMessage::SendMessage(queue))
+            }
+            None => {
+                button(row![text("Send Message"), Warning::new("Cannot send a message to a topic containing a filter. Specify a concrete topic to send.")].spacing(4))
+            }
+        };
         column![row![
             column![
                 text("Administration")
@@ -134,7 +138,6 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                 text("Receiving"),
                 row![
                     button("Subscribe").on_press(InspectViewMessage::Subscribe),
-                    text(nerd::icon_to_char(Nerd::Warning)).font(iced_fonts::NERD_FONT),
                     button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
                     text(self.received_message.as_str())
                 ]
@@ -169,7 +172,7 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                 let addr2 = addr.clone();
                 return Task::perform(
                     async move { Self::delete_buffer(connector, addr2).await },
-                    move |result| InspectViewMessage::Deleted,
+                    move |_| InspectViewMessage::Deleted,
                 );
             }
             InspectViewMessage::MessageBodyChanged(s) => self.message_body = s,
@@ -255,9 +258,6 @@ impl<T: QueueSelector + 'static> InspectView<T> {
             }
             InspectViewMessage::SubtopicCreated => {}
             InspectViewMessage::Deleted => {}
-            InspectViewMessage::GetSubscription => {
-                return Self::get_subscription_task(self.connector.clone())
-            }
             InspectViewMessage::Subscription(subscription) => {
                 self.subscription = subscription;
             }
@@ -282,7 +282,7 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                     .await
                     .ok()
             },
-            move |result| InspectViewMessage::Subscribed,
+            move |_| InspectViewMessage::Subscribed,
         )
     }
 

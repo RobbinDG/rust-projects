@@ -18,7 +18,7 @@ impl QueueSelector for DirectSelector {
         row![].into()
     }
 
-    fn update(&mut self, message: Message) {}
+    fn update(&mut self, _: Message) {}
 
     fn selected(&self) -> Option<QueueId> {
         Some(QueueId::Queue(self.name.clone()))

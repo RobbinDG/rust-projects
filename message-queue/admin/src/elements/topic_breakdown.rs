@@ -1,9 +1,9 @@
-use std::collections::HashSet;
 use crate::elements::collapsible;
 use crate::elements::collapsible::Collapsible;
 use backend::protocol::queue_id::TopicLiteral;
 use iced::widget::{button, container, hover, mouse_area, row, text, text_input, Container, Row};
 use iced::{color, Background, Border, Element, Length, Padding};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -75,15 +75,6 @@ impl TopicBreakdown {
             },
             Message::SubSubSelected(i, j) => self.subsub_selection = Some((i, j)),
         }
-    }
-
-    pub fn selected_topic(&self) -> Option<(TopicLiteral, TopicLiteral)> {
-        let (i, j) = self.subsub_selection?;
-        let (name, _, subs) = self.sub_breakdown_views.get(i)?;
-        Some((
-            TopicLiteral::Name(name.clone()),
-            TopicLiteral::Name(subs.get(j)?.clone()),
-        ))
     }
 
     pub fn set_data(&mut self, data: Vec<(String, Vec<String>)>) {

@@ -11,6 +11,5 @@ mod direct_selector;
 mod topic_selector;
 mod warning;
 
-pub use queue_view::UIMessage;
 pub use queue_table::QueueTable;
 pub use queue_view::QueueView;

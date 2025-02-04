@@ -57,14 +57,6 @@ impl ServerConnector {
     async fn attempt_connect(c: DisconnectedClient<String>) -> Client {
         match c.connect().await {
             Ok(connected) => Client::Connected(connected),
-            // Ok(mut connected) => match rt.block_on(connected.transfer_request(SetupRequest::Admin))
-            // {
-            //     Ok(SetupResponse::Admin) => Client::Connected(connected),
-            //     s => {
-            //         println!("Unexpected response: {:?}", s);
-            //         Client::Disconnected(connected.disconnect())
-            //     }
-            // },
             Err(err) => Client::Disconnected(err.server),
         }
     }
