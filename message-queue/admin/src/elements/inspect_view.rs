@@ -23,7 +23,7 @@ pub enum InspectViewMessage {
     Delete(QueueId),
     Deleted,
     MessageBodyChanged(String),
-    SendMessage,
+    SendMessage(QueueId),
     MessageSent,
     SendFailure,
     Subscribe,
@@ -95,6 +95,21 @@ impl InspectView {
         if !self.props.system.is_system {
             delete_btn = delete_btn.on_press(InspectViewMessage::Delete(self.queue_id.clone()));
         }
+        let mut send_message_btn = button("Send Message");
+        let send_queue = match self.queue_id.clone() {
+            QueueId::Topic(name, _, _) => match &self.new_filter_selection {
+                (Some(TopicLiteral::Name(f1)), Some(TopicLiteral::Name(f2))) => {
+                    Some(QueueId::Topic(name, f1.clone(), f2.clone()))
+                }
+                _ => {
+                    None
+                }
+            },
+            q => Some(q),
+        };
+        if let Some(queue) = send_queue {
+            send_message_btn = send_message_btn.on_press(InspectViewMessage::SendMessage(queue));
+        }
         column![row![
             column![
                 text("Administration").align_x(Alignment::Center),
@@ -128,7 +143,7 @@ impl InspectView {
                     text(format!("{}s", self.ttl_value)),
                     checkbox("Permanent", self.ttl_permanent)
                         .on_toggle(InspectViewMessage::TTLPermanentToggle),
-                    button("Send Message").on_press(InspectViewMessage::SendMessage)
+                    send_message_btn,
                 ]
                 .spacing(10),
                 row![
@@ -184,19 +199,7 @@ impl InspectView {
                 );
             }
             InspectViewMessage::MessageBodyChanged(s) => self.message_body = s,
-            InspectViewMessage::SendMessage => {
-                let queue = match self.queue_id.clone() {
-                    QueueId::Topic(name, _, _) => match self.breakdown_view.selected_topic() {
-                        Some((TopicLiteral::Name(f1), TopicLiteral::Name(f2))) => {
-                            QueueId::Topic(name, f1, f2)
-                        }
-                        _ => {
-                            println!("No topic selected, couldn't send message!");
-                            return Task::none();
-                        }
-                    },
-                    q => q,
-                };
+            InspectViewMessage::SendMessage(queue) => {
                 let connector = self.connector.clone();
                 let body = self.message_body.clone();
                 let ttl = if self.ttl_permanent {
