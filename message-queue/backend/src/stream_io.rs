@@ -116,7 +116,6 @@ impl StreamIO {
         T: Serialize + for<'a> Deserialize<'a>,
     {
         let response: Result<Vec<u8>, RequestError> = self.read().await?;
-        println!("{:?}", response);
         Ok(match response {
             Ok(r) => Ok(postcard::from_bytes(r.as_slice())?),
             Err(err) => Err(err),

@@ -15,9 +15,10 @@ use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, Status, UserQueueProperties};
 use iced::widget::{
     button, checkbox, column, horizontal_space, row, slider, text, text_input, vertical_rule,
-    Column,
+    Column, Row,
 };
-use iced::{Alignment, Element, Length, Task};
+use iced::{Alignment, Element, Length, Padding, Task};
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -55,6 +56,7 @@ where
     ttl_value: u16,
     ttl_permanent: bool,
     subscription: Option<QueueFilter>,
+    message_log: VecDeque<String>,
     queue_selector: T,
 }
 
@@ -80,6 +82,7 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                 ttl_value: 50,
                 ttl_permanent: false,
                 subscription: None,
+                message_log: VecDeque::new(),
                 queue_selector,
             },
             window_load_task,
@@ -100,6 +103,12 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                 button(row![text("Send Message"), Warning::new("Cannot send a message to a topic containing a filter. Specify a concrete topic to send.")].spacing(4))
             }
         };
+
+        let mut message_log = Column::new();
+        for message in &self.message_log {
+            message_log = message_log.push(text(message));
+        }
+
         column![row![
             Column::new()
                 .push(
@@ -110,7 +119,10 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                 )
                 .push(
                     Table::new()
-                        .push(text("DLX"), text(pretty_print_queue_dlx(&self.props.user.dlx)))
+                        .push(
+                            text("DLX"),
+                            text(pretty_print_queue_dlx(&self.props.user.dlx))
+                        )
                         .push(text("Is DLX"), bool_badge(self.props.user.is_dlx))
                         .push(
                             text("Is System Managed"),
@@ -142,25 +154,27 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                 text("Receiving"),
                 row![
                     button("Subscribe").on_press(InspectViewMessage::Subscribe),
-                    button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
-                    text(self.received_message.as_str())
+                    text(match &self.subscription {
+                        None => "Not subscribed to any queue.".to_string(),
+                        Some(queue) => {
+                            let is_this_queue = match (&queue, &self.queue_id) {
+                                (QueueFilter::Queue(a), QueueId::Queue(b)) => a == b,
+                                (QueueFilter::Topic(a, _, _), QueueId::Topic(b, _, _)) => a == b,
+                                _ => false,
+                            };
+                            if is_this_queue {
+                                queue.to_string()
+                            } else {
+                                "Not subscribed to this queue.".to_string()
+                            }
+                        }
+                    })
                 ]
                 .spacing(ELEMENT_SPACING),
-                text(match &self.subscription {
-                    None => "Not subscribed to any queue.".to_string(),
-                    Some(queue) => {
-                        let is_this_queue = match (&queue, &self.queue_id) {
-                            (QueueFilter::Queue(a), QueueId::Queue(b)) => a == b,
-                            (QueueFilter::Topic(a, _, _), QueueId::Topic(b, _, _)) => a == b,
-                            _ => false,
-                        };
-                        if is_this_queue {
-                            queue.to_string()
-                        } else {
-                            "Not subscribed to this queue.".to_string()
-                        }
-                    }
-                }),
+                Row::new()
+                    .push(button("Receive Message").on_press(InspectViewMessage::ReceiveMessage))
+                    .push(text(format!("Received: {}", self.received_message))),
+                message_log.padding(Padding::ZERO.left(20)).spacing(2)
             ]
             .spacing(ELEMENT_SPACING),
         ]
@@ -241,8 +255,14 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                     },
                 );
             }
-            InspectViewMessage::MessageReceived(m) => self.received_message = m,
-            InspectViewMessage::NoMessageAvailable => self.received_message.clear(),
+            InspectViewMessage::MessageReceived(m) => {
+                self.message_log.push_front(self.received_message.clone());
+                self.message_log.truncate(5);
+                self.received_message = m;
+            }
+            InspectViewMessage::NoMessageAvailable => {
+                self.received_message = "No message".to_string()
+            }
             InspectViewMessage::TTLValueChanged(val) => self.ttl_value = val,
             InspectViewMessage::TTLPermanentToggle(toggle) => self.ttl_permanent = toggle,
             InspectViewMessage::LoadBreakdown => {
