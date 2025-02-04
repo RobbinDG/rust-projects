@@ -6,6 +6,7 @@ use backend::protocol::queue_id::TopicLiteral;
 use backend::protocol::QueueProperties;
 use log::{debug, info};
 use std::collections::{HashMap, HashSet};
+use backend::protocol::routing_error::RoutingError;
 
 pub struct MessageTopic {
     properties: QueueProperties,
@@ -68,12 +69,18 @@ impl MessageTopic {
         &self.properties
     }
 
-    pub fn publish(&mut self, message: Message, f1: String, f2: String) {
+    pub fn publish(&mut self, message: Message, f1: String, f2: String) -> Result<(), Message> {
         let clients = self.clients_by_filter.get_clients((f1, f2));
+
+        if clients.len() <= 0 {
+            return Err(message);
+        }
+
         for client in clients {
             if let Some(queue) = self.client_queues.get_mut(client) {
                 queue.push(message.clone());
             }
         }
+        Ok(())
     }
 }

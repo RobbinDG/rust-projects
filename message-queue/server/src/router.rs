@@ -1,5 +1,5 @@
 use crate::queue::MessageState;
-use crate::queue_store::QueueStore;
+use crate::queue_store::{Publisher, QueueStore};
 use backend::protocol::client_id::ClientID;
 use backend::protocol::message::{Message, TTL};
 use backend::protocol::queue_id::{QueueFilter, QueueId};
@@ -7,7 +7,7 @@ use backend::protocol::routing_error::RoutingError;
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, SystemQueueProperties, UserQueueProperties};
 use log::{debug, error, info, warn};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LockResult, Mutex};
 
 const DEFAULT_DLX_NAME: &'static str = "default_dlx";
 
@@ -40,7 +40,7 @@ impl Router {
     }
 
     /// Publish a message to its intended destination queue, regardless of queue implementation
-    /// type (Queue/Topic).
+    /// type (Queue/Topic). If sending fails, the message is sent to its requested DLX.
     ///
     /// # Arguments
     ///
@@ -50,16 +50,29 @@ impl Router {
     /// returns: `Result<(), RoutingError>` a potential routing error if it occurs
     ///     during publishing.
     pub fn publish(&mut self, message: Message) -> Result<(), RoutingError> {
-        let mut binding = self.queues.lock()?;
-        let publisher = binding.publisher(&message.routing_key.id.clone());
-        match publisher {
-            None => Err(RoutingError::NotFound),
-            Some(mut p) => {
-                info!("Publishing to {:?}", &message.routing_key.id);
-                p.publish(message);
-                Ok(())
+        let publish_err = {
+            let mut binding = self.queues.lock()?;
+            match binding.publisher(&message.routing_key.id.clone()) {
+                None => Err((RoutingError::NotFound, message)),
+                Some(mut publisher) => {
+                    info!("Publishing to {:?}", &message.routing_key.id);
+                    match publisher.publish(message) {
+                        Ok(_) => Ok(()),
+                        Err(msg) => Err((RoutingError::NoRecipients, msg)),
+                    }
+                }
+            }
+        };
+
+        if let Err((err, msg)) = publish_err {
+            self.send_to_dlx(msg)?;
+            match &err {
+                RoutingError::NoRecipients => {},  // This is not a reason to Err the requester.
+                _ => return Err(err),
             }
         }
+
+        Ok(())
     }
 
     /// Receive a message that is valid at the time of calling. During this call, invalid
@@ -88,7 +101,11 @@ impl Router {
         message
     }
 
-    fn receive_until_valid(&mut self, queue: &QueueFilter, for_client: ClientID) -> (Option<Message>, Vec<Message>) {
+    fn receive_until_valid(
+        &mut self,
+        queue: &QueueFilter,
+        for_client: ClientID,
+    ) -> (Option<Message>, Vec<Message>) {
         // TODO the starting capacity can be chosen intelligently if we track i.e. the shortest
         //  ttl of all messages currently in the queue.
         let mut dlx_messages = vec![];
@@ -129,7 +146,11 @@ impl Router {
             DLXPreference::Queue => {
                 let queue_dlx = match self.queues.lock()?.properties(&id) {
                     None => self.default_dlx.clone(),
-                    Some(properties) => properties.user.dlx.clone().unwrap_or(self.default_dlx.clone()),
+                    Some(properties) => properties
+                        .user
+                        .dlx
+                        .clone()
+                        .unwrap_or(self.default_dlx.clone()),
                 };
                 RoutingKey::new(queue_dlx, DLXPreference::Drop)
             }

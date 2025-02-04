@@ -3,7 +3,8 @@ use crate::message_topic::MessageTopic;
 use crate::queue::DequeuedMessage;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::message::Message;
-use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopicLiteral};
+use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId};
+use backend::protocol::routing_error::RoutingError;
 use backend::protocol::QueueProperties;
 use std::collections::HashMap;
 
@@ -19,17 +20,13 @@ pub trait Publishable {
     fn publish(&mut self, message: Message);
 }
 
-// pub trait Publisher<'a> {
-//     fn publish(&'a mut self, message: Message);
-// }
-
 pub struct QueuePublisher<'a> {
     queue: &'a mut MessageQueue,
 }
 
 impl<'a> QueuePublisher<'a> {
     fn publish(&'a mut self, message: Message) {
-        self.queue.publish(message);
+        self.queue.publish(message)
     }
 }
 
@@ -40,9 +37,9 @@ pub struct TopicPublisher<'a> {
 }
 
 impl<'a> TopicPublisher<'a> {
-    fn publish(&'a mut self, message: Message) {
+    fn publish(&'a mut self, message: Message) -> Result<(), Message> {
         self.topic
-            .publish(message, self.f1.clone(), self.f2.clone());
+            .publish(message, self.f1.clone(), self.f2.clone())
     }
 }
 
@@ -52,9 +49,17 @@ pub enum Publisher<'a> {
 }
 
 impl<'a> Publisher<'a> {
-    pub fn publish(&'a mut self, message: Message) {
+    /// Publishes a message to the designated queue. Returns the message if the queue was
+    /// unable to receive it.
+    ///
+    /// # Arguments
+    ///
+    /// * `message`: the message to publish.
+    ///
+    /// returns: `Result<(), Message>`
+    pub fn publish(&'a mut self, message: Message) -> Result<(), Message> {
         match self {
-            Publisher::Queue(q) => q.publish(message),
+            Publisher::Queue(q) => Ok(q.publish(message)),
             Publisher::Topic(t) => t.publish(message),
         }
     }

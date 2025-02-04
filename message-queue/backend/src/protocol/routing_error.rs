@@ -1,5 +1,5 @@
-use std::sync::PoisonError;
 use serde::{Deserialize, Serialize};
+use std::sync::PoisonError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RoutingError {
@@ -11,6 +11,11 @@ pub enum RoutingError {
     NotFound,
     /// When the message was dropped because the router's internal state is poisoned.
     Internal,
+    /// When there are no valid recipients for a message. This usually applies to unused topics.
+    NoRecipients,
+    /// When a message couldn't be published to the DLX because of the DLX
+    /// queue failing to accept it.
+    DLXFailed,
 }
 
 impl<T> From<PoisonError<T>> for RoutingError {
