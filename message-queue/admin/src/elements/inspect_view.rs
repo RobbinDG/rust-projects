@@ -15,10 +15,9 @@ use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, Status, UserQueueProperties};
 use iced::widget::{
     button, checkbox, column, horizontal_space, row, slider, text, text_input, vertical_rule,
-    Column, Row,
+    Column,
 };
 use iced::{Alignment, Element, Length, Task};
-use iced_aw::{badge, style};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -109,18 +108,9 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                         .font(font_heading())
                         .size(SIZE_HEADING)
                 )
-                .push(text(format!(
-                    "DLX: {}",
-                    pretty_print_queue_dlx(&self.props.user.dlx)
-                )))
-                // .push(
-                //     Row::new()
-                //         .push(text("Is DLX"))
-                //         .push(bool_badge(self.props.user.is_dlx))
-                // )
-                // .push(Row::new().push(text("Is System Managed")).push())
                 .push(
                     Table::new()
+                        .push(text("DLX"), text(pretty_print_queue_dlx(&self.props.user.dlx)))
                         .push(text("Is DLX"), bool_badge(self.props.user.is_dlx))
                         .push(
                             text("Is System Managed"),

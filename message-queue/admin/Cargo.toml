@@ -7,6 +7,6 @@ resolver = "2"
 [dependencies]
 backend = { path = "../backend" }
 iced = { version = "0.13.1", features = ["tokio"] }
-iced_aw = { version = "0.11.0", default-features = false, features = ["badge"] }
+iced_aw = { version = "0.11.0", default-features = false, features = ["badge", "grid"] }
 iced_fonts = { version = "0.1.1", features = ["nerd"] }
 tokio = { version = "1.43.0", features = ["full"] }

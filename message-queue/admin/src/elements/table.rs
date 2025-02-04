@@ -1,5 +1,5 @@
 use iced::Element;
-use iced::widget::{row, Column};
+use iced_aw::{grid, grid_row};
 
 pub struct Table<'a, M> {
     data: Vec<(Element<'a, M>, Element<'a, M>)>,
@@ -16,12 +16,12 @@ impl<'a, M> Table<'a, M> {
     }
 }
 
-impl<'a, M: 'a> From<Table<'a, M>> for Element<'a, M> {
+impl<'a, M: 'static> From<Table<'a, M>> for Element<'a, M> {
     fn from(value: Table<'a, M>) -> Self {
-        let mut col = Column::new();
+        let mut grid = grid!().padding(2);
         for (left, right) in value.data {
-            col = col.push(row([left, right]));
+            grid = grid.push(grid_row!(left, right));
         };
-        col.into()
+        grid.into()
     }
 }
