@@ -1,19 +1,19 @@
-use crate::elements::topic_breakdown;
-use crate::elements::topic_breakdown::TopicBreakdown;
+use crate::elements::queue_selector;
+use crate::elements::queue_selector::QueueSelector;
+use crate::fonts::{font_heading, ELEMENT_SPACING, SIZE_HEADING};
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
-use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopicLiteral};
+use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId};
 use backend::protocol::request::{
     CreateQueue, DeleteQueue, GetSubscription, GetTopicBreakdown, Publish, Receive, Subscribe,
 };
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, Status, UserQueueProperties};
-use iced::application::Update;
 use iced::widget::{
-    button, checkbox, column, combo_box, row, slider, text, text_input, vertical_rule,
+    button, checkbox, column, horizontal_space, row, slider, text, text_input, vertical_rule,
 };
-use iced::{Alignment, Element, Task};
+use iced::{Alignment, Element, Length, Task};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -34,17 +34,16 @@ pub enum InspectViewMessage {
     TTLValueChanged(u16),
     TTLPermanentToggle(bool),
     LoadBreakdown,
-    BreakdownLoaded(Option<Vec<(String, Vec<String>)>>),
-    SubtopicCreateSelectionChanged0(TopicLiteral),
-    SubtopicCreateSelectionChanged1(TopicLiteral),
-    CreateSubtopic(String, Option<String>),
     SubtopicCreated,
-    BreakdownMessage(topic_breakdown::Message),
     GetSubscription,
     Subscription(Option<QueueFilter>),
+    Selector(queue_selector::Message),
 }
 
-pub struct InspectView {
+pub struct InspectView<T>
+where
+    T: QueueSelector,
+{
     queue_id: QueueId,
     props: QueueProperties,
     message_body: String,
@@ -52,20 +51,16 @@ pub struct InspectView {
     connector: Arc<Mutex<ServerConnector>>,
     ttl_value: u16,
     ttl_permanent: bool,
-    breakdown_view: TopicBreakdown,
     subscription: Option<QueueFilter>,
-    new_filter_state: (
-        combo_box::State<TopicLiteral>,
-        combo_box::State<TopicLiteral>,
-    ),
-    new_filter_selection: (Option<TopicLiteral>, Option<TopicLiteral>),
+    queue_selector: T,
 }
 
-impl InspectView {
+impl<T: QueueSelector + 'static> InspectView<T> {
     pub fn new(
         connector: Arc<Mutex<ServerConnector>>,
         queue_id: QueueId,
         props: QueueProperties,
+        queue_selector: T,
     ) -> (Self, Task<InspectViewMessage>) {
         let mut window_load_task = Self::get_subscription_task(connector.clone());
         if let QueueId::Topic(name, _, _) = &queue_id {
@@ -81,10 +76,8 @@ impl InspectView {
                 connector,
                 ttl_value: 50,
                 ttl_permanent: false,
-                breakdown_view: TopicBreakdown::new("Breakdown".into()),
                 subscription: None,
-                new_filter_state: (combo_box::State::new(vec![]), combo_box::State::new(vec![])),
-                new_filter_selection: (None, None),
+                queue_selector,
             },
             window_load_task,
         )
@@ -96,23 +89,16 @@ impl InspectView {
             delete_btn = delete_btn.on_press(InspectViewMessage::Delete(self.queue_id.clone()));
         }
         let mut send_message_btn = button("Send Message");
-        let send_queue = match self.queue_id.clone() {
-            QueueId::Topic(name, _, _) => match &self.new_filter_selection {
-                (Some(TopicLiteral::Name(f1)), Some(TopicLiteral::Name(f2))) => {
-                    Some(QueueId::Topic(name, f1.clone(), f2.clone()))
-                }
-                _ => {
-                    None
-                }
-            },
-            q => Some(q),
-        };
+        let send_queue = self.queue_selector.selected();
         if let Some(queue) = send_queue {
             send_message_btn = send_message_btn.on_press(InspectViewMessage::SendMessage(queue));
         }
         column![row![
             column![
-                text("Administration").align_x(Alignment::Center),
+                text("Administration")
+                    .align_x(Alignment::Center)
+                    .font(font_heading())
+                    .size(SIZE_HEADING),
                 text(format!(
                     "DLX: {}",
                     pretty_print_queue_dlx(&self.props.user.dlx)
@@ -126,16 +112,15 @@ impl InspectView {
             ],
             vertical_rule(1),
             column![
-                button("get breakdown").on_press(InspectViewMessage::LoadBreakdown),
-                self.breakdown_view.view().map(|msg| {
-                    match msg {
-                        topic_breakdown::Message::CreateSubtopic(s, ss) => {
-                            InspectViewMessage::CreateSubtopic(s, ss)
-                        }
-                        m => InspectViewMessage::BreakdownMessage(m),
-                    }
-                }),
-                text("Messaging").align_x(Alignment::Center),
+                row![
+                    text("Interfacing").font(font_heading()).size(SIZE_HEADING),
+                    horizontal_space().width(Length::Fill),
+                    button("Reload").on_press(InspectViewMessage::LoadBreakdown),
+                ],
+                self.queue_selector
+                    .view()
+                    .map(|m| InspectViewMessage::Selector(m)),
+                text("Publishing"),
                 text_input("Message body", self.message_body.as_str())
                     .on_input(InspectViewMessage::MessageBodyChanged),
                 row![
@@ -145,26 +130,15 @@ impl InspectView {
                         .on_toggle(InspectViewMessage::TTLPermanentToggle),
                     send_message_btn,
                 ]
-                .spacing(10),
+                .spacing(ELEMENT_SPACING),
+                text("Receiving"),
                 row![
-                    combo_box(
-                        &self.new_filter_state.0,
-                        "topic",
-                        self.new_filter_selection.0.as_ref(),
-                        InspectViewMessage::SubtopicCreateSelectionChanged0,
-                    ),
-                    combo_box(
-                        &self.new_filter_state.1,
-                        "topic",
-                        self.new_filter_selection.1.as_ref(),
-                        InspectViewMessage::SubtopicCreateSelectionChanged1,
-                    ),
                     button("Subscribe").on_press(InspectViewMessage::Subscribe),
-                ],
-                row![
+                    text(nerd::icon_to_char(Nerd::Warning)).font(iced_fonts::NERD_FONT),
                     button("Receive Message").on_press(InspectViewMessage::ReceiveMessage),
                     text(self.received_message.as_str())
-                ],
+                ]
+                .spacing(ELEMENT_SPACING),
                 text(match &self.subscription {
                     None => "Not subscribed to any queue.".to_string(),
                     Some(queue) => {
@@ -181,10 +155,10 @@ impl InspectView {
                     }
                 }),
             ]
-            .spacing(10),
+            .spacing(ELEMENT_SPACING),
         ]
-        .spacing(10)
-        .padding(10),]
+        .spacing(ELEMENT_SPACING)
+        .padding(ELEMENT_SPACING),]
         .into()
     }
 
@@ -269,22 +243,7 @@ impl InspectView {
                     return Self::load_breakdown_task(self.connector.clone(), topic_name.clone());
                 }
             }
-            InspectViewMessage::BreakdownLoaded(breakdown) => {
-                if let Some(data) = breakdown {
-                    let topics: Vec<_> = data
-                        .iter()
-                        .map(|e| TopicLiteral::Name(e.0.clone()))
-                        .collect();
-                    let mut items = vec![TopicLiteral::Wildcard];
-                    items.extend(topics);
-                    self.new_filter_state = (
-                        combo_box::State::new(items),
-                        combo_box::State::new(vec![TopicLiteral::Wildcard]),
-                    );
-                    self.breakdown_view.set_data(data);
-                }
-            }
-            InspectViewMessage::CreateSubtopic(s, ss) => {
+            InspectViewMessage::Selector(queue_selector::Message::CreateSubtopic(s, ss)) => {
                 if let QueueId::Topic(topic, _, _) = &self.queue_id {
                     let connector = self.connector.clone();
                     let topic = NewQueueId::Topic(topic.clone(), Some((s.clone(), ss.clone())));
@@ -295,7 +254,6 @@ impl InspectView {
                 }
             }
             InspectViewMessage::SubtopicCreated => {}
-            InspectViewMessage::BreakdownMessage(msg) => self.breakdown_view.update(msg),
             InspectViewMessage::Deleted => {}
             InspectViewMessage::GetSubscription => {
                 return Self::get_subscription_task(self.connector.clone())
@@ -303,16 +261,7 @@ impl InspectView {
             InspectViewMessage::Subscription(subscription) => {
                 self.subscription = subscription;
             }
-            InspectViewMessage::SubtopicCreateSelectionChanged0(choice) => {
-                let topics = self.breakdown_view.subsubs(&choice);
-                let mut items = vec![TopicLiteral::Wildcard];
-                items.extend(topics);
-                self.new_filter_state.1 = combo_box::State::new(items);
-                self.new_filter_selection = (Some(choice), None);
-            }
-            InspectViewMessage::SubtopicCreateSelectionChanged1(choice) => {
-                self.new_filter_selection.1 = Some(choice);
-            }
+            InspectViewMessage::Selector(m) => self.queue_selector.update(m),
         }
         Task::none()
     }
@@ -321,20 +270,7 @@ impl InspectView {
         &mut self,
         connector: Arc<Mutex<ServerConnector>>,
     ) -> Task<InspectViewMessage> {
-        let queue = match self.queue_id.clone() {
-            QueueId::Topic(name, _, _) => {
-                let f1 = match &self.new_filter_selection.0 {
-                    None => TopicLiteral::Wildcard,
-                    Some(lit) => lit.clone(),
-                };
-                let f2 = match &self.new_filter_selection.1 {
-                    None => TopicLiteral::Wildcard,
-                    Some(lit) => lit.clone(),
-                };
-                QueueFilter::Topic(name, f1, f2)
-            }
-            q => QueueFilter::from(q),
-        };
+        let queue = self.queue_selector.selected_filter();
         Task::perform(
             async move {
                 let mut binding = connector.lock().await;
@@ -363,7 +299,7 @@ impl InspectView {
                     .await
                     .ok()?
             },
-            InspectViewMessage::BreakdownLoaded,
+            move |d| InspectViewMessage::Selector(queue_selector::Message::BreakdownLoaded(d)),
         )
     }
 
