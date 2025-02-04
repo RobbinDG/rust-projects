@@ -1,5 +1,7 @@
+use crate::elements::bool_badge::bool_badge;
 use crate::elements::queue_selector;
 use crate::elements::queue_selector::QueueSelector;
+use crate::elements::table::Table;
 use crate::elements::warning::Warning;
 use crate::fonts::{font_heading, ELEMENT_SPACING, SIZE_HEADING};
 use crate::server_connector::ServerConnector;
@@ -13,8 +15,10 @@ use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{QueueProperties, Status, UserQueueProperties};
 use iced::widget::{
     button, checkbox, column, horizontal_space, row, slider, text, text_input, vertical_rule,
+    Column, Row,
 };
 use iced::{Alignment, Element, Length, Task};
+use iced_aw::{badge, style};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -98,22 +102,32 @@ impl<T: QueueSelector + 'static> InspectView<T> {
             }
         };
         column![row![
-            column![
-                text("Administration")
-                    .align_x(Alignment::Center)
-                    .font(font_heading())
-                    .size(SIZE_HEADING),
-                text(format!(
+            Column::new()
+                .push(
+                    text("Administration")
+                        .align_x(Alignment::Center)
+                        .font(font_heading())
+                        .size(SIZE_HEADING)
+                )
+                .push(text(format!(
                     "DLX: {}",
                     pretty_print_queue_dlx(&self.props.user.dlx)
-                )),
-                text(format!("Is DLX: {}", self.props.user.is_dlx)),
-                text(format!(
-                    "Is System Managed: {}",
-                    self.props.system.is_system
-                )),
-                delete_btn,
-            ],
+                )))
+                // .push(
+                //     Row::new()
+                //         .push(text("Is DLX"))
+                //         .push(bool_badge(self.props.user.is_dlx))
+                // )
+                // .push(Row::new().push(text("Is System Managed")).push())
+                .push(
+                    Table::new()
+                        .push(text("Is DLX"), bool_badge(self.props.user.is_dlx))
+                        .push(
+                            text("Is System Managed"),
+                            bool_badge(self.props.system.is_system)
+                        )
+                )
+                .push(delete_btn),
             vertical_rule(1),
             column![
                 row![

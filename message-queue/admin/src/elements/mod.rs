@@ -10,6 +10,8 @@ mod queue_selector;
 mod direct_selector;
 mod topic_selector;
 mod warning;
+mod bool_badge;
+mod table;
 
 pub use queue_table::QueueTable;
 pub use queue_view::QueueView;
