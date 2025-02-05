@@ -14,8 +14,8 @@ impl DirectSelector {
 }
 
 impl QueueSelector for DirectSelector {
-    fn view(&self) -> Element<Message> {
-        row![].into()
+    fn view(&self) -> impl Into<Element<Message>> {
+        row![]
     }
 
     fn update(&mut self, _: Message) {}

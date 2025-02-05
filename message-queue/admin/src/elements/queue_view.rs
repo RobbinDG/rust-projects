@@ -47,10 +47,7 @@ pub struct QueueView {
 impl Default for QueueView {
     fn default() -> Self {
         QueueView {
-            queue_table: QueueTable::new(
-                ["Queue", "Senders", "Receivers", "# Messages"],
-                [300, 200, 200, 200],
-            ),
+            queue_table: QueueTable::new(["Queue", "Subscribers", "Messages"], [300, 200, 200]),
             new_queue_text: String::new(),
             selected_buffer_type: Some(QueueType::Queue),
             dlx_state: combo_box::State::new(vec![]),

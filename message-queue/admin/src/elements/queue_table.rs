@@ -7,15 +7,15 @@ use iced::{color, font, Alignment, Background, Border, Element, Length};
 use std::iter::zip;
 
 pub struct QueueTable {
-    names: [&'static str; 4],
-    widths: [u16; 4],
+    names: [&'static str; 3],
+    widths: [u16; 3],
     content: Vec<(TopLevelQueueId, [String; 2])>,
     header_font: font::Font,
     height: Length,
 }
 
 impl QueueTable {
-    pub fn new(names: [&'static str; 4], widths: [u16; 4]) -> Self {
+    pub fn new(names: [&'static str; 3], widths: [u16; 3]) -> Self {
         Self {
             names,
             widths,
