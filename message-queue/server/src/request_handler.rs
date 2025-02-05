@@ -2,7 +2,10 @@ use crate::queue_store::QueueStore;
 use crate::router::Router;
 use crate::subscription_manager::SubscriptionManager;
 use backend::protocol::client_id::ClientID;
-use backend::protocol::request::{CheckQueue, CreateQueue, DeleteQueue, GetProperties, GetSubscription, GetTopicBreakdown, ListQueues, Publish, Receive, Subscribe};
+use backend::protocol::request::{
+    CheckQueue, CreateQueue, DeleteQueue, GetProperties, GetSubscription, GetTopicBreakdown,
+    ListQueues, Publish, Receive, Subscribe,
+};
 use backend::protocol::request_error::RequestError;
 use backend::protocol::{QueueProperties, Request, Status, SystemQueueProperties};
 use std::sync::{Arc, Mutex};
@@ -16,11 +19,18 @@ where
 
 pub struct ListQueuesHandler {
     queues: Arc<Mutex<QueueStore>>,
+    subscription_manager: Arc<Mutex<SubscriptionManager>>,
 }
 
 impl ListQueuesHandler {
-    pub fn new(queues: Arc<Mutex<QueueStore>>) -> Self {
-        Self { queues }
+    pub fn new(
+        queues: Arc<Mutex<QueueStore>>,
+        subscription_manager: Arc<Mutex<SubscriptionManager>>,
+    ) -> Self {
+        Self {
+            queues,
+            subscription_manager,
+        }
     }
 }
 
@@ -30,7 +40,16 @@ impl Handler<ListQueues> for ListQueuesHandler {
         _: ListQueues,
         _: ClientID,
     ) -> Result<<ListQueues as Request>::Response, RequestError> {
-        Ok(self.queues.lock()?.list())
+        let store = self.queues.lock()?;
+        let queues = store.list();
+        let mut subscriber_counts = self.subscription_manager.lock()?.subscriber_counts();
+        let mut result = Vec::with_capacity(queues.len());
+        for queue in queues {
+            let subs = subscriber_counts.remove(&queue).unwrap_or(0usize);
+            let messages = store.message_count(&queue);
+            result.push((queue, subs, messages));
+        }
+        Ok(result)
     }
 }
 
@@ -259,12 +278,22 @@ pub struct GetSubscriptionHandler {
 
 impl GetSubscriptionHandler {
     pub fn new(subscription_manager: Arc<Mutex<SubscriptionManager>>) -> Self {
-        Self { subscription_manager }
+        Self {
+            subscription_manager,
+        }
     }
 }
 
 impl Handler<GetSubscription> for GetSubscriptionHandler {
-    fn handle(&mut self, _: GetSubscription, client: ClientID) -> Result<<GetSubscription as Request>::Response, RequestError> {
-        Ok(self.subscription_manager.lock()?.subscription(&client).cloned())
+    fn handle(
+        &mut self,
+        _: GetSubscription,
+        client: ClientID,
+    ) -> Result<<GetSubscription as Request>::Response, RequestError> {
+        Ok(self
+            .subscription_manager
+            .lock()?
+            .subscription(&client)
+            .cloned())
     }
 }

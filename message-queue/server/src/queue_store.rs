@@ -3,8 +3,7 @@ use crate::message_topic::MessageTopic;
 use crate::queue::DequeuedMessage;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::message::Message;
-use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId};
-use backend::protocol::routing_error::RoutingError;
+use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopLevelQueueId};
 use backend::protocol::QueueProperties;
 use std::collections::HashMap;
 
@@ -14,10 +13,6 @@ use std::collections::HashMap;
 pub struct QueueStore {
     directs: HashMap<String, MessageQueue>,
     primary_topics: HashMap<String, MessageTopic>,
-}
-
-pub trait Publishable {
-    fn publish(&mut self, message: Message);
 }
 
 pub struct QueuePublisher<'a> {
@@ -66,7 +61,6 @@ impl<'a> Publisher<'a> {
 }
 
 pub struct QueueReceiver<'a> {
-    client: &'a ClientID,
     queue: &'a mut MessageQueue,
 }
 
@@ -109,23 +103,35 @@ impl QueueStore {
         }
     }
 
-    pub fn list(&self) -> Vec<(QueueId, usize, usize, usize)> {
-        let mut result: Vec<(QueueId, usize, usize, usize)> = self
+    pub fn list(&self) -> Vec<TopLevelQueueId> {
+        let mut result: Vec<TopLevelQueueId> = self
             .directs
             .keys()
             .cloned()
-            .map(|id| (QueueId::Queue(id), 0, 0, 0))
+            .map(TopLevelQueueId::Queue)
             .collect();
-        for (topic_name, _) in &self.primary_topics {
-            let x = (
-                QueueId::Topic(topic_name.clone(), "".into(), "".into()),
-                0usize,
-                0usize,
-                0usize,
-            );
-            result.push(x);
-        }
+        result.extend(
+            self.primary_topics
+                .keys()
+                .cloned()
+                .map(TopLevelQueueId::Topic),
+        );
         result
+    }
+
+    pub fn message_count(&self, queue: &TopLevelQueueId) -> usize {
+        match queue {
+            TopLevelQueueId::Queue(q) => self
+                .directs
+                .get(q)
+                .map(|queue| queue.message_count())
+                .unwrap_or(0),
+            TopLevelQueueId::Topic(t) => self
+                .primary_topics
+                .get(t)
+                .map(|topic| topic.message_count())
+                .unwrap_or(0),
+        }
     }
 
     pub fn create(&mut self, queue_id: NewQueueId, properties: QueueProperties) {
@@ -169,22 +175,17 @@ impl QueueStore {
         self.primary_topics.get(name)
     }
 
-    pub fn properties(&self, queue_id: &QueueId) -> Option<&QueueProperties> {
+    pub fn properties(&self, queue_id: &TopLevelQueueId) -> Option<&QueueProperties> {
         match queue_id {
-            QueueId::Queue(name) => self.directs.get(name).map(|q| q.properties()),
-            QueueId::Topic(name, _, _) => self.primary_topics.get(name).map(|q| q.properties()),
+            TopLevelQueueId::Queue(name) => self.directs.get(name).map(|q| q.properties()),
+            TopLevelQueueId::Topic(name) => self.primary_topics.get(name).map(|q| q.properties()),
         }
     }
 
-    pub fn delete(&mut self, queue_id: &QueueId) -> bool {
+    pub fn delete(&mut self, queue_id: &TopLevelQueueId) -> bool {
         match queue_id {
-            QueueId::Queue(name) => self.directs.remove(name).is_some(),
-            QueueId::Topic(name, _, _) => {
-                // TODO semantics surrounding removing topics can be complicated, so they
-                //  are not yet implemented rigorously. Perhaps a separate key for deletion
-                //  is required.
-                self.primary_topics.remove(name).is_some()
-            }
+            TopLevelQueueId::Queue(name) => self.directs.remove(name).is_some(),
+            TopLevelQueueId::Topic(name) => self.primary_topics.remove(name).is_some(),
         }
     }
 
@@ -210,12 +211,10 @@ impl QueueStore {
         for_queue: &QueueFilter,
     ) -> Option<Receiver<'a>> {
         match for_queue {
-            QueueFilter::Queue(name) => self.directs.get_mut(name).map(|queue| {
-                Receiver::Queue(QueueReceiver {
-                    queue,
-                    client: for_client,
-                })
-            }),
+            QueueFilter::Queue(name) => self
+                .directs
+                .get_mut(name)
+                .map(|queue| Receiver::Queue(QueueReceiver { queue })),
             QueueFilter::Topic(topic, _, _) => self.primary_topics.get_mut(topic).map(|topic| {
                 Receiver::Topic(TopicReceiver {
                     topic,

@@ -7,7 +7,7 @@ use crate::elements::topic_selector::TopicSelector;
 use crate::elements::{overlay_dialog, QueueView};
 use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
-use backend::protocol::queue_id::QueueId;
+use backend::protocol::queue_id::TopLevelQueueId;
 use backend::protocol::request::GetProperties;
 use backend::protocol::QueueProperties;
 use iced::widget::{column, vertical_space};
@@ -23,8 +23,8 @@ pub enum Message {
 
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
-    InspectBuffer(QueueId),
-    InspectInfo(QueueId, QueueProperties),
+    InspectBuffer(TopLevelQueueId),
+    InspectInfo(TopLevelQueueId, QueueProperties),
     CloseInspect,
     BufferView(UIMessage),
     Inspector(InspectViewMessage),
@@ -170,7 +170,7 @@ impl AdminView {
             }
             AdminViewMessage::InspectInfo(address, properties) => {
                 let (view, load_task) = match &address {
-                    QueueId::Queue(name) => {
+                    TopLevelQueueId::Queue(name) => {
                         let title = address.to_string();
                         let name = name.clone();
                         let (inspect_view, load_task) = InspectView::new(
@@ -184,7 +184,7 @@ impl AdminView {
                             load_task,
                         )
                     }
-                    QueueId::Topic(name, _, _) => {
+                    TopLevelQueueId::Topic(name) => {
                         let title = address.to_string();
                         let name = name.clone();
                         let (inspect_view, load_task) = InspectView::new(

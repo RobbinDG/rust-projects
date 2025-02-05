@@ -1,3 +1,4 @@
+use std::cmp::max;
 use crate::queue::{DequeuedMessage, Queue};
 use crate::topic_filter_tree::TopicFilterTree;
 use backend::protocol::client_id::ClientID;
@@ -82,5 +83,13 @@ impl MessageTopic {
             }
         }
         Ok(())
+    }
+
+    pub fn message_count(&self) -> usize {
+        let mut max_count = 0usize;
+        for queue in self.client_queues.values() {
+            max_count = max_count.max(queue.len());
+        }
+        max_count
     }
 }

@@ -2,7 +2,7 @@ use crate::elements::QueueTable;
 use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
-use backend::protocol::queue_id::{NewQueueId, QueueId, QueueType};
+use backend::protocol::queue_id::{NewQueueId, QueueId, QueueType, TopLevelQueueId};
 use backend::protocol::request::{CreateQueue, ListQueues};
 use backend::protocol::UserQueueProperties;
 use iced::widget::{button, checkbox, column, combo_box, radio, row, text_input};
@@ -19,11 +19,11 @@ struct DLXChoice {
 #[derive(Debug, Clone)]
 pub enum UIMessage {
     Refresh,
-    NewTableData(Vec<(QueueId, usize, usize, usize)>),
+    NewTableData(Vec<(TopLevelQueueId, usize, usize)>),
     NewQueueName(String),
     CreateQueue,
     SelectBufferType(QueueType),
-    InspectBuffer(QueueId),
+    InspectBuffer(TopLevelQueueId),
     SetDLXChoice(DLXChoice),
     SetIsDLX(bool),
 }
@@ -147,9 +147,11 @@ impl QueueView {
                 let mut options = vec![DLXChoice { value: None }];
                 self.queue_table.clear();
                 for queue_data in data {
-                    options.push(DLXChoice {
-                        value: Some(queue_data.0.clone()),
-                    });
+                    if let TopLevelQueueId::Queue(name) = &queue_data.0 {
+                        options.push(DLXChoice {
+                            value: Some(QueueId::Queue(name.clone())),
+                        });
+                    }
                     self.queue_table.push(queue_data);
                 }
                 self.dlx_state = combo_box::State::new(options);

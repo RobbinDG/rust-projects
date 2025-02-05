@@ -1,6 +1,6 @@
 use crate::queue_store::QueueStore;
 use backend::protocol::client_id::ClientID;
-use backend::protocol::queue_id::{QueueFilter};
+use backend::protocol::queue_id::{QueueFilter, TopLevelQueueId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use log::info;
@@ -81,5 +81,13 @@ impl SubscriptionManager {
     /// returns: `Option<&QueueId>` the queue ID of the current subscription of the client.
     pub fn subscription(&self, client: &ClientID) -> Option<&QueueFilter> {
         self.subscriptions.get(client)
+    }
+
+    pub fn subscriber_counts(&self) -> HashMap<TopLevelQueueId, usize> {
+        let mut counts = HashMap::new();
+        for (_, filter) in &self.subscriptions {
+            counts.entry(filter.to_top_level()).and_modify(|v| *v += 1);
+        }
+        counts
     }
 }

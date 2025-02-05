@@ -8,7 +8,7 @@ use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
-use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId};
+use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopLevelQueueId};
 use backend::protocol::request::{
     CreateQueue, DeleteQueue, GetSubscription, GetTopicBreakdown, Publish, Receive, Subscribe,
 };
@@ -26,7 +26,7 @@ use tokio::sync::Mutex;
 
 #[derive(Clone, Debug)]
 pub enum InspectViewMessage {
-    Delete(QueueId),
+    Delete(TopLevelQueueId),
     Deleted,
     MessageBodyChanged(String),
     SendMessage(QueueId),
@@ -49,7 +49,7 @@ pub struct InspectView<T>
 where
     T: QueueSelector,
 {
-    queue_id: QueueId,
+    queue_id: TopLevelQueueId,
     props: QueueProperties,
     message_body: String,
     received_message: String,
@@ -64,12 +64,12 @@ where
 impl<T: QueueSelector + 'static> InspectView<T> {
     pub fn new(
         connector: Arc<Mutex<ServerConnector>>,
-        queue_id: QueueId,
+        queue_id: TopLevelQueueId,
         props: QueueProperties,
         queue_selector: T,
     ) -> (Self, Task<Result<InspectViewMessage, ()>>) {
         let mut window_load_task = Self::get_subscription_task(connector.clone());
-        if let QueueId::Topic(name, _, _) = &queue_id {
+        if let TopLevelQueueId::Topic(name) = &queue_id {
             window_load_task =
                 window_load_task.chain(Self::load_breakdown_task(connector.clone(), name.clone()));
         }
@@ -159,8 +159,8 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                         None => "Not subscribed to any queue.".to_string(),
                         Some(queue) => {
                             let is_this_queue = match (&queue, &self.queue_id) {
-                                (QueueFilter::Queue(a), QueueId::Queue(b)) => a == b,
-                                (QueueFilter::Topic(a, _, _), QueueId::Topic(b, _, _)) => a == b,
+                                (QueueFilter::Queue(a), TopLevelQueueId::Queue(b)) => a == b,
+                                (QueueFilter::Topic(a, _, _), TopLevelQueueId::Topic(b)) => a == b,
                                 _ => false,
                             };
                             if is_this_queue {
@@ -248,12 +248,12 @@ impl<T: QueueSelector + 'static> InspectView<T> {
             InspectViewMessage::TTLValueChanged(val) => self.ttl_value = val,
             InspectViewMessage::TTLPermanentToggle(toggle) => self.ttl_permanent = toggle,
             InspectViewMessage::LoadBreakdown => {
-                if let QueueId::Topic(topic_name, _, _) = &self.queue_id {
+                if let TopLevelQueueId::Topic(topic_name) = &self.queue_id {
                     return Self::load_breakdown_task(self.connector.clone(), topic_name.clone());
                 }
             }
             InspectViewMessage::Selector(queue_selector::Message::CreateSubtopic(s, ss)) => {
-                if let QueueId::Topic(topic, _, _) = &self.queue_id {
+                if let TopLevelQueueId::Topic(topic) = &self.queue_id {
                     return request_task(
                         self.connector.clone(),
                         CreateQueue {

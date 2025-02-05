@@ -28,6 +28,10 @@ impl Queue {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
+
     pub fn push(&mut self, message: Message) {
         self.messages.push_back(QueuedMessage {
             message,

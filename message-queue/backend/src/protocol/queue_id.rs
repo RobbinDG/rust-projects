@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 const TOPIC_DELIMITER: &str = ":";
 
@@ -39,6 +39,29 @@ impl Display for TopicLiteral {
     }
 }
 
+/// The top level definition of a [QueueId], without any subtopics.
+#[derive(Serialize, Deserialize, Debug, Eq, Hash, PartialEq, Clone)]
+pub enum TopLevelQueueId {
+    Queue(String),
+    Topic(String),
+}
+
+impl TopLevelQueueId {
+    pub fn to_string(&self) -> String {
+        match self {
+            TopLevelQueueId::Queue(name) => name.clone(),
+            TopLevelQueueId::Topic(name) => format!(
+                "{}{}{}{}{}",
+                name.to_string(),
+                TOPIC_DELIMITER,
+                TopicLiteral::Wildcard.to_string(),
+                TOPIC_DELIMITER,
+                TopicLiteral::Wildcard.to_string(),
+            ),
+        }
+    }
+}
+
 /// A generalised form of [QueueId], used for receiving from queues using
 /// generic path arguments.
 #[derive(Serialize, Deserialize, Debug, Eq, Hash, PartialEq, Clone)]
@@ -59,6 +82,13 @@ impl QueueFilter {
                 TOPIC_DELIMITER,
                 c.to_string()
             ),
+        }
+    }
+
+    pub fn to_top_level(&self) -> TopLevelQueueId {
+        match &self {
+            QueueFilter::Queue(q) => TopLevelQueueId::Queue(q.clone()),
+            QueueFilter::Topic(t, _, _) => TopLevelQueueId::Topic(t.clone()),
         }
     }
 }
@@ -83,13 +113,6 @@ impl From<QueueId> for QueueFilter {
 }
 
 impl QueueId {
-    pub fn queue_type(&self) -> QueueType {
-        match self {
-            QueueId::Queue(_) => QueueType::Queue,
-            QueueId::Topic(_, _, _) => QueueType::Topic,
-        }
-    }
-
     pub fn to_string(&self) -> String {
         match self {
             QueueId::Queue(name) => name.clone(),
@@ -102,6 +125,19 @@ impl QueueId {
                 c.to_string()
             ),
         }
+    }
+
+    pub fn to_top_level(&self) -> TopLevelQueueId {
+        match self {
+            QueueId::Queue(q) => TopLevelQueueId::Queue(q.clone()),
+            QueueId::Topic(t, _, _) => TopLevelQueueId::Topic(t.clone()),
+        }
+    }
+}
+
+impl From<QueueId> for TopLevelQueueId {
+    fn from(value: QueueId) -> Self {
+        value.to_top_level()
     }
 }
 

@@ -16,7 +16,6 @@ trait ClientCollection {
         filter_by_level: &Vec<TopicLiteral>,
         depth: usize,
     ) -> bool;
-    fn get_clients(&self, filter_by_level: &Vec<TopicLiteral>, depth: usize) -> HashSet<&ClientID>;
 }
 
 type TopicFilterTreeLeaf = HashSet<ClientID>;
@@ -30,10 +29,6 @@ impl ClientCollection for TopicFilterTreeLeaf {
     fn remove_client(&mut self, client_id: &ClientID, _: &Vec<TopicLiteral>, _: usize) -> bool {
         self.remove(&client_id);
         true
-    }
-
-    fn get_clients(&self, _: &Vec<TopicLiteral>, _: usize) -> HashSet<&ClientID> {
-        self.iter().collect::<HashSet<&ClientID>>()
     }
 }
 
@@ -76,7 +71,12 @@ impl<T: ClientCollection> ClientCollection for TopicFilterTreeNode<T> {
         }
     }
 
-    fn remove_client(&mut self, client_id: &ClientID, filter_by_level: &Vec<TopicLiteral>, depth: usize) -> bool {
+    fn remove_client(
+        &mut self,
+        client_id: &ClientID,
+        filter_by_level: &Vec<TopicLiteral>,
+        depth: usize,
+    ) -> bool {
         let filter = filter_by_level
             .get(depth)
             .unwrap_or(&TopicLiteral::Wildcard);
@@ -93,27 +93,6 @@ impl<T: ClientCollection> ClientCollection for TopicFilterTreeNode<T> {
                 true
             }
         }
-    }
-
-    fn get_clients(&self, filter_by_level: &Vec<TopicLiteral>, depth: usize) -> HashSet<&ClientID> {
-        let filter = filter_by_level
-            .get(depth)
-            .unwrap_or(&TopicLiteral::Wildcard);
-
-        let mut elements = self.terminating.iter().collect::<HashSet<&ClientID>>();
-        match filter {
-            TopicLiteral::Name(name) => {
-                if let Some(sub) = self.sub.get(name) {
-                    elements.extend(sub.get_clients(filter_by_level, depth + 1));
-                }
-            }
-            TopicLiteral::Wildcard => {
-                for sub in self.sub.values() {
-                    elements.extend(sub.get_clients(filter_by_level, depth + 1));
-                }
-            }
-        };
-        elements
     }
 }
 
@@ -194,10 +173,6 @@ impl TopicFilterTree {
         Self::get_clients_filter_tree(&self.topics, address)
             .into_iter()
             .collect()
-    }
-
-    fn get_client_set(&mut self, filter: &Vec<TopicLiteral>) -> HashSet<&ClientID> {
-        self.topics.get_clients(filter, 0)
     }
 
     fn get_clients_filter_tree(

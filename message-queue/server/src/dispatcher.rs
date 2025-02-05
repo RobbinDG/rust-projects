@@ -37,7 +37,7 @@ impl RequestDispatcher {
         let subscription_manager =
             Arc::new(Mutex::new(SubscriptionManager::new(queue_store.clone())));
         Self {
-            list_queues: ListQueuesHandler::new(queue_store.clone()),
+            list_queues: ListQueuesHandler::new(queue_store.clone(), subscription_manager.clone()),
             check_queue: CheckQueueHandler::new(queue_store.clone()),
             create: CreateQueueHandler::new(queue_store.clone()),
             delete: DeleteQueueHandler::new(queue_store.clone()),

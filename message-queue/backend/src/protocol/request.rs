@@ -1,5 +1,5 @@
 use crate::protocol::message::Message;
-use crate::protocol::queue_id::{NewQueueId, QueueFilter, QueueId};
+use crate::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopLevelQueueId};
 use crate::protocol::queue_properties::UserQueueProperties;
 use crate::protocol::routing_error::RoutingError;
 use crate::protocol::status_code::Status;
@@ -27,12 +27,12 @@ pub struct CreateQueue {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DeleteQueue {
-    pub queue_name: QueueId,
+    pub queue_name: TopLevelQueueId,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProperties {
-    pub queue: QueueId,
+    pub queue: TopLevelQueueId,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -57,7 +57,7 @@ pub struct GetTopicBreakdown {
 pub struct GetSubscription {}
 
 impl Request for ListQueues {
-    type Response = Vec<(QueueId, usize, usize, usize)>;
+    type Response = Vec<(TopLevelQueueId, usize, usize)>;
 }
 
 impl Request for CheckQueue {

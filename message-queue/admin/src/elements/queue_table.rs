@@ -1,5 +1,5 @@
 use crate::elements::queue_view::UIMessage;
-use backend::protocol::queue_id::QueueId;
+use backend::protocol::queue_id::TopLevelQueueId;
 use iced::widget::{
     column, container, horizontal_rule, hover, mouse_area, row, scrollable, text, Column, Row,
 };
@@ -9,7 +9,7 @@ use std::iter::zip;
 pub struct QueueTable {
     names: [&'static str; 4],
     widths: [u16; 4],
-    content: Vec<(QueueId, [String; 3])>,
+    content: Vec<(TopLevelQueueId, [String; 2])>,
     header_font: font::Font,
     height: Length,
 }
@@ -32,10 +32,10 @@ impl QueueTable {
         self.content.clear();
     }
 
-    pub fn push(&mut self, row: (QueueId, usize, usize, usize)) {
+    pub fn push(&mut self, row: (TopLevelQueueId, usize, usize)) {
         self.content.push((
-            row.0,
-            [row.1.to_string(), row.2.to_string(), row.3.to_string()],
+            row.0.into(),
+            [row.1.to_string(), row.2.to_string()],
         ));
     }
 
@@ -65,8 +65,8 @@ impl QueueTable {
         column![header, divider, scrollable(rows_column).width(Length::Fill)].height(self.height)
     }
 
-    fn make_content_row(&self, row_content: &(QueueId, [String; 3])) -> Element<UIMessage> {
-        let rows: [String; 4] = std::array::from_fn(|i| {
+    fn make_content_row(&self, row_content: &(TopLevelQueueId, [String; 2])) -> Element<UIMessage> {
+        let rows: [String; 3] = std::array::from_fn(|i| {
             if i == 0 {
                 row_content.0.to_string()
             } else {

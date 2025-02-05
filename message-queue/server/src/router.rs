@@ -144,7 +144,7 @@ impl Router {
                 RoutingKey::new(self.default_dlx.clone(), DLXPreference::Drop)
             }
             DLXPreference::Queue => {
-                let queue_dlx = match self.queues.lock()?.properties(&id) {
+                let queue_dlx = match self.queues.lock()?.properties(&id.to_top_level()) {
                     None => self.default_dlx.clone(),
                     Some(properties) => properties
                         .user

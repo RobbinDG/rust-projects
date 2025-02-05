@@ -1,5 +1,4 @@
 use crate::queue::{DequeuedMessage, Queue};
-use crate::queue_store::Publishable;
 use backend::protocol::message::Message;
 use backend::protocol::QueueProperties;
 
@@ -23,10 +22,12 @@ impl MessageQueue {
     pub fn properties(&self) -> &QueueProperties {
         &self.properties
     }
-}
 
-impl Publishable for MessageQueue {
-    fn publish(&mut self, message: Message) {
+    pub fn publish(&mut self, message: Message) {
         self.queue.push(message);
+    }
+
+    pub fn message_count(&self) -> usize {
+        self.queue.len()
     }
 }
