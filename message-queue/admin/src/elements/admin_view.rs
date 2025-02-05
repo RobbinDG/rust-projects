@@ -1,10 +1,10 @@
 use crate::elements::connection_interface::{ConnectionInterface, ConnectionInterfaceMessage};
 use crate::elements::direct_selector::DirectSelector;
 use crate::elements::inspect_view::{InspectView, InspectViewMessage};
-use crate::elements::overlay_dialog::{Message, OverlayDialog};
+use crate::elements::overlay_dialog::OverlayDialog;
 use crate::elements::queue_view::UIMessage;
 use crate::elements::topic_selector::TopicSelector;
-use crate::elements::QueueView;
+use crate::elements::{overlay_dialog, QueueView};
 use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
 use backend::protocol::queue_id::QueueId;
@@ -14,6 +14,12 @@ use iced::widget::{column, vertical_space};
 use iced::{Element, Task};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+#[derive(Clone, Debug)]
+pub enum Message {
+    View(AdminViewMessage),
+    RequestSuccess(AdminViewMessage),
+}
 
 #[derive(Clone, Debug)]
 pub enum AdminViewMessage {
@@ -78,20 +84,20 @@ impl Default for AdminView {
 }
 
 impl AdminView {
-    pub fn view(&self) -> Element<AdminViewMessage> {
-        match &self.inspect_view {
+    pub fn view(&self) -> Element<Message> {
+        let element: Element<AdminViewMessage> = match &self.inspect_view {
             Inspect::Topic(inspect_view) => inspect_view
                 .view(|inspect| inspect.view())
                 .map(|msg| match msg {
-                    Message::Close => AdminViewMessage::CloseInspect,
-                    Message::Dialog(msg) => AdminViewMessage::from(msg),
+                    overlay_dialog::Message::Close => AdminViewMessage::CloseInspect,
+                    overlay_dialog::Message::Dialog(msg) => AdminViewMessage::from(msg),
                 })
                 .into(),
             Inspect::Direct(inspect_view) => inspect_view
                 .view(|inspect| inspect.view())
                 .map(|msg| match msg {
-                    Message::Close => AdminViewMessage::CloseInspect,
-                    Message::Dialog(msg) => AdminViewMessage::from(msg),
+                    overlay_dialog::Message::Close => AdminViewMessage::CloseInspect,
+                    overlay_dialog::Message::Dialog(msg) => AdminViewMessage::from(msg),
                 })
                 .into(),
             Inspect::None => {
@@ -107,12 +113,32 @@ impl AdminView {
                 cols = cols.spacing(2).padding(10);
                 cols.into()
             }
+        };
+        element.map(Message::View)
+    }
+
+    pub fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::View(msg) => self.update_view_message(msg),
+            Message::RequestSuccess(msg) => {
+                self.connection_interface.set_connected(true);
+                self.update_view_message(msg)
+            }
         }
     }
 
-    pub fn update(&mut self, message: AdminViewMessage) -> Task<AdminViewMessage> {
+    pub fn update_view_message(&mut self, message: AdminViewMessage) -> Task<Message> {
         match message {
-            AdminViewMessage::BufferView(m) => self.buffer_view.update(m, self.connector.clone()),
+            AdminViewMessage::BufferView(m) => {
+                return self.buffer_view.update(m, self.connector.clone()).map(
+                    |result| match result {
+                        Ok(val) => Message::RequestSuccess(AdminViewMessage::from(val)),
+                        Err(_) => Message::View(AdminViewMessage::ConnectionUpdated(
+                            ConnectionInterfaceMessage::Connected(false),
+                        )),
+                    },
+                )
+            }
             AdminViewMessage::Inspector(m) => match &mut self.inspect_view {
                 Inspect::None => Task::none(),
                 Inspect::Direct(inspect_view) => inspect_view.update(|inspect| inspect.update(m)),
@@ -120,19 +146,20 @@ impl AdminView {
             }
             .map(AdminViewMessage::from),
             AdminViewMessage::InspectBuffer(address) => {
-                request_task(
+                return request_task(
                     self.connector.clone(),
                     GetProperties {
                         queue: address.clone(),
                     },
-                    move |response| AdminViewMessage::InspectInfo(address.clone(), response.unwrap()),
+                    move |response| {
+                        AdminViewMessage::InspectInfo(address.clone(), response.unwrap())
+                    },
                 )
-                .map(|result| {
-                    result.unwrap_or_else(|_| {
-                        AdminViewMessage::ConnectionUpdated(ConnectionInterfaceMessage::Connected(
-                            false,
-                        ))
-                    })
+                .map(|result| match result {
+                    Ok(r) => Message::RequestSuccess(r),
+                    Err(_) => Message::View(AdminViewMessage::ConnectionUpdated(
+                        ConnectionInterfaceMessage::Connected(false),
+                    )),
                 })
             }
             AdminViewMessage::InspectInfo(address, properties) => {
@@ -187,5 +214,6 @@ impl AdminView {
             }
             _ => Task::none(),
         }
+        .map(Message::View)
     }
 }

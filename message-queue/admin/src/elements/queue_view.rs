@@ -1,4 +1,5 @@
 use crate::elements::QueueTable;
+use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::queue_id::{NewQueueId, QueueId, QueueType};
@@ -18,7 +19,7 @@ struct DLXChoice {
 #[derive(Debug, Clone)]
 pub enum UIMessage {
     Refresh,
-    NewTableData(Option<Vec<(QueueId, usize, usize, usize)>>),
+    NewTableData(Vec<(QueueId, usize, usize, usize)>),
     NewQueueName(String),
     CreateQueue,
     SelectBufferType(QueueType),
@@ -105,37 +106,36 @@ impl QueueView {
         element.map(Message::from)
     }
 
-    pub fn update<Message>(
+    pub fn update(
         &mut self,
         message: UIMessage,
         connector: Arc<Mutex<ServerConnector>>,
-    ) -> Task<Message>
-    where
-        Message: From<UIMessage> + Clone + Send + 'static,
-    {
+    ) -> Task<Result<UIMessage, ()>> {
         match message {
             UIMessage::Refresh => {
-                return Task::future(async move { Self::refresh(connector).await })
-                    .map(|m| m.into())
+                return request_task(connector.clone(), ListQueues {}, UIMessage::NewTableData);
             }
             UIMessage::NewQueueName(s) => {
                 self.new_queue_text = s;
             }
             UIMessage::CreateQueue => match self.selected_buffer_type {
                 Some(queue_type) => {
-                    let queue = match queue_type {
-                        QueueType::Queue => NewQueueId::Queue(self.new_queue_text.clone()),
-                        QueueType::Topic => NewQueueId::Topic(self.new_queue_text.clone(), None),
-                    };
-                    let dlx_choice = self.current_dlx.clone();
-                    let is_dlx = self.is_dlx;
-                    return Task::perform(
-                            async move {
-                                Self::create(connector.clone(), queue, dlx_choice, is_dlx).await
+                    return request_task(
+                        connector.clone(),
+                        CreateQueue {
+                            queue_address: match queue_type {
+                                QueueType::Queue => NewQueueId::Queue(self.new_queue_text.clone()),
+                                QueueType::Topic => {
+                                    NewQueueId::Topic(self.new_queue_text.clone(), None)
+                                }
                             },
-                            |_| UIMessage::Refresh,
-                        )
-                        .map(|m| m.into());
+                            properties: UserQueueProperties {
+                                is_dlx: self.is_dlx,
+                                dlx: self.current_dlx.value.clone(),
+                            },
+                        },
+                        |_| UIMessage::Refresh,
+                    );
                 }
                 None => {}
             },
@@ -143,20 +143,17 @@ impl QueueView {
                 self.selected_buffer_type = Some(t);
             }
             UIMessage::InspectBuffer(_) => {}
-            UIMessage::NewTableData(data) => match data {
-                Some(response) => {
-                    let mut options = vec![DLXChoice { value: None }];
-                    self.queue_table.clear();
-                    for queue_data in response {
-                        options.push(DLXChoice {
-                            value: Some(queue_data.0.clone()),
-                        });
-                        self.queue_table.push(queue_data);
-                    }
-                    self.dlx_state = combo_box::State::new(options);
+            UIMessage::NewTableData(data) => {
+                let mut options = vec![DLXChoice { value: None }];
+                self.queue_table.clear();
+                for queue_data in data {
+                    options.push(DLXChoice {
+                        value: Some(queue_data.0.clone()),
+                    });
+                    self.queue_table.push(queue_data);
                 }
-                None => println!("Failed to fetch queue data."),
-            },
+                self.dlx_state = combo_box::State::new(options);
+            }
             UIMessage::SetDLXChoice(choice) => self.current_dlx = choice,
             UIMessage::SetIsDLX(toggle) => self.is_dlx = toggle,
         }
@@ -181,15 +178,5 @@ impl QueueView {
                 .await
             {}
         }
-    }
-
-    async fn refresh(connector: Arc<Mutex<ServerConnector>>) -> UIMessage {
-        UIMessage::NewTableData(match connector.lock().await.client().await {
-            Ok(client) => client.transfer_admin_request(ListQueues {}).await.ok(),
-            Err(err) => {
-                println!("{err:?}");
-                None
-            }
-        })
     }
 }

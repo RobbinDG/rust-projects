@@ -55,7 +55,6 @@ impl ConnectionInterface {
         }
 
         let y = <Element<ConnectionInterfaceMessage>>::from(row);
-        // let x = row as ;
         y.map(Message::from)
     }
 
@@ -71,25 +70,27 @@ impl ConnectionInterface {
             ConnectionInterfaceMessage::DesiredAddressChanged(desired_address) => {
                 self.entered_address_valid = SocketAddr::from_str(desired_address.as_str()).is_ok();
                 self.entered_address = desired_address;
-                Task::none()
+                self.set_connected(false);
             }
             ConnectionInterfaceMessage::Reconnect => {
                 if self.entered_address_valid {
                     let queue_id = self.entered_address.clone();
-                    Task::perform(
+                    return Task::perform(
                         async move {
                             connector.lock().await.connect_to(queue_id).await;
                         },
                         |_| ConnectionInterfaceMessage::Connected(true).into(),
-                    )
-                } else {
-                    Task::none()
+                    );
                 }
             }
-            ConnectionInterfaceMessage::Connected(_) => {
-                self.connected = true;
-                Task::none()
+            ConnectionInterfaceMessage::Connected(val) => {
+                self.set_connected(val);
             }
         }
+        Task::none()
+    }
+
+    pub fn set_connected(&mut self, connected: bool) {
+        self.connected = connected;
     }
 }
