@@ -4,6 +4,7 @@ use crate::elements::queue_selector::QueueSelector;
 use crate::elements::table::Table;
 use crate::elements::warning::Warning;
 use crate::fonts::{font_heading, ELEMENT_SPACING, SIZE_HEADING};
+use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
 use backend::protocol::message::{Message, TTL};
@@ -66,7 +67,7 @@ impl<T: QueueSelector + 'static> InspectView<T> {
         queue_id: QueueId,
         props: QueueProperties,
         queue_selector: T,
-    ) -> (Self, Task<InspectViewMessage>) {
+    ) -> (Self, Task<Result<InspectViewMessage, ()>>) {
         let mut window_load_task = Self::get_subscription_task(connector.clone());
         if let QueueId::Topic(name, _, _) = &queue_id {
             window_load_task =
@@ -183,77 +184,58 @@ impl<T: QueueSelector + 'static> InspectView<T> {
         .into()
     }
 
-    pub fn update(&mut self, message: InspectViewMessage) -> Task<InspectViewMessage> {
+    pub fn update(&mut self, message: InspectViewMessage) -> Task<Result<InspectViewMessage, ()>> {
         match message {
             InspectViewMessage::Delete(addr) => {
-                let connector = self.connector.clone();
-                let addr2 = addr.clone();
-                return Task::perform(
-                    async move { Self::delete_buffer(connector, addr2).await },
-                    move |_| InspectViewMessage::Deleted,
+                return request_task(
+                    self.connector.clone(),
+                    DeleteQueue { queue_name: addr },
+                    |_| InspectViewMessage::Deleted,
                 );
             }
             InspectViewMessage::MessageBodyChanged(s) => self.message_body = s,
             InspectViewMessage::SendMessage(queue) => {
-                let connector = self.connector.clone();
-                let body = self.message_body.clone();
                 let ttl = if self.ttl_permanent {
                     TTL::Permanent
                 } else {
                     TTL::Duration(Duration::from_secs(self.ttl_value as u64))
                 };
-                return Task::perform(
-                    async move {
-                        let mut binding = connector.lock().await;
-                        binding
-                            .client()
-                            .await
-                            .ok()?
-                            .transfer_admin_request(Publish {
-                                message: Message {
-                                    payload: body,
-                                    routing_key: RoutingKey {
-                                        id: queue,
-                                        dlx: DLXPreference::Default,
-                                    },
-                                    ttl,
-                                },
-                            })
-                            .await
-                            .ok()
+                return request_task(
+                    self.connector.clone(),
+                    Publish {
+                        message: Message {
+                            payload: self.message_body.clone(),
+                            routing_key: RoutingKey {
+                                id: queue,
+                                dlx: DLXPreference::Default,
+                            },
+                            ttl,
+                        },
                     },
-                    move |result| {
-                        if result.is_some() {
-                            InspectViewMessage::MessageSent
-                        } else {
-                            InspectViewMessage::SendFailure
-                        }
+                    |a| match a {
+                        Ok(_) => InspectViewMessage::MessageSent,
+                        Err(_) => InspectViewMessage::SendFailure,
                     },
                 );
             }
             InspectViewMessage::MessageSent => {}
             InspectViewMessage::SendFailure => {}
             InspectViewMessage::Subscribe => {
-                return self
-                    .subscribe_task(self.connector.clone())
-                    .chain(Self::get_subscription_task(self.connector.clone()));
+                return request_task(
+                    self.connector.clone(),
+                    Subscribe {
+                        queue: self.queue_selector.selected_filter().into(),
+                    },
+                    |_| InspectViewMessage::Subscribed,
+                )
+                .chain(Self::get_subscription_task(self.connector.clone()));
             }
             InspectViewMessage::Subscribed => {}
             InspectViewMessage::ReceiveMessage => {
-                let connector = self.connector.clone();
-                return Task::perform(
-                    async move {
-                        let mut binding = connector.lock().await;
-                        let client = binding.client().await.ok()?;
-                        client.transfer_admin_request(Receive {}).await.ok()?
-                    },
-                    move |result| match result {
-                        Some(Message { payload, .. }) => {
-                            InspectViewMessage::MessageReceived(payload)
-                        }
-                        _ => InspectViewMessage::NoMessageAvailable,
-                    },
-                );
+                return request_task(self.connector.clone(), Receive {}, |result| match result {
+                    Some(Message { payload, .. }) => InspectViewMessage::MessageReceived(payload),
+                    _ => InspectViewMessage::NoMessageAvailable,
+                });
             }
             InspectViewMessage::MessageReceived(m) => {
                 self.message_log.push_front(self.received_message.clone());
@@ -272,10 +254,18 @@ impl<T: QueueSelector + 'static> InspectView<T> {
             }
             InspectViewMessage::Selector(queue_selector::Message::CreateSubtopic(s, ss)) => {
                 if let QueueId::Topic(topic, _, _) = &self.queue_id {
-                    let connector = self.connector.clone();
-                    let topic = NewQueueId::Topic(topic.clone(), Some((s.clone(), ss.clone())));
-                    return Task::perform(
-                        async move { Self::create(connector.clone(), topic).await },
+                    return request_task(
+                        self.connector.clone(),
+                        CreateQueue {
+                            queue_address: NewQueueId::Topic(
+                                topic.clone(),
+                                Some((s.clone(), ss.clone())),
+                            ),
+                            properties: UserQueueProperties {
+                                is_dlx: false,
+                                dlx: None,
+                            },
+                        },
                         |_| InspectViewMessage::SubtopicCreated,
                     );
                 }
@@ -293,53 +283,31 @@ impl<T: QueueSelector + 'static> InspectView<T> {
     fn subscribe_task(
         &mut self,
         connector: Arc<Mutex<ServerConnector>>,
-    ) -> Task<InspectViewMessage> {
-        let queue = self.queue_selector.selected_filter();
-        Task::perform(
-            async move {
-                let mut binding = connector.lock().await;
-                let client = binding.client().await.ok()?;
-                client
-                    .transfer_admin_request(Subscribe {
-                        queue: queue.into(),
-                    })
-                    .await
-                    .ok()
+    ) -> Task<Result<InspectViewMessage, ()>> {
+        request_task(
+            connector,
+            Subscribe {
+                queue: self.queue_selector.selected_filter().into(),
             },
-            move |_| InspectViewMessage::Subscribed,
+            |_| InspectViewMessage::Subscribed,
         )
     }
 
     fn load_breakdown_task(
         connector: Arc<Mutex<ServerConnector>>,
         topic_name: String,
-    ) -> Task<InspectViewMessage> {
-        Task::perform(
-            async move {
-                let mut binding = connector.lock().await;
-                let client = binding.client().await.ok()?;
-                client
-                    .transfer_admin_request(GetTopicBreakdown { topic_name })
-                    .await
-                    .ok()?
-            },
-            move |d| InspectViewMessage::Selector(queue_selector::Message::BreakdownLoaded(d)),
-        )
-    }
-
-    fn get_subscription_task(connector: Arc<Mutex<ServerConnector>>) -> Task<InspectViewMessage> {
-        Task::perform(Self::get_subscription(connector), move |payload| {
-            InspectViewMessage::Subscription(payload)
+    ) -> Task<Result<InspectViewMessage, ()>> {
+        request_task(connector, GetTopicBreakdown { topic_name }, move |d| {
+            InspectViewMessage::Selector(queue_selector::Message::BreakdownLoaded(d))
         })
     }
 
-    async fn get_subscription(connector: Arc<Mutex<ServerConnector>>) -> Option<QueueFilter> {
-        let mut binding = connector.lock().await;
-        let client = binding.client().await.ok()?;
-        client
-            .transfer_admin_request(GetSubscription {})
-            .await
-            .ok()?
+    fn get_subscription_task(
+        connector: Arc<Mutex<ServerConnector>>,
+    ) -> Task<Result<InspectViewMessage, ()>> {
+        request_task(connector, GetSubscription {}, move |payload| {
+            InspectViewMessage::Subscription(payload)
+        })
     }
 
     async fn create(connector: Arc<Mutex<ServerConnector>>, queue_id: NewQueueId) {

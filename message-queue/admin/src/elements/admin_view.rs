@@ -139,12 +139,18 @@ impl AdminView {
                     },
                 )
             }
-            AdminViewMessage::Inspector(m) => match &mut self.inspect_view {
-                Inspect::None => Task::none(),
-                Inspect::Direct(inspect_view) => inspect_view.update(|inspect| inspect.update(m)),
-                Inspect::Topic(inspect_view) => inspect_view.update(|inspect| inspect.update(m)),
+            AdminViewMessage::Inspector(m) => {
+                return match &mut self.inspect_view {
+                    Inspect::None => Task::none(),
+                    Inspect::Direct(inspect_view) => {
+                        inspect_view.update(|inspect| inspect.update(m))
+                    }
+                    Inspect::Topic(inspect_view) => {
+                        inspect_view.update(|inspect| inspect.update(m))
+                    }
+                }
+                .map(Self::map_task)
             }
-            .map(AdminViewMessage::from),
             AdminViewMessage::InspectBuffer(address) => {
                 return request_task(
                     self.connector.clone(),
@@ -194,11 +200,12 @@ impl AdminView {
                     }
                 };
                 self.inspect_view = view;
-                load_task.map(AdminViewMessage::from)
+                return load_task.map(Self::map_task);
             }
-            AdminViewMessage::ConnectionUpdated(m) => {
-                self.connection_interface.update(m, self.connector.clone())
-            }
+            AdminViewMessage::ConnectionUpdated(m) => self
+                .connection_interface
+                .update(m, self.connector.clone())
+                .map(AdminViewMessage::ConnectionUpdated),
             AdminViewMessage::CloseInspect => {
                 match self.inspect_view.take() {
                     Inspect::Direct(inspect_view) => {
@@ -215,5 +222,17 @@ impl AdminView {
             _ => Task::none(),
         }
         .map(Message::View)
+    }
+
+    pub fn map_task<M>(msg: Result<M, ()>) -> Message
+    where
+        AdminViewMessage: From<M>,
+    {
+        match msg {
+            Ok(msg) => Message::RequestSuccess(AdminViewMessage::from(msg)),
+            Err(_) => Message::View(AdminViewMessage::ConnectionUpdated(
+                ConnectionInterfaceMessage::Connected(false),
+            )),
+        }
     }
 }
