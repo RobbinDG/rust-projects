@@ -140,6 +140,7 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                 ],
                 self.queue_selector
                     .view()
+                    .into()
                     .map(|m| InspectViewMessage::Selector(m)),
                 text("Publishing"),
                 text_input("Message body", self.message_body.as_str())

@@ -12,7 +12,7 @@ pub enum Message {
 }
 
 pub trait QueueSelector {
-    fn view(&self) -> Element<Message>;
+    fn view(&self) -> impl Into<Element<Message>>;
 
     fn update(&mut self, message: Message);
 

@@ -1,10 +1,10 @@
 use crate::elements::queue_selector::{Message, QueueSelector};
 use crate::elements::topic_breakdown;
 use crate::elements::topic_breakdown::TopicBreakdown;
-use crate::fonts::ELEMENT_SPACING_HORIZONTAL;
+use crate::fonts::{ELEMENT_SPACING_HORIZONTAL, ELEMENT_SPACING_VERTICAL};
 use backend::protocol::queue_id::{QueueFilter, QueueId, TopicLiteral};
-use iced::widget::{column, row};
 use iced::widget::{combo_box, text};
+use iced::widget::{Column, Row};
 use iced::Element;
 
 pub struct TopicSelector {
@@ -29,33 +29,30 @@ impl TopicSelector {
 }
 
 impl QueueSelector for TopicSelector {
-    fn view(&self) -> Element<Message> {
-        column![
-            self.breakdown_view.view().map(|msg| {
-                match msg {
-                    topic_breakdown::Message::CreateSubtopic(s, ss) => {
-                        Message::CreateSubtopic(s, ss)
-                    }
-                    m => Message::BreakdownMessage(m),
-                }
-            }),
-            row![
-                text("Topic Selection"),
-                combo_box(
-                    &self.new_filter_state.0,
-                    "topic",
-                    self.new_filter_selection.0.as_ref(),
-                    Message::SubtopicCreateSelectionChanged0,
-                ),
-                combo_box(
-                    &self.new_filter_state.1,
-                    "topic",
-                    self.new_filter_selection.1.as_ref(),
-                    Message::SubtopicCreateSelectionChanged1,
-                ),
-            ].spacing(ELEMENT_SPACING_HORIZONTAL)
-        ]
-        .into()
+    fn view(&self) -> impl Into<Element<Message>> {
+        Column::new()
+            .spacing(ELEMENT_SPACING_VERTICAL)
+            .push(self.breakdown_view.view().map(|msg| match msg {
+                topic_breakdown::Message::CreateSubtopic(s, ss) => Message::CreateSubtopic(s, ss),
+                m => Message::BreakdownMessage(m),
+            }))
+            .push(
+                Row::new()
+                    .spacing(ELEMENT_SPACING_HORIZONTAL)
+                    .push(text("Topic Selection"))
+                    .push(combo_box(
+                        &self.new_filter_state.0,
+                        "topic",
+                        self.new_filter_selection.0.as_ref(),
+                        Message::SubtopicCreateSelectionChanged0,
+                    ))
+                    .push(combo_box(
+                        &self.new_filter_state.1,
+                        "topic",
+                        self.new_filter_selection.1.as_ref(),
+                        Message::SubtopicCreateSelectionChanged1,
+                    )),
+            )
     }
 
     fn update(&mut self, message: Message) {
