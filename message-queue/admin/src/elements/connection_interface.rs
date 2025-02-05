@@ -1,5 +1,6 @@
+use crate::fonts::{ELEMENT_SPACING_HORIZONTAL, ELEMENT_SPACING_VERTICAL};
 use crate::server_connector::ServerConnector;
-use iced::widget::{button, container, row, text, text_input};
+use iced::widget::{button, container, text, text_input, Column, Row};
 use iced::{Alignment, Element, Length, Task};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -19,11 +20,12 @@ pub struct ConnectionInterface {
 }
 
 impl ConnectionInterface {
-    pub fn new() -> Self {
+    pub fn new(initial_address: String) -> Self {
+        let valid = Self::validate_address(&initial_address);
         Self {
             connected: false,
-            entered_address: "".into(),
-            entered_address_valid: false,
+            entered_address: initial_address,
+            entered_address_valid: valid,
         }
     }
 
@@ -35,13 +37,16 @@ impl ConnectionInterface {
         if self.entered_address_valid {
             reconnect_btn = reconnect_btn.on_press(ConnectionInterfaceMessage::Reconnect);
         }
-        let mut row = row![
-            text_input("Address", self.entered_address.as_str())
-                .on_input(ConnectionInterfaceMessage::DesiredAddressChanged),
-            reconnect_btn,
-        ];
+        let row = Row::new()
+            .spacing(ELEMENT_SPACING_HORIZONTAL)
+            .push(
+                text_input("Address", self.entered_address.as_str())
+                    .on_input(ConnectionInterfaceMessage::DesiredAddressChanged),
+            )
+            .push(reconnect_btn);
+        let mut col = Column::new().spacing(ELEMENT_SPACING_VERTICAL).push(row);
         if !self.connected {
-            row = row.push(
+            col = col.push(
                 container(
                     text("Couldn't connect to server.")
                         .width(Length::Fill)
@@ -54,7 +59,7 @@ impl ConnectionInterface {
             );
         }
 
-        let y = <Element<ConnectionInterfaceMessage>>::from(row);
+        let y = <Element<ConnectionInterfaceMessage>>::from(col);
         y.map(Message::from)
     }
 
@@ -68,7 +73,7 @@ impl ConnectionInterface {
     {
         match message {
             ConnectionInterfaceMessage::DesiredAddressChanged(desired_address) => {
-                self.entered_address_valid = SocketAddr::from_str(desired_address.as_str()).is_ok();
+                self.entered_address_valid = Self::validate_address(&desired_address);
                 self.entered_address = desired_address;
                 self.set_connected(false);
             }
@@ -77,9 +82,9 @@ impl ConnectionInterface {
                     let queue_id = self.entered_address.clone();
                     return Task::perform(
                         async move {
-                            connector.lock().await.connect_to(queue_id).await;
+                            connector.lock().await.connect_to(queue_id).await
                         },
-                        |_| ConnectionInterfaceMessage::Connected(true).into(),
+                        |connected| ConnectionInterfaceMessage::Connected(connected).into(),
                     );
                 }
             }
@@ -88,6 +93,10 @@ impl ConnectionInterface {
             }
         }
         Task::none()
+    }
+
+    fn validate_address(desired_address: &String) -> bool {
+        SocketAddr::from_str(desired_address.as_str()).is_ok()
     }
 
     pub fn set_connected(&mut self, connected: bool) {

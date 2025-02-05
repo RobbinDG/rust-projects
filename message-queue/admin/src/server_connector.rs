@@ -10,10 +10,10 @@ pub struct ServerConnector {
 }
 
 impl ServerConnector {
-    pub fn new() -> Self {
+    pub fn new(initial_address: String) -> Self {
         Self {
             client: Some(Client::Disconnected(DisconnectedClient::new(
-                "127.0.0.1:1234".to_string(),
+                initial_address,
             ))),
         }
     }
@@ -41,17 +41,18 @@ impl ServerConnector {
         Err("Couldn't connect".to_string())
     }
 
-    pub async fn connect_to(&mut self, addr: String) {
+    pub async fn connect_to(&mut self, addr: String) -> bool {
         if let Some(client) = self.client.take() {
             if let Client::Connected(c) = client {
                 c.disconnect();
             }
         }
         let new_client = DisconnectedClient::new(addr);
-        let _ = self.client.insert(match new_client.connect().await {
+        let client = self.client.insert(match new_client.connect().await {
             Ok(c) => Client::Connected(c),
             Err(e) => Client::Disconnected(e.server),
         });
+        matches!(client, Client::Connected(_))
     }
 
     async fn attempt_connect(c: DisconnectedClient<String>) -> Client {

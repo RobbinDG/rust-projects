@@ -1,7 +1,7 @@
 use crate::elements::queue_selector::{Message, QueueSelector};
 use crate::elements::topic_breakdown;
 use crate::elements::topic_breakdown::TopicBreakdown;
-use crate::fonts::ELEMENT_SPACING;
+use crate::fonts::ELEMENT_SPACING_HORIZONTAL;
 use backend::protocol::queue_id::{QueueFilter, QueueId, TopicLiteral};
 use iced::widget::{column, row};
 use iced::widget::{combo_box, text};
@@ -53,7 +53,7 @@ impl QueueSelector for TopicSelector {
                     self.new_filter_selection.1.as_ref(),
                     Message::SubtopicCreateSelectionChanged1,
                 ),
-            ].spacing(ELEMENT_SPACING)
+            ].spacing(ELEMENT_SPACING_HORIZONTAL)
         ]
         .into()
     }

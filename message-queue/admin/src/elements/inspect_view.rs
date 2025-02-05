@@ -3,7 +3,7 @@ use crate::elements::queue_selector;
 use crate::elements::queue_selector::QueueSelector;
 use crate::elements::table::Table;
 use crate::elements::warning::Warning;
-use crate::fonts::{font_heading, ELEMENT_SPACING, SIZE_HEADING};
+use crate::fonts::{font_heading, ELEMENT_SPACING_HORIZONTAL, SIZE_HEADING};
 use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
@@ -13,7 +13,7 @@ use backend::protocol::request::{
     CreateQueue, DeleteQueue, GetSubscription, GetTopicBreakdown, Publish, Receive, Subscribe,
 };
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
-use backend::protocol::{QueueProperties, Status, UserQueueProperties};
+use backend::protocol::{QueueProperties, UserQueueProperties};
 use iced::widget::{
     button, checkbox, column, horizontal_space, row, slider, text, text_input, vertical_rule,
     Column, Row,
@@ -151,7 +151,7 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                         .on_toggle(InspectViewMessage::TTLPermanentToggle),
                     send_message_btn,
                 ]
-                .spacing(ELEMENT_SPACING),
+                .spacing(ELEMENT_SPACING_HORIZONTAL),
                 text("Receiving"),
                 row![
                     button("Subscribe").on_press(InspectViewMessage::Subscribe),
@@ -171,16 +171,16 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                         }
                     })
                 ]
-                .spacing(ELEMENT_SPACING),
+                .spacing(ELEMENT_SPACING_HORIZONTAL),
                 Row::new()
                     .push(button("Receive Message").on_press(InspectViewMessage::ReceiveMessage))
                     .push(text(format!("Received: {}", self.received_message))),
                 message_log.padding(Padding::ZERO.left(20)).spacing(2)
             ]
-            .spacing(ELEMENT_SPACING),
+            .spacing(ELEMENT_SPACING_HORIZONTAL),
         ]
-        .spacing(ELEMENT_SPACING)
-        .padding(ELEMENT_SPACING),]
+        .spacing(ELEMENT_SPACING_HORIZONTAL)
+        .padding(ELEMENT_SPACING_HORIZONTAL),]
         .into()
     }
 

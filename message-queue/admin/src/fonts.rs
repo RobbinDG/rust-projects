@@ -11,4 +11,5 @@ pub fn font_heading() -> Font {
 }
 pub const SIZE_HEADING: u16 = 20;
 
-pub const ELEMENT_SPACING: u16 = 10;
+pub const ELEMENT_SPACING_HORIZONTAL: u16 = 10;
+pub const ELEMENT_SPACING_VERTICAL: u16 = 4;

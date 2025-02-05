@@ -72,12 +72,13 @@ pub struct AdminView {
 
 impl Default for AdminView {
     fn default() -> Self {
-        let connector = Arc::new(Mutex::new(ServerConnector::new()));
+        let address = "127.0.0.1:1234".to_string();
+        let connector = Arc::new(Mutex::new(ServerConnector::new(address.clone())));
         Self {
             connector,
             buffer_view: QueueView::default(),
             inspect_view: Inspect::None,
-            connection_interface: ConnectionInterface::new(),
+            connection_interface: ConnectionInterface::new(address),
         }
     }
 }
