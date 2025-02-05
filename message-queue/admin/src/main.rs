@@ -3,6 +3,7 @@ use crate::elements::admin_view::AdminView;
 mod elements;
 mod fonts;
 mod util;
+pub mod make_request;
 
 fn main() -> iced::Result {
     iced::application(

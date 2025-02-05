@@ -7,8 +7,8 @@ use crate::protocol::QueueProperties;
 use serde::{Deserialize, Serialize};
 use std::str;
 
-pub trait Request {
-    type Response: Serialize + for<'de> Deserialize<'de> + Sized;
+pub trait Request: Serialize + for<'de> Deserialize<'de> + Send {
+    type Response: Serialize + for<'de> Deserialize<'de> + Sized + Send;
 }
 
 #[derive(Serialize, Deserialize, Debug)]

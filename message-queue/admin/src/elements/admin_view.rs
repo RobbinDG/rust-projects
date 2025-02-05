@@ -5,6 +5,7 @@ use crate::elements::overlay_dialog::{Message, OverlayDialog};
 use crate::elements::queue_view::UIMessage;
 use crate::elements::topic_selector::TopicSelector;
 use crate::elements::QueueView;
+use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
 use backend::protocol::queue_id::QueueId;
 use backend::protocol::request::GetProperties;
@@ -68,7 +69,7 @@ impl Default for AdminView {
     fn default() -> Self {
         let connector = Arc::new(Mutex::new(ServerConnector::new()));
         Self {
-            connector: connector.clone(),
+            connector,
             buffer_view: QueueView::default(),
             inspect_view: Inspect::None,
             connection_interface: ConnectionInterface::new(),
@@ -119,31 +120,20 @@ impl AdminView {
             }
             .map(AdminViewMessage::from),
             AdminViewMessage::InspectBuffer(address) => {
-                let connection = self.connector.clone();
-
-                Task::perform(
-                    async move {
-                        if let Ok(client) = connection.lock().await.client().await {
-                            let address_2 = address.clone();
-                            Some((
-                                address_2,
-                                client
-                                    .transfer_admin_request(GetProperties { queue: address })
-                                    .await,
-                            ))
-                        } else {
-                            None
-                        }
+                request_task(
+                    self.connector.clone(),
+                    GetProperties {
+                        queue: address.clone(),
                     },
-                    move |maybe_data| match maybe_data {
-                        Some((address, properties)) => {
-                            AdminViewMessage::InspectInfo(address, properties.unwrap().unwrap())
-                        }
-                        None => AdminViewMessage::ConnectionUpdated(
-                            ConnectionInterfaceMessage::Connected(false),
-                        ),
-                    },
+                    move |response| AdminViewMessage::InspectInfo(address.clone(), response.unwrap()),
                 )
+                .map(|result| {
+                    result.unwrap_or_else(|_| {
+                        AdminViewMessage::ConnectionUpdated(ConnectionInterfaceMessage::Connected(
+                            false,
+                        ))
+                    })
+                })
             }
             AdminViewMessage::InspectInfo(address, properties) => {
                 let (view, load_task) = match &address {
