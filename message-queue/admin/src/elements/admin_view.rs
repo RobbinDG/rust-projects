@@ -29,7 +29,6 @@ pub enum AdminViewMessage {
     BufferView(UIMessage),
     Inspector(InspectViewMessage),
     ConnectionUpdated(ConnectionInterfaceMessage),
-    Nothing,
 }
 
 impl From<ConnectionInterfaceMessage> for AdminViewMessage {
@@ -219,7 +218,6 @@ impl AdminView {
                 self.inspect_view = Inspect::None;
                 Task::none()
             }
-            _ => Task::none(),
         }
         .map(Message::View)
     }

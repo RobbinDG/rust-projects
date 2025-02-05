@@ -159,24 +159,4 @@ impl QueueView {
         }
         Task::none()
     }
-
-    async fn create(
-        connector: Arc<Mutex<ServerConnector>>,
-        queue_id: NewQueueId,
-        dlx: DLXChoice,
-        is_dlx: bool,
-    ) {
-        if let Ok(client) = connector.lock().await.client().await {
-            if let Err(_) = client
-                .transfer_admin_request(CreateQueue {
-                    queue_address: queue_id,
-                    properties: UserQueueProperties {
-                        is_dlx,
-                        dlx: dlx.value,
-                    },
-                })
-                .await
-            {}
-        }
-    }
 }

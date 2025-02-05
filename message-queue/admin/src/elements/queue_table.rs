@@ -1,8 +1,7 @@
 use crate::elements::queue_view::UIMessage;
 use backend::protocol::queue_id::QueueId;
 use iced::widget::{
-    column, container, horizontal_rule, hover, mouse_area, row, scrollable, text, Column,
-    Row,
+    column, container, horizontal_rule, hover, mouse_area, row, scrollable, text, Column, Row,
 };
 use iced::{color, font, Alignment, Background, Border, Element, Length};
 use std::iter::zip;
@@ -66,10 +65,6 @@ impl QueueTable {
         column![header, divider, scrollable(rows_column).width(Length::Fill)].height(self.height)
     }
 
-    pub fn queue_ids(&self) -> Vec<QueueId> {
-        self.content.iter().map(|r| r.0.clone()).collect()
-    }
-
     fn make_content_row(&self, row_content: &(QueueId, [String; 3])) -> Element<UIMessage> {
         let rows: [String; 4] = std::array::from_fn(|i| {
             if i == 0 {
@@ -96,10 +91,5 @@ impl QueueTable {
         ))
         .on_press(UIMessage::InspectBuffer(row_content.0.clone()))
         .into()
-    }
-
-    pub fn height<T: Into<Length>>(mut self, height: T) -> Self {
-        self.height = height.into();
-        self
     }
 }

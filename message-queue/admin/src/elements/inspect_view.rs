@@ -280,19 +280,6 @@ impl<T: QueueSelector + 'static> InspectView<T> {
         Task::none()
     }
 
-    fn subscribe_task(
-        &mut self,
-        connector: Arc<Mutex<ServerConnector>>,
-    ) -> Task<Result<InspectViewMessage, ()>> {
-        request_task(
-            connector,
-            Subscribe {
-                queue: self.queue_selector.selected_filter().into(),
-            },
-            |_| InspectViewMessage::Subscribed,
-        )
-    }
-
     fn load_breakdown_task(
         connector: Arc<Mutex<ServerConnector>>,
         topic_name: String,
@@ -308,31 +295,5 @@ impl<T: QueueSelector + 'static> InspectView<T> {
         request_task(connector, GetSubscription {}, move |payload| {
             InspectViewMessage::Subscription(payload)
         })
-    }
-
-    async fn create(connector: Arc<Mutex<ServerConnector>>, queue_id: NewQueueId) {
-        if let Ok(client) = connector.lock().await.client().await {
-            if let Err(_) = client
-                .transfer_admin_request(CreateQueue {
-                    queue_address: queue_id,
-                    properties: UserQueueProperties {
-                        is_dlx: false,
-                        dlx: None,
-                    },
-                })
-                .await
-            {}
-        }
-    }
-
-    async fn delete_buffer(connector: Arc<Mutex<ServerConnector>>, s: QueueId) -> Option<Status> {
-        if let Ok(client) = connector.lock().await.client().await {
-            client
-                .transfer_admin_request(DeleteQueue { queue_name: s })
-                .await
-                .ok()
-        } else {
-            None
-        }
     }
 }

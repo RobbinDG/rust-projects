@@ -16,7 +16,6 @@ pub struct TopicBreakdown {
     breakdown_view: Collapsible,
     sub_breakdown_views: Vec<(String, Collapsible, Vec<String>)>,
     new_subtopic_name: String,
-    subsub_selection: Option<(usize, usize)>,
 }
 
 impl TopicBreakdown {
@@ -46,7 +45,6 @@ impl TopicBreakdown {
             breakdown_view: Collapsible::new(title, false),
             sub_breakdown_views: Vec::new(),
             new_subtopic_name: String::new(),
-            subsub_selection: None,
         }
     }
 
