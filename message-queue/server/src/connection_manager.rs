@@ -28,15 +28,14 @@ impl ConnectionManager {
     }
 
     pub async fn start(&self) {
+        let dispatcher = Arc::new(RequestDispatcher::new(self.queues.clone()));
         loop {
             match self.listener.accept().await {
                 Ok((stream, addr)) => {
                     info!("New client: {addr}");
-                    // let worker = SetupWorker::new(stream);
-                    let dispatcher = RequestDispatcher::new(self.queues.clone());
-                    let worker = RequestWorker::new(StreamIO::new(stream), dispatcher);
+                    let worker = RequestWorker::new(StreamIO::new(stream), dispatcher.clone());
                     tokio::spawn(async move {
-                        let exit_status = worker.run().await;
+                        let _exit_status = worker.run().await;
                     });
                     info!("connected");
                 }

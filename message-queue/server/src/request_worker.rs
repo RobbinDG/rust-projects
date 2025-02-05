@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::dispatcher::RequestDispatcher;
 use backend::protocol::request_error::RequestError;
 use backend::protocol::request::SupportedRequest;
@@ -6,11 +7,11 @@ use log::error;
 
 pub struct RequestWorker {
     stream_io: StreamIO,
-    dispatcher: RequestDispatcher,
+    dispatcher: Arc<RequestDispatcher>,
 }
 
 impl RequestWorker {
-    pub fn new(stream: StreamIO, dispatcher: RequestDispatcher) -> Self {
+    pub fn new(stream: StreamIO, dispatcher: Arc<RequestDispatcher>) -> Self {
         Self {
             stream_io: stream,
             dispatcher,

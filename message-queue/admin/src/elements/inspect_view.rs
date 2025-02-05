@@ -7,7 +7,7 @@ use crate::fonts::{font_heading, ELEMENT_SPACING_HORIZONTAL, SIZE_HEADING};
 use crate::make_request::request_task;
 use crate::server_connector::ServerConnector;
 use crate::util::pretty_print_queue_dlx;
-use backend::protocol::message::{Message, TTL};
+use backend::protocol::message::{Message, MessagePayload, TTL};
 use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopLevelQueueId};
 use backend::protocol::request::{
     CreateQueue, DeleteQueue, GetSubscription, GetTopicBreakdown, Publish, Receive, Subscribe,
@@ -205,7 +205,7 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                     self.connector.clone(),
                     Publish {
                         message: Message {
-                            payload: self.message_body.clone(),
+                            payload: self.message_body.clone().into(),
                             routing_key: RoutingKey {
                                 id: queue,
                                 dlx: DLXPreference::Default,
@@ -234,7 +234,10 @@ impl<T: QueueSelector + 'static> InspectView<T> {
             InspectViewMessage::Subscribed => {}
             InspectViewMessage::ReceiveMessage => {
                 return request_task(self.connector.clone(), Receive {}, |result| match result {
-                    Some(Message { payload, .. }) => InspectViewMessage::MessageReceived(payload),
+                    Some(Message {
+                        payload: MessagePayload::Text(payload),
+                        ..
+                    }) => InspectViewMessage::MessageReceived(payload),
                     _ => InspectViewMessage::NoMessageAvailable,
                 });
             }

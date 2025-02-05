@@ -105,7 +105,7 @@ impl log::Log for QueueLogger {
         });
 
         let message = Message {
-            payload: record.args().to_string(),
+            payload: record.args().to_string().into(),
             routing_key: RoutingKey {
                 id: queue,
                 dlx: DLXPreference::Default,

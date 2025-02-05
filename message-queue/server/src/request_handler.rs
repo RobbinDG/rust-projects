@@ -14,7 +14,7 @@ pub trait Handler<R>
 where
     R: Request,
 {
-    fn handle(&mut self, request: R, _: ClientID) -> Result<R::Response, RequestError>;
+    fn handle(&self, request: R, _: ClientID) -> Result<R::Response, RequestError>;
 }
 
 pub struct ListQueuesHandler {
@@ -36,7 +36,7 @@ impl ListQueuesHandler {
 
 impl Handler<ListQueues> for ListQueuesHandler {
     fn handle(
-        &mut self,
+        &self,
         _: ListQueues,
         _: ClientID,
     ) -> Result<<ListQueues as Request>::Response, RequestError> {
@@ -65,7 +65,7 @@ impl CheckQueueHandler {
 
 impl Handler<CheckQueue> for CheckQueueHandler {
     fn handle(
-        &mut self,
+        &self,
         request: CheckQueue,
         _: ClientID,
     ) -> Result<<CheckQueue as Request>::Response, RequestError> {
@@ -89,7 +89,7 @@ impl CreateQueueHandler {
 
 impl Handler<CreateQueue> for CreateQueueHandler {
     fn handle(
-        &mut self,
+        &self,
         request: CreateQueue,
         _: ClientID,
     ) -> Result<<CreateQueue as Request>::Response, RequestError> {
@@ -99,8 +99,11 @@ impl Handler<CreateQueue> for CreateQueueHandler {
             system: SystemQueueProperties { is_system: false },
             user: request.properties,
         };
-        queues.create(request.queue_address.clone(), properties);
-        Ok(Status::Created)
+        if queues.create(request.queue_address.clone(), properties) {
+            Ok(Status::Created)
+        } else {
+            Ok(Status::Exists)
+        }
     }
 }
 
@@ -116,7 +119,7 @@ impl DeleteQueueHandler {
 
 impl Handler<DeleteQueue> for DeleteQueueHandler {
     fn handle(
-        &mut self,
+        &self,
         request: DeleteQueue,
         _: ClientID,
     ) -> Result<<DeleteQueue as Request>::Response, RequestError> {
@@ -142,7 +145,7 @@ impl GetPropertiesHandler {
 
 impl Handler<GetProperties> for GetPropertiesHandler {
     fn handle(
-        &mut self,
+        &self,
         request: GetProperties,
         _: ClientID,
     ) -> Result<<GetProperties as Request>::Response, RequestError> {
@@ -166,7 +169,7 @@ impl PublishHandler {
 
 impl Handler<Publish> for PublishHandler {
     fn handle(
-        &mut self,
+        &self,
         request: Publish,
         _: ClientID,
     ) -> Result<<Publish as Request>::Response, RequestError> {
@@ -189,7 +192,7 @@ impl SubscribeHandler {
 
 impl Handler<Subscribe> for SubscribeHandler {
     fn handle(
-        &mut self,
+        &self,
         request: Subscribe,
         client_id: ClientID,
     ) -> Result<<Subscribe as Request>::Response, RequestError> {
@@ -226,7 +229,7 @@ impl ReceiveHandler {
 
 impl Handler<Receive> for ReceiveHandler {
     fn handle(
-        &mut self,
+        &self,
         _: Receive,
         client: ClientID,
     ) -> Result<<Receive as Request>::Response, RequestError> {
@@ -252,7 +255,7 @@ impl GetTopicBreakdownHandler {
 
 impl Handler<GetTopicBreakdown> for GetTopicBreakdownHandler {
     fn handle(
-        &mut self,
+        &self,
         request: GetTopicBreakdown,
         _: ClientID,
     ) -> Result<<GetTopicBreakdown as Request>::Response, RequestError> {
@@ -286,7 +289,7 @@ impl GetSubscriptionHandler {
 
 impl Handler<GetSubscription> for GetSubscriptionHandler {
     fn handle(
-        &mut self,
+        &self,
         _: GetSubscription,
         client: ClientID,
     ) -> Result<<GetSubscription as Request>::Response, RequestError> {

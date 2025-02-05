@@ -134,10 +134,10 @@ impl QueueStore {
         }
     }
 
-    pub fn create(&mut self, queue_id: NewQueueId, properties: QueueProperties) {
+    pub fn create(&mut self, queue_id: NewQueueId, properties: QueueProperties) -> bool {
         match queue_id {
             NewQueueId::Queue(name) => {
-                self.directs.insert(name, MessageQueue::new(properties));
+                self.directs.insert(name, MessageQueue::new(properties)).is_some()
             }
             NewQueueId::Topic(name, sub) => {
                 let topic = self
@@ -145,10 +145,13 @@ impl QueueStore {
                     .entry(name)
                     .or_insert_with(|| MessageTopic::new(properties));
                 if let Some(sub) = sub {
-                    topic.create_subtopic(sub)
+                    topic.create_subtopic(sub);
+                    true
+                } else {
+                    false
                 }
             }
-        };
+        }
     }
 
     pub fn exists(&self, queue_id: &QueueId) -> bool {

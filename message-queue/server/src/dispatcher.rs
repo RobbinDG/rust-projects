@@ -59,21 +59,21 @@ impl RequestDispatcher {
     /// returns: `Result<Vec<u8, Global>, RequestError>` The byte-encoded result or a request
     ///     error.
     pub async fn dispatch(
-        &mut self,
+        &self,
         request: SupportedRequest,
         client: ClientID,
     ) -> Result<Vec<u8>, RequestError> {
         match request {
-            SupportedRequest::ListQueues(r) => handle_and_encode(r, &mut self.list_queues, client),
-            SupportedRequest::CheckQueue(r) => handle_and_encode(r, &mut self.check_queue, client),
-            SupportedRequest::CreateQueue(r) => handle_and_encode(r, &mut self.create, client),
-            SupportedRequest::DeleteQueue(r) => handle_and_encode(r, &mut self.delete, client),
-            SupportedRequest::GetProperties(r) => handle_and_encode(r, &mut self.get_props, client),
-            SupportedRequest::Publish(r) => handle_and_encode(r, &mut self.publish, client),
-            SupportedRequest::Subscribe(r) => handle_and_encode(r, &mut self.subscribe, client),
-            SupportedRequest::Receive(r) => handle_and_encode(r, &mut self.receive, client),
-            SupportedRequest::GetTopicBreakdown(r) => handle_and_encode(r, &mut self.get_topic_breakdown, client),
-            SupportedRequest::GetSubscription(r) => handle_and_encode(r, &mut self.get_subscription, client),
+            SupportedRequest::ListQueues(r) => handle_and_encode(r, &self.list_queues, client),
+            SupportedRequest::CheckQueue(r) => handle_and_encode(r, &self.check_queue, client),
+            SupportedRequest::CreateQueue(r) => handle_and_encode(r, &self.create, client),
+            SupportedRequest::DeleteQueue(r) => handle_and_encode(r, &self.delete, client),
+            SupportedRequest::GetProperties(r) => handle_and_encode(r, &self.get_props, client),
+            SupportedRequest::Publish(r) => handle_and_encode(r, &self.publish, client),
+            SupportedRequest::Subscribe(r) => handle_and_encode(r, &self.subscribe, client),
+            SupportedRequest::Receive(r) => handle_and_encode(r, &self.receive, client),
+            SupportedRequest::GetTopicBreakdown(r) => handle_and_encode(r, &self.get_topic_breakdown, client),
+            SupportedRequest::GetSubscription(r) => handle_and_encode(r, &self.get_subscription, client),
         }
     }
 }
@@ -89,7 +89,7 @@ impl RequestDispatcher {
 /// returns: `Result<Vec<u8, Global>, RequestError>` the encoded result or an error.
 fn handle_and_encode<R, H>(
     request: R,
-    handler: &mut H,
+    handler: &H,
     client: ClientID,
 ) -> Result<Vec<u8>, RequestError>
 where
