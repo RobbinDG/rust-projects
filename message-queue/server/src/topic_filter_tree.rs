@@ -16,6 +16,8 @@ trait ClientCollection {
         filter_by_level: &Vec<TopicLiteral>,
         depth: usize,
     ) -> bool;
+
+    fn get_clients(&self, filter_by_level: &Vec<TopicLiteral>, depth: usize) -> HashSet<&ClientID>;
 }
 
 type TopicFilterTreeLeaf = HashSet<ClientID>;
@@ -29,6 +31,10 @@ impl ClientCollection for TopicFilterTreeLeaf {
     fn remove_client(&mut self, client_id: &ClientID, _: &Vec<TopicLiteral>, _: usize) -> bool {
         self.remove(&client_id);
         true
+    }
+
+    fn get_clients(&self, _: &Vec<TopicLiteral>, _: usize) -> HashSet<&ClientID> {
+        self.iter().collect::<HashSet<&ClientID>>()
     }
 }
 
@@ -93,6 +99,27 @@ impl<T: ClientCollection> ClientCollection for TopicFilterTreeNode<T> {
                 true
             }
         }
+    }
+
+    fn get_clients(&self, filter_by_level: &Vec<TopicLiteral>, depth: usize) -> HashSet<&ClientID> {
+        let filter = filter_by_level
+            .get(depth)
+            .unwrap_or(&TopicLiteral::Wildcard);
+
+        let mut elements = self.terminating.iter().collect::<HashSet<&ClientID>>();
+        match filter {
+            TopicLiteral::Name(name) => {
+                if let Some(sub) = self.sub.get(name) {
+                    elements.extend(sub.get_clients(filter_by_level, depth + 1));
+                }
+            }
+            TopicLiteral::Wildcard => {
+                for sub in self.sub.values() {
+                    elements.extend(sub.get_clients(filter_by_level, depth + 1));
+                }
+            }
+        };
+        elements
     }
 }
 
@@ -168,34 +195,11 @@ impl TopicFilterTree {
     ///
     /// * `address`: the address to look up.
     ///
-    /// returns: `Vec<&ClientID, Global>` a reference to all client ID's.
-    pub fn get_clients(&self, address: (String, String)) -> Vec<&ClientID> {
-        Self::get_clients_filter_tree(&self.topics, address)
-            .into_iter()
-            .collect()
-    }
-
-    fn get_clients_filter_tree(
-        tree: &TopicFilterTreeNode<TopicFilterTreeNode<TopicFilterTreeLeaf>>,
-        address: (String, String),
-    ) -> HashSet<&ClientID> {
-        let mut clients = match tree.sub.get(&address.0) {
-            None => HashSet::new(),
-            Some(subtree) => Self::get_clients_subtree(subtree, address.1.clone()),
-        };
-        clients.extend(&tree.terminating);
-        clients
-    }
-
-    fn get_clients_subtree(
-        address: &TopicFilterTreeNode<TopicFilterTreeLeaf>,
-        filter: String,
-    ) -> HashSet<&ClientID> {
-        let mut clients = match address.sub.get(&filter) {
-            None => HashSet::new(),
-            Some(c) => c.iter().collect(),
-        };
-        clients.extend(&address.terminating);
-        clients
+    /// returns: `HashSet<&ClientID, Global>` a reference to all client ID's.
+    pub fn get_clients(&self, address: (String, String)) -> HashSet<&ClientID> {
+        self.topics.get_clients(
+            &vec![TopicLiteral::Name(address.0), TopicLiteral::Name(address.1)],
+            0,
+        )
     }
 }
