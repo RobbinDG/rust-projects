@@ -175,7 +175,14 @@ impl<T: QueueSelector + 'static> InspectView<T> {
                 .spacing(ELEMENT_SPACING_HORIZONTAL),
                 Row::new()
                     .push(button("Receive Message").on_press(InspectViewMessage::ReceiveMessage))
-                    .push(text(format!("Received: {}", self.received_message))),
+                    .push(text(format!(
+                        "Received: {}",
+                        if !self.received_message.is_empty() {
+                            &self.received_message
+                        } else {
+                            "No message"
+                        }
+                    ))),
                 message_log.padding(Padding::ZERO.left(20)).spacing(2)
             ]
             .spacing(ELEMENT_SPACING_HORIZONTAL),
@@ -234,21 +241,23 @@ impl<T: QueueSelector + 'static> InspectView<T> {
             InspectViewMessage::Subscribed => {}
             InspectViewMessage::ReceiveMessage => {
                 return request_task(self.connector.clone(), Receive {}, |result| match result {
-                    Some(Message {
-                        payload: MessagePayload::Text(payload),
-                        ..
-                    }) => InspectViewMessage::MessageReceived(payload),
+                    Some(Message { payload, .. }) => match payload {
+                        MessagePayload::Text(text) => InspectViewMessage::MessageReceived(text),
+                        MessagePayload::Blob(blob) => {
+                            InspectViewMessage::MessageReceived(format!("Blob [{}]", blob.len()))
+                        }
+                    },
                     _ => InspectViewMessage::NoMessageAvailable,
                 });
             }
             InspectViewMessage::MessageReceived(m) => {
-                self.message_log.push_front(self.received_message.clone());
-                self.message_log.truncate(5);
+                if !self.received_message.is_empty() {
+                    self.message_log.push_front(self.received_message.clone());
+                    self.message_log.truncate(5);
+                }
                 self.received_message = m;
             }
-            InspectViewMessage::NoMessageAvailable => {
-                self.received_message = "No message".to_string()
-            }
+            InspectViewMessage::NoMessageAvailable => self.received_message.clear(),
             InspectViewMessage::TTLValueChanged(val) => self.ttl_value = val,
             InspectViewMessage::TTLPermanentToggle(toggle) => self.ttl_permanent = toggle,
             InspectViewMessage::LoadBreakdown => {
