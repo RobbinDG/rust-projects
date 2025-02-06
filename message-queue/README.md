@@ -80,19 +80,27 @@ These are made using a demo application in the `client` workspace.
 
 Once booted, a user is greeted by the home screen. This gives an overview of the direct queues 
 and topics currently available.
-![image](images/admin_home.png)
+
+<img src="images/admin_home.gif" alt="drawing" style="width:49%; display: block; margin-left: auto; 
+margin-right: auto;"/>
+
 We can create new direct queues and topics, choose their default DLX and mark them as designated 
 DLX. Although a DLX choice for a queue does not have to be a designated DLX, a designated DLX 
-will ensure that messages are destructed if the expire whilst in that queue. 
-![gif](images/create.gif)
+will ensure that messages are destructed if the expire whilst in that queue.
+
+<img src="images/create.gif" alt="drawing" style="width:49%; display: block; margin-left: auto; margin-right: auto;"/>
+
 We can then inspect a queue to see more information about it, as well as send and receive 
 messages or subdivide topics.
-![gif](images/inspect.gif)
-![gif](images/create_topic.gif)
+
+<img src="images/inspect.gif" alt="drawing" style="width:49%;"/>
+<img src="images/create_topic.gif" alt="drawing" style="width:49%;"/>
+
 Sending and receiving messages is different on direct queues and topics. For a topic, a concrete 
 subtopic must be chosen, but for subscription, a range (or filter) can be selected.
-![gif](images/send_queue.gif)
-![gif](images/send_topic.gif)
+
+<img src="images/send_queue.gif" alt="drawing" style="width:49%;"/>
+<img src="images/send_topic.gif" alt="drawing" style="width:49%;"/>
 
 ### Typed Routing Keys
 Routing keys are a message attribute that determines to which queue a message should be sent. 
@@ -143,9 +151,10 @@ pub enum DLXPreference {
 }
 ```
 To demonstrate this, we can set the TTL of a message to 0 seconds.
-![gif](images/dlx.gif)
-A caveat to mention is that 
-messages are only dead lettered if they are attempted to be received whilst at the front of the 
+
+<img src="images/dlx.gif" alt="drawing" style="width:49%; display: block; margin-left: auto; margin-right: auto;"/>
+
+A caveat to mention is that messages are only dead lettered if they are attempted to be received whilst at the front of the 
 queue. In the video above, you see that I first subscribe to the queue and press "Receive" once. 
 When this happens, it attempts to receive a valid message and the server dead-letters all others.
 The default DLX then buffers this message until I retrieve it. This implementation could be 
