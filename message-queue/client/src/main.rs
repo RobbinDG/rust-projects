@@ -4,6 +4,7 @@ use backend::protocol::request::{CreateQueue, Publish, Receive, Subscribe};
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::UserQueueProperties;
 use backend::DisconnectedClient;
+use rand::random;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::task::JoinSet;
@@ -84,7 +85,10 @@ async fn main() {
         };
 
         loop {
-            let payload = NumberPair { left: 2, right: 3 };
+            let payload = NumberPair {
+                left: random(),
+                right: random(),
+            };
 
             server
                 .transfer_admin_request(Publish {
@@ -106,7 +110,7 @@ async fn main() {
                 .await
                 .unwrap()
                 .unwrap();
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(rand::random_range(1..5))).await;
         }
     });
 
@@ -133,12 +137,17 @@ async fn main() {
             let response = server.transfer_admin_request(Receive {}).await.unwrap();
             if let Some(response) = response {
                 let numbers = response.payload.decode_blob::<NumberPair>().unwrap();
-                let result = numbers.left as u32 + numbers.right as u32;
-                println!("sum {}", result);
+                let result = format!(
+                    "{} + {} = {}",
+                    numbers.left,
+                    numbers.right,
+                    numbers.left as u32 + numbers.right as u32
+                );
+                tokio::time::sleep(Duration::from_secs(rand::random_range(1..3))).await; // Delay
                 server
                     .transfer_admin_request(Publish {
                         message: Message {
-                            payload: MessagePayload::encode_blob(&result).unwrap(),
+                            payload: MessagePayload::Text(result),
                             routing_key: RoutingKey {
                                 id: QueueId::Topic(
                                     "numbers".to_string(),
@@ -155,7 +164,6 @@ async fn main() {
                     .await
                     .unwrap()
                     .unwrap();
-                tokio::time::sleep(Duration::from_secs(5)).await;
             }
         }
     });
@@ -183,12 +191,17 @@ async fn main() {
             let response = server.transfer_admin_request(Receive {}).await.unwrap();
             if let Some(response) = response {
                 let numbers = response.payload.decode_blob::<NumberPair>().unwrap();
-                let result = numbers.left as u32 * numbers.right as u32;
-                println!("product {}", result);
+                let result = format!(
+                    "{} * {} = {}",
+                    numbers.left,
+                    numbers.right,
+                    numbers.left as u32 * numbers.right as u32
+                );
+                tokio::time::sleep(Duration::from_secs(rand::random_range(1..3))).await; // Delay
                 server
                     .transfer_admin_request(Publish {
                         message: Message {
-                            payload: MessagePayload::encode_blob(&result).unwrap(),
+                            payload: MessagePayload::Text(result),
                             routing_key: RoutingKey {
                                 id: QueueId::Topic(
                                     "numbers".to_string(),
@@ -205,7 +218,35 @@ async fn main() {
                     .await
                     .unwrap()
                     .unwrap();
-                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        }
+    });
+
+    set.spawn(async move {
+        let server = DisconnectedClient::new("127.0.0.1:1234");
+        let mut server = match server.connect().await {
+            Ok(client) => client,
+            Err(_) => panic!("Failed to connect to server"),
+        };
+
+        server
+            .transfer_admin_request(Subscribe {
+                queue: QueueFilter::Topic(
+                    "numbers".to_string(),
+                    TopicLiteral::Name("outputs".to_string()),
+                    TopicLiteral::Wildcard,
+                ),
+            })
+            .await
+            .unwrap();
+
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let response = server.transfer_admin_request(Receive {}).await.unwrap();
+            if let Some(response) = response {
+                if let MessagePayload::Text(result) = response.payload {
+                    println!("{}", result);
+                }
             }
         }
     });
