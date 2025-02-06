@@ -9,6 +9,7 @@ pub enum TTL {
     Permanent,
 }
 
+#[derive(Debug)]
 pub enum PayloadDecodeError {
     Codec(CodecError),
     NotBlob,

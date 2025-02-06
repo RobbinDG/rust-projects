@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::io;
 use tokio::net::{TcpStream, ToSocketAddrs};
+use log::info;
 
 pub struct ConnectionConfig<T>
 where
@@ -43,7 +44,7 @@ impl<T: ToSocketAddrs + Clone + Debug + Send> DisconnectedClient<T> {
     }
 
     pub async fn connect(self) -> Result<ConnectedClient<T>, ConnectionError<T>> {
-        println!("Connecting to {:?}", self.config.address);
+        info!("Connecting to {:?}", self.config.address);
         match TcpStream::connect(&self.config.address).await {
             Ok(stream) => Ok(ConnectedClient {
                 config: self.config,

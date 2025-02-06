@@ -6,6 +6,8 @@ mod util;
 pub mod make_request;
 
 fn main() -> iced::Result {
+    env_logger::init();
+
     iced::application(
         "Message Queue Admin Panel",
         AdminView::update,
