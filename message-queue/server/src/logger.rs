@@ -1,6 +1,7 @@
 use backend::protocol::message::{Message, TTL};
 use backend::protocol::queue_id::{NewQueueId, QueueId};
 use backend::protocol::request::{CreateQueue, Publish, SupportedRequest};
+use backend::protocol::routing_error::RoutingError;
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::{Request, UserQueueProperties};
 use backend::stream_io::StreamIO;
@@ -59,12 +60,17 @@ impl QueueLogger {
                     .write_encode(&SupportedRequest::Publish(Publish { message: msg }))
                     .await
                     .unwrap();
-                stream
+                match stream
                     .read_encoded_result::<<Publish as Request>::Response>()
                     .await
                     .unwrap()
                     .unwrap()
-                    .unwrap();
+                {
+                    Ok(_) | Err(RoutingError::DropOnDLX) => {}
+                    Err(e) => {
+                        println!("Error during logging: {:?}", e)
+                    }
+                };
                 currently_logging.store(false, Ordering::Relaxed);
             }
         });
@@ -96,10 +102,15 @@ impl log::Log for QueueLogger {
         task::block_in_place(|| {
             Handle::current()
                 .block_on(async move {
-                    self.create_sender.send(CreateQueue {
-                        queue_address: new_queue,
-                        properties: UserQueueProperties { is_dlx: false, dlx: None },
-                    }).await
+                    self.create_sender
+                        .send(CreateQueue {
+                            queue_address: new_queue,
+                            properties: UserQueueProperties {
+                                is_dlx: true,
+                                dlx: None,
+                            },
+                        })
+                        .await
                 })
                 .unwrap()
         });
@@ -108,7 +119,7 @@ impl log::Log for QueueLogger {
             payload: record.args().to_string().into(),
             routing_key: RoutingKey {
                 id: queue,
-                dlx: DLXPreference::Default,
+                dlx: DLXPreference::Drop,
             },
             ttl: TTL::Permanent,
         };

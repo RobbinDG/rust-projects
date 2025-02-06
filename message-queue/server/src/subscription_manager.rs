@@ -1,9 +1,9 @@
 use crate::queue_store::QueueStore;
 use backend::protocol::client_id::ClientID;
 use backend::protocol::queue_id::{QueueFilter, TopLevelQueueId};
+use log::info;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use log::info;
 
 /// Maintains the active subscriptions to queues, and forwards resource allocation
 /// to support receive requests to only the subscribed queue.
@@ -86,7 +86,10 @@ impl SubscriptionManager {
     pub fn subscriber_counts(&self) -> HashMap<TopLevelQueueId, usize> {
         let mut counts = HashMap::new();
         for (_, filter) in &self.subscriptions {
-            counts.entry(filter.to_top_level()).and_modify(|v| *v += 1);
+            counts
+                .entry(filter.to_top_level())
+                .and_modify(|v| *v += 1)
+                .or_insert(1usize);
         }
         counts
     }
