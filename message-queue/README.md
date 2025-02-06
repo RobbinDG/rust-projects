@@ -10,8 +10,9 @@
 - [x] Send messages in queue to DLX on deletion.
 - [x] Reconnect on disconnect admin panel.
 - [x] Filtering on topics on the receiving end, i.e. creating topics and subtopics.
-- [ ] Messages with payloads other than strings (JSON, YAML, XML, etc.).
+- [x] Messages with payloads other than strings (JSON, YAML, XML, etc.).
 - [x] Logs are (also) messages onto a topic.
+- [ ] Blocking receive requests.
 
 ## Redacted ideas
 
