@@ -44,19 +44,6 @@ impl<T: ToSocketAddrs + Clone + Debug + Send> DisconnectedClient<T> {
 
     pub async fn connect(self) -> Result<ConnectedClient<T>, ConnectionError<T>> {
         println!("Connecting to {:?}", self.config.address);
-        // let addr = match self.config.address.to_socket_addrs() {
-        //     Ok(mut addrs) => match addrs.next() {
-        //         None => return Err(ConnectionError {
-        //             error_body: None, // TODO give this a proper error type. Occurs when parsing fails.
-        //             server: self,
-        //         }),
-        //         Some(a) => a,
-        //     },
-        //     Err(e) => return Err(ConnectionError {
-        //         error_body: Some(e),
-        //         server: self,
-        //     }),
-        // };
         match TcpStream::connect(&self.config.address).await {
             Ok(stream) => Ok(ConnectedClient {
                 config: self.config,
@@ -74,7 +61,7 @@ impl<T: ToSocketAddrs + Clone + Debug + Send> DisconnectedClient<T> {
 impl<T: ToSocketAddrs + Clone + Debug + Send> ConnectedClient<T> {
     pub async fn transfer_request<R>(&mut self, request: R) -> Result<R::Response, StreamIOError>
     where
-        R: Request + Serialize + for<'a> Deserialize<'a>,
+        R: Request + Serialize + for<'a> Deserialize<'a> + Debug,
     {
         self.push_message(request).await?;
         self.pull_message().await
@@ -87,7 +74,7 @@ impl<T: ToSocketAddrs + Clone + Debug + Send> ConnectedClient<T> {
     {
         if let Err(e) = self.push_message(SupportedRequest::from(request)).await {
                return Err(match e{
-                   StreamIOError::Stream(_) => RequestError:: CommunicationError,
+                   StreamIOError::Stream(_) => RequestError::CommunicationError,
                    StreamIOError::Codec(_) => RequestError::PayloadEncodeError,
                })
         }
@@ -96,7 +83,7 @@ impl<T: ToSocketAddrs + Clone + Debug + Send> ConnectedClient<T> {
 
     pub async fn push_message<R>(&mut self, message: R) -> Result<(), StreamIOError>
     where
-        R: Serialize + for<'a> Deserialize<'a>,
+        R: Serialize + for<'a> Deserialize<'a> + Debug,
     {
         let result = self.stream.write_encode(&message).await;
 

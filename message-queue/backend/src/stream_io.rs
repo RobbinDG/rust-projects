@@ -1,4 +1,5 @@
-use crate::protocol::codec::{encode, CodecError};
+use std::fmt::Debug;
+use crate::protocol::codec::{decode, encode, CodecError};
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -65,6 +66,7 @@ impl StreamIO {
     }
 
     pub async fn write(&mut self, data: &Vec<u8>) -> Result<(), StreamIOError> {
+
         let result = Ok(self.stream.write_all(data).await?);
         self.last_write = Some(SystemTime::now());
         result
@@ -74,9 +76,10 @@ impl StreamIO {
     /// be serialisable and deserialisable by `serde`.
     pub async fn write_encode<T>(&mut self, message: &T) -> Result<(), StreamIOError>
     where
-        T: Serialize + for<'a> Deserialize<'a>,
+        T: Serialize + for<'a> Deserialize<'a> + Debug,
     {
-        self.write(&encode(message)?).await
+        let encoded = encode(message)?;
+        self.write(&encoded).await
     }
 
     /// Read a struct from the stream, after first decoding it. The struct must
@@ -87,7 +90,7 @@ impl StreamIO {
     {
         let mut buf = [0; BUFFER_SIZE];
         self.stream.read(&mut buf).await?;
-        let result = Ok(postcard::from_bytes(&buf)?);
+        let result = Ok(decode(&buf.to_vec())?);
         self.last_read = Some(SystemTime::now());
         result
     }

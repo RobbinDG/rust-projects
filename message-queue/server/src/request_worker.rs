@@ -27,7 +27,10 @@ impl RequestWorker {
                     .dispatcher
                     .dispatch(r, self.stream_io.client_id()?)
                     .await,
-                Err(e) => Err(e),
+                Err(e) => {
+                    error!("Error during request handling: {:?}", e);
+                    Err(e)
+                },
             };
             if let Err(e) = self.stream_io.write_encode(&response).await {
                 match e {

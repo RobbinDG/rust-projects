@@ -17,9 +17,9 @@ where
     Ok(postcard::to_allocvec(payload)?)
 }
 
-pub fn decode<T>(encoded: Vec<u8>) -> Result<T, CodecError>
+pub fn decode<T>(encoded: &Vec<u8>) -> Result<T, CodecError>
 where
     T: Serialize + DeserializeOwned,
 {
-    Ok(postcard::from_bytes(encoded.as_slice())?)
+    Ok(postcard::from_bytes(encoded)?)
 }
