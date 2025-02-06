@@ -1,11 +1,12 @@
 use backend::protocol::message::{Message, MessagePayload, TTL};
-use backend::protocol::queue_id::{NewQueueId, QueueId};
-use backend::protocol::request::{CreateQueue, Publish};
+use backend::protocol::queue_id::{NewQueueId, QueueFilter, QueueId, TopicLiteral};
+use backend::protocol::request::{CreateQueue, Publish, Receive, Subscribe};
 use backend::protocol::routing_key::{DLXPreference, RoutingKey};
 use backend::protocol::UserQueueProperties;
 use backend::DisconnectedClient;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tokio::task::JoinSet;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct NumberPair {
@@ -46,7 +47,8 @@ async fn main() {
         .await
         .unwrap();
 
-    tokio::spawn(async move {
+    let mut set = JoinSet::new();
+    set.spawn(async move {
         let server = DisconnectedClient::new("127.0.0.1:1234");
         let mut server = match server.connect().await {
             Ok(client) => client,
@@ -77,5 +79,31 @@ async fn main() {
             }).await.unwrap().unwrap();
             tokio::time::sleep(Duration::from_secs(5)).await;
         };
-    }).await.unwrap();
+    });
+
+    set.spawn(async move {
+        let server = DisconnectedClient::new("127.0.0.1:1234");
+        let mut server = match server.connect().await {
+            Ok(client) => client,
+            Err(_) => panic!("Failed to connect to server"),
+        };
+
+        server.transfer_admin_request(Subscribe {
+            queue: QueueFilter::Topic(
+                "inputs".to_string(),
+                TopicLiteral::Name("pairs".to_string()),
+                TopicLiteral::Name("numbers".to_string()),
+            )
+        }).await.unwrap();
+
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let response = server.transfer_admin_request(Receive {}).await.unwrap();
+            if let Some(response) = response {
+                println!("{:?}", response.payload.decode_blob::<NumberPair>().unwrap());
+            }
+        };
+    });
+
+    set.join_all().await;
 }
