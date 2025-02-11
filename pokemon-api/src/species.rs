@@ -4,6 +4,7 @@ use crate::pkm_type::PkmType;
 use crate::primitive_types::PkmId;
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use sqlx::{Pool, Sqlite};
+use crate::ability::AbilityPool;
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -76,5 +77,9 @@ impl Species {
 
     async fn moves(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<PkmMove>> {
         PkmMove::by_pkm(ctx, self.id).await
+    }
+
+    async fn abilities(&self, ctx: &Context<'_>) -> async_graphql::Result<AbilityPool> {
+        AbilityPool::get(ctx, self.id).await
     }
 }

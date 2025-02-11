@@ -18,6 +18,8 @@ mod pkm_stats;
 mod pkm_move;
 mod move_effect;
 mod owned_pokemon;
+mod nature;
+mod ability;
 
 struct Query;
 
