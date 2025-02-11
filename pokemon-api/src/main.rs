@@ -9,6 +9,7 @@ use async_graphql_poem::GraphQL;
 use poem::{get, handler, listener::TcpListener, web::Html, IntoResponse, Route, Server};
 use species::Species;
 use sqlx::sqlite::SqlitePoolOptions;
+use crate::owned_pokemon::OwnedPokemon;
 
 mod primitive_types;
 mod species;
@@ -16,6 +17,7 @@ mod pkm_type;
 mod pkm_stats;
 mod pkm_move;
 mod move_effect;
+mod owned_pokemon;
 
 struct Query;
 
@@ -27,6 +29,10 @@ impl Query {
         id: i64,
     ) -> async_graphql::Result<Species> {
         Species::get(ctx, id).await
+    }
+
+    async fn random_pokemon(&self, ctx: &Context<'_>) -> async_graphql::Result<OwnedPokemon> {
+        OwnedPokemon::random(ctx).await
     }
 
     async fn moves(

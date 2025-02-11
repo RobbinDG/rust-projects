@@ -29,6 +29,20 @@ impl Species {
         .await?;
         Ok(result)
     }
+
+    pub async fn max_id(ctx: &Context<'_>) -> async_graphql::Result<i64> {
+        struct Result {
+            id: Option<i64>,
+        }
+        let pool = ctx.data::<Pool<Sqlite>>()?;
+        let m = sqlx::query_as!(Result, r#"SELECT MAX(id) id FROM pokemon_species"#)
+            .fetch_one(pool)
+            .await?;
+        match m.id {
+            None => Err(async_graphql::Error::new("Species table empty")),
+            Some(id) => Ok(id),
+        }
+    }
 }
 
 #[ComplexObject]

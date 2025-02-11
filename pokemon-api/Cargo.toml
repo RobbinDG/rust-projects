@@ -9,3 +9,4 @@ sqlx = { version = "0.8.3", features = ["runtime-tokio", "sqlite"] }
 poem = "3.1.6"
 async-graphql = "7.0.15"
 async-graphql-poem = "7.0.15"
+rand = "0.8.5"
