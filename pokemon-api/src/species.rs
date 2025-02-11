@@ -1,8 +1,9 @@
+use crate::pkm_move::PkmMove;
+use crate::pkm_stats::PkmStats;
 use crate::pkm_type::PkmType;
 use crate::primitive_types::PkmId;
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use sqlx::{Pool, Sqlite};
-use crate::pkm_stats::PkmStats;
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -13,12 +14,20 @@ pub struct Species {
 }
 
 impl Species {
-    pub fn new(id: PkmId, identifier: String, evolves_from: Option<PkmId>) -> Self {
-        Self {
-            id,
-            identifier,
-            evolves_from,
-        }
+    pub async fn get(ctx: &Context<'_>, id: i64) -> async_graphql::Result<Species> {
+        let pool = ctx.data::<Pool<Sqlite>>()?;
+
+        let result = sqlx::query_as!(
+            Species,
+            "\
+            SELECT id, identifier, evolves_from_species_id as evolves_from \
+            FROM pokemon_species s WHERE id = $1
+            ",
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(result)
     }
 }
 
@@ -49,5 +58,9 @@ impl Species {
 
     async fn pkm_stats(&self, ctx: &Context<'_>) -> async_graphql::Result<PkmStats> {
         PkmStats::get(self.id, ctx).await
+    }
+
+    async fn moves(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<PkmMove>> {
+        PkmMove::by_pkm(ctx, self.id).await
     }
 }

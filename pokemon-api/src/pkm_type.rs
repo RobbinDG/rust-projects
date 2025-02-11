@@ -7,7 +7,7 @@ pub struct PkmType {
     id: PkmTypeId,
     name: String,
     generation_id: GenerationId,
-    damage_class: Option<f64>,
+    damage_class: Option<i64>,
 }
 
 impl PkmType {

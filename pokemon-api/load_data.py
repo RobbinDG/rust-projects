@@ -29,6 +29,8 @@ def create_table_definition(table_name: str, df: pd.DataFrame, conn: Connection)
     for col, dtype in df.dtypes.items():
         sql_type = "TEXT"  # Default type (you may refine this based on dtype)
         if pd.api.types.is_numeric_dtype(dtype):
+            if (df[col].dropna() % 1 == 0).all():
+                dtype = pd.Int64Dtype()  # Convert to nullable integer
             sql_type = "INTEGER" if pd.api.types.is_integer_dtype(dtype) else "REAL"
 
         not_null = "NOT NULL" if col in non_null_columns else ""

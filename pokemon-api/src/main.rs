@@ -1,14 +1,14 @@
 use std::error::Error;
 
+use crate::pkm_move::PkmMove;
+use crate::primitive_types::PkmMoveId;
 use async_graphql::{
     http::GraphiQLSource, ComplexObject, Context, EmptyMutation, EmptySubscription, Object, Schema,
 };
 use async_graphql_poem::GraphQL;
 use poem::{get, handler, listener::TcpListener, web::Html, IntoResponse, Route, Server};
-use primitive_types::PkmId;
 use species::Species;
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::{Pool, Sqlite};
 
 mod primitive_types;
 mod species;
@@ -24,23 +24,16 @@ impl Query {
         &self,
         ctx: &Context<'_>,
         id: i64,
-    ) -> async_graphql::Result<Option<Species>> {
-        let pool = ctx.data::<Pool<Sqlite>>()?;
+    ) -> async_graphql::Result<Species> {
+        Species::get(ctx, id).await
+    }
 
-        let result: Option<(PkmId, String, Option<f64>)> = sqlx::query_as(
-            "\
-            SELECT id, identifier, evolves_from_species_id \
-            FROM pokemon_species s WHERE id = $1
-            ",
-        )
-        .bind(id)
-        .fetch_one(pool)
-        .await
-        .ok();
-
-        Ok(result.map(|(id, identifier, evolves_from)| {
-            Species::new(id, identifier, evolves_from.map(|f| f as PkmId))
-        }))
+    async fn moves(
+        &self,
+        ctx: &Context<'_>,
+        id: PkmMoveId,
+    ) -> async_graphql::Result<PkmMove> {
+        PkmMove::get(ctx, id).await
     }
 }
 
