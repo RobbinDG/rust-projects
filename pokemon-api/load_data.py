@@ -9,6 +9,7 @@ data_sources = {
     'type_efficacy': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/type_efficacy.csv',
     'moves': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/moves.csv',
     'move_names': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/move_names.csv',
+    'move_effects': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/move_effect_prose.csv',
     'pokemon_moves': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/pokemon_moves.csv',
     'pokemon_species': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/pokemon_species.csv',
     'pokemon_stats': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/pokemon_stats.csv',

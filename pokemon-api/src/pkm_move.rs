@@ -1,3 +1,4 @@
+use crate::move_effect::{BoundMoveEffect, MoveEffect};
 use crate::pkm_type::PkmType;
 use crate::primitive_types::{PkmEffectId, PkmId, PkmMoveId, PkmTypeId};
 use async_graphql::{ComplexObject, Context, SimpleObject};
@@ -71,13 +72,10 @@ impl PkmMove {
         PkmType::get(self.type_id, ctx).await
     }
 
-    pub async fn effect(&self) -> Option<PkmEffect> {
-        match self.effect_chance {
-            None => None,
-            Some(chance) => Some(PkmEffect {
-                id: self.effect_id,
-                chance,
-            }),
-        }
+    pub async fn effect(&self, ctx: &Context<'_>) -> async_graphql::Result<BoundMoveEffect> {
+        Ok(BoundMoveEffect::new(
+            MoveEffect::get(ctx, self.effect_id).await?,
+            self.effect_chance,
+        ))
     }
 }

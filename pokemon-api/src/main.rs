@@ -15,6 +15,7 @@ mod species;
 mod pkm_type;
 mod pkm_stats;
 mod pkm_move;
+mod move_effect;
 
 struct Query;
 
