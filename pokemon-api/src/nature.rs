@@ -4,7 +4,7 @@ use sqlx::{Pool, Sqlite};
 
 #[derive(SimpleObject)]
 pub struct Nature {
-    id: NatureId,
+    pub id: NatureId,
     name: String,
     decreased: i64,
     increased: i64,

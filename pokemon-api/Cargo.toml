@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
-sqlx = { version = "0.8.3", features = ["runtime-tokio", "sqlite", "macros", "sqlx-macros"] }
+sqlx = { version = "0.8.3", features = ["runtime-tokio", "sqlite", "macros", "sqlx-macros", "migrate"] }
 poem = "3.1.6"
 async-graphql = "7.0.15"
 async-graphql-poem = "7.0.15"

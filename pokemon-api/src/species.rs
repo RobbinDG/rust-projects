@@ -9,7 +9,7 @@ use crate::ability::AbilityPool;
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct Species {
-    id: PkmId,
+    pub id: PkmId,
     identifier: String,
     evolves_from: Option<PkmId>,
 }

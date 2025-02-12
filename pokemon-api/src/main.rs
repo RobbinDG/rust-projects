@@ -1,50 +1,63 @@
-use std::error::Error;
-
+use crate::owned_pokemon::OwnedPokemon;
 use crate::pkm_move::PkmMove;
 use crate::primitive_types::PkmMoveId;
 use async_graphql::{
-    http::GraphiQLSource, ComplexObject, Context, EmptyMutation, EmptySubscription, Object, Schema,
+    http::GraphiQLSource, ComplexObject, Context, EmptySubscription, Object, Schema,
 };
 use async_graphql_poem::GraphQL;
 use poem::{get, handler, listener::TcpListener, web::Html, IntoResponse, Route, Server};
 use species::Species;
+use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqlitePoolOptions;
-use crate::owned_pokemon::OwnedPokemon;
+use sqlx::{Pool, Sqlite};
+use std::error::Error;
 
-mod primitive_types;
-mod species;
-mod pkm_type;
-mod pkm_stats;
-mod pkm_move;
-mod move_effect;
-mod owned_pokemon;
-mod nature;
 mod ability;
 mod damage_calc;
 mod damage_class;
+mod move_effect;
+mod nature;
+mod owned_pokemon;
+mod pkm_move;
+mod pkm_stats;
+mod pkm_type;
+mod primitive_types;
+mod species;
+
+static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 struct Query;
 
 #[Object]
 impl Query {
-    async fn pokemon_species(
-        &self,
-        ctx: &Context<'_>,
-        id: i64,
-    ) -> async_graphql::Result<Species> {
+    async fn pokemon_species(&self, ctx: &Context<'_>, id: i64) -> async_graphql::Result<Species> {
         Species::get(ctx, id).await
     }
 
-    async fn random_pokemon(&self, ctx: &Context<'_>) -> async_graphql::Result<OwnedPokemon> {
-        OwnedPokemon::random(ctx).await
-    }
-
-    async fn moves(
-        &self,
-        ctx: &Context<'_>,
-        id: PkmMoveId,
-    ) -> async_graphql::Result<PkmMove> {
+    async fn moves(&self, ctx: &Context<'_>, id: PkmMoveId) -> async_graphql::Result<PkmMove> {
         PkmMove::get(ctx, id).await
+    }
+}
+
+struct Mutation;
+
+#[Object]
+impl Mutation {
+    async fn random_pokemon(&self, ctx: &Context<'_>) -> async_graphql::Result<OwnedPokemon> {
+        let pool = ctx.data::<Pool<Sqlite>>()?;
+        let pkm = OwnedPokemon::random(ctx).await?;
+        let x = sqlx::query!(
+            "INSERT INTO realised_pokemon VALUES (?, ?, ?, ?, ?, ?)",
+            pkm.species.id,
+            pkm.move_1.id,
+            pkm.move_2.id,
+            pkm.move_3.id,
+            pkm.move_4.id,
+            pkm.nature.id,
+        )
+        .execute(pool)
+        .await?;
+        Ok(pkm)
     }
 }
 
@@ -60,8 +73,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .connect("sqlite://./pokemon.db")
         .await?;
 
+    MIGRATOR.run(&pool).await?;
+
     // create the schema
-    let schema = Schema::build(Query, EmptyMutation, EmptySubscription)
+    let schema = Schema::build(Query, Mutation, EmptySubscription)
         .data(pool)
         .finish();
 

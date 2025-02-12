@@ -15,7 +15,7 @@ pub struct PkmEffect {
 #[derive(SimpleObject, sqlx::FromRow)]
 #[graphql(complex)]
 pub struct PkmMove {
-    id: PkmMoveId,
+    pub id: PkmMoveId,
     name: String,
     #[graphql(skip)]
     type_id: PkmTypeId,
