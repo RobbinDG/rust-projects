@@ -7,12 +7,12 @@ use crate::nature::Nature;
 
 #[derive(SimpleObject)]
 pub struct OwnedPokemon {
-    species: Species,
-    move_1: PkmMove,
-    move_2: PkmMove,
-    move_3: PkmMove,
-    move_4: PkmMove,
-    nature: Nature,
+    pub species: Species,
+    pub move_1: PkmMove,
+    pub move_2: PkmMove,
+    pub move_3: PkmMove,
+    pub move_4: PkmMove,
+    pub nature: Nature,
 }
 
 impl OwnedPokemon {

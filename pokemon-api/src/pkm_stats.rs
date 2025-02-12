@@ -6,12 +6,12 @@ use sqlx::{Pool, Sqlite};
 
 #[derive(SimpleObject)]
 pub struct PkmStats {
-    hp: PkmStat,
-    atk: PkmStat,
-    def: PkmStat,
-    s_atk: PkmStat,
-    s_def: PkmStat,
-    spd: PkmStat,
+    pub hp: PkmStat,
+    pub atk: PkmStat,
+    pub def: PkmStat,
+    pub s_atk: PkmStat,
+    pub s_def: PkmStat,
+    pub spd: PkmStat,
 }
 
 impl PkmStats {
@@ -52,9 +52,9 @@ impl PkmStats {
 
 #[derive(SimpleObject)]
 pub struct PkmStat {
-    stat_id: i64,
-    base_stat: i64,
-    effort: i64,
+    pub stat_id: i64,
+    pub base_stat: i64,
+    pub effort: i64,
 }
 
 impl PkmStat {}

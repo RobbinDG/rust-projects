@@ -48,7 +48,7 @@ impl Species {
 
 #[ComplexObject]
 impl Species {
-    async fn pkm_type(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<PkmType>> {
+    pub async fn pkm_type(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<PkmType>> {
         let pool = ctx.data::<Pool<Sqlite>>()?;
 
         let result: Vec<(i64,)> = sqlx::query_as(
@@ -71,15 +71,15 @@ impl Species {
         })
     }
 
-    async fn pkm_stats(&self, ctx: &Context<'_>) -> async_graphql::Result<PkmStats> {
+    pub async fn pkm_stats(&self, ctx: &Context<'_>) -> async_graphql::Result<PkmStats> {
         PkmStats::get(self.id, ctx).await
     }
 
-    async fn moves(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<PkmMove>> {
+    pub async fn moves(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<PkmMove>> {
         PkmMove::by_pkm(ctx, self.id).await
     }
 
-    async fn abilities(&self, ctx: &Context<'_>) -> async_graphql::Result<AbilityPool> {
+    pub async fn abilities(&self, ctx: &Context<'_>) -> async_graphql::Result<AbilityPool> {
         AbilityPool::get(ctx, self.id).await
     }
 }

@@ -20,6 +20,8 @@ mod move_effect;
 mod owned_pokemon;
 mod nature;
 mod ability;
+mod damage_calc;
+mod damage_class;
 
 struct Query;
 
