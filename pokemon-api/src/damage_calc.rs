@@ -1,5 +1,5 @@
 use crate::damage_class::DamageClass;
-use crate::owned_pokemon::OwnedPokemon;
+use crate::realised_pokemon::RealisedPokemon;
 use crate::pkm_move::PkmMove;
 use async_graphql::Context;
 use rand::Rng;
@@ -7,9 +7,9 @@ use std::any::Any;
 
 pub async fn calculate(
     ctx: &Context<'_>,
-    attacker: OwnedPokemon,
+    attacker: RealisedPokemon,
     move_used: PkmMove,
-    defender: OwnedPokemon,
+    defender: RealisedPokemon,
 ) -> async_graphql::Result<u32> {
     let move_type = move_used.pkm_type(ctx).await?;
     let attacker_stats = attacker.species.pkm_stats(ctx).await?;

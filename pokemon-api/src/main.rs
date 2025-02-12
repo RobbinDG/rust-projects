@@ -1,4 +1,4 @@
-use crate::owned_pokemon::OwnedPokemon;
+use crate::realised_pokemon::RealisedPokemon;
 use crate::pkm_move::PkmMove;
 use crate::primitive_types::PkmMoveId;
 use async_graphql::{
@@ -17,7 +17,7 @@ mod damage_calc;
 mod damage_class;
 mod move_effect;
 mod nature;
-mod owned_pokemon;
+mod realised_pokemon;
 mod pkm_move;
 mod pkm_stats;
 mod pkm_type;
@@ -43,11 +43,12 @@ struct Mutation;
 
 #[Object]
 impl Mutation {
-    async fn random_pokemon(&self, ctx: &Context<'_>) -> async_graphql::Result<OwnedPokemon> {
+    async fn random_pokemon(&self, ctx: &Context<'_>) -> async_graphql::Result<RealisedPokemon> {
         let pool = ctx.data::<Pool<Sqlite>>()?;
-        let pkm = OwnedPokemon::random(ctx).await?;
+        let pkm = RealisedPokemon::random(ctx).await?;
         let x = sqlx::query!(
-            "INSERT INTO realised_pokemon VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO realised_pokemon VALUES (?, ?, ?, ?, ?, ?, ?)",
+            pkm.id,
             pkm.species.id,
             pkm.move_1.id,
             pkm.move_2.id,
