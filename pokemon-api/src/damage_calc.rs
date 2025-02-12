@@ -1,6 +1,7 @@
 use crate::damage_class::DamageClass;
 use crate::pkm_move::PkmMove;
 use crate::realised_pokemon::RealisedPokemon;
+use crate::turn_outcome::{TurnStep, TurnStepType};
 use async_graphql::Context;
 use rand::Rng;
 
@@ -9,7 +10,7 @@ pub async fn calculate(
     attacker: &RealisedPokemon,
     move_used: &PkmMove,
     defender: &RealisedPokemon,
-) -> async_graphql::Result<u32> {
+) -> async_graphql::Result<(u32, TurnStepType)> {
     let move_type = move_used.pkm_type(ctx).await?;
     let attacker_stats = attacker.species(ctx).await?.pkm_stats(ctx).await?;
     let defender_stats = defender.species(ctx).await?.pkm_stats(ctx).await?;
@@ -39,12 +40,15 @@ pub async fn calculate(
     let effectiveness = move_type
         .get_type_efficacy(ctx, &defender.species(ctx).await?.pkm_type(ctx).await?)
         .await?;
+    if effectiveness <= 0.001 {
+        return Ok((0, TurnStepType::Immune));
+    }
     let burn = 1.0; // TODO burn
 
     let unmodified = dr((dr(2 * level, 5) + 2) * power * dr(a, d), 50) + 2;
     let factored =
         unmodified as f64 * targets * weather * critical * random * stab * effectiveness * burn;
-    Ok(factored as u32)
+    Ok((factored as u32, TurnStepType::Damage))
 }
 
 fn dr(numerator: i64, denominator: i64) -> i64 {

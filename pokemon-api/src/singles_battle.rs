@@ -4,6 +4,7 @@ use crate::pokemon_in_battle::PokemonInBattle;
 use crate::primitive_types::{BattleId, RealisedId};
 use crate::realised_pokemon::RealisedPokemon;
 use crate::turn_choice::TurnChoice;
+use crate::turn_outcome::{TurnOutcome, TurnStep, TurnStepType};
 use async_graphql::{Context, SimpleObject};
 use sqlx::{Pool, Sqlite};
 
@@ -50,7 +51,7 @@ impl SinglesBattle {
         battle_id: BattleId,
         turn_a: TurnChoice,
         turn_b: TurnChoice,
-    ) -> async_graphql::Result<Self> {
+    ) -> async_graphql::Result<TurnOutcome> {
         let mut battle = Self::get(ctx, battle_id).await?;
 
         let mut active_a = battle
@@ -80,8 +81,8 @@ impl SinglesBattle {
             .spd
             .base_stat;
 
-        let damage_a_b = calculate(ctx, &pkm_a, &move_a, &pkm_b).await?;
-        let damage_b_a = calculate(ctx, &pkm_b, &move_b, &pkm_a).await?;
+        let (damage_a_b, outcome_a_b) = calculate(ctx, &pkm_a, &move_a, &pkm_b).await?;
+        let (damage_b_a, outcome_b_a) = calculate(ctx, &pkm_b, &move_b, &pkm_a).await?;
 
         let a_first = if speed_a > speed_b {
             true
@@ -91,20 +92,64 @@ impl SinglesBattle {
             rand::random::<bool>()
         };
 
-        if a_first {
-            active_b.apply_damage(damage_a_b);
-            if !active_b.fainted() {
-                active_a.apply_damage(damage_b_a);
-            }
+        let outcomes = if a_first {
+            Self::perform_turn(
+                &mut active_a,
+                &mut active_b,
+                damage_a_b,
+                outcome_a_b,
+                damage_b_a,
+                outcome_b_a,
+            )
         } else {
-            active_a.apply_damage(damage_b_a);
-            if !active_a.fainted() {
-                active_b.apply_damage(damage_a_b);
+            Self::perform_turn(
+                &mut active_b,
+                &mut active_a,
+                damage_b_a,
+                outcome_b_a,
+                damage_a_b,
+                outcome_a_b,
+            )
+        };
+        active_a.update_for_battle(ctx, battle_id).await?;
+        active_b.update_for_battle(ctx, battle_id).await?;
+        Ok(TurnOutcome { order: outcomes })
+    }
+
+    fn perform_turn(
+        first: &mut &mut PokemonInBattle,
+        second: &mut &mut PokemonInBattle,
+        first_damage: u32,
+        first_type: TurnStepType,
+        second_damage: u32,
+        second_type: TurnStepType,
+    ) -> Vec<TurnStep> {
+        let mut outcomes = Vec::new();
+        let true_damage = second.apply_damage(first_damage);
+        if second.fainted() {
+            outcomes.push(TurnStep {
+                damage_dealt: true_damage,
+                type_: TurnStepType::Fainted,
+            })
+        } else {
+            outcomes.push(TurnStep {
+                damage_dealt: true_damage,
+                type_: first_type,
+            });
+            let true_damage = first.apply_damage(second_damage);
+            if first.fainted() {
+                outcomes.push(TurnStep {
+                    damage_dealt: true_damage,
+                    type_: TurnStepType::Fainted,
+                })
+            } else {
+                outcomes.push(TurnStep {
+                    damage_dealt: true_damage,
+                    type_: second_type,
+                })
             }
         }
-        active_a.update_for_battle(ctx).await?;
-        active_b.update_for_battle(ctx).await?;
-        Self::get(ctx, battle_id).await
+        outcomes
     }
 
     async fn get_selected_move(

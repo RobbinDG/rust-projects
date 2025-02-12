@@ -2,7 +2,7 @@ use crate::primitive_types::{BattleId, RealisedId};
 use crate::realised_pokemon::RealisedPokemon;
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use sqlx::{Pool, Sqlite};
-use std::cmp::max;
+use std::cmp::{max, min};
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -98,8 +98,10 @@ impl PokemonInBattle {
         Ok(())
     }
 
-    pub fn apply_damage(&mut self, damage: u32) {
-        self.remaining_hp = max(self.remaining_hp - damage as i64, 0);
+    pub fn apply_damage(&mut self, damage: u32) -> i64 {
+        let true_damage = min(self.remaining_hp, damage as i64);
+        self.remaining_hp = max(self.remaining_hp - true_damage, 0);
+        true_damage
     }
 
     pub fn fainted(&self) -> bool {
