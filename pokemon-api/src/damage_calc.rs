@@ -1,9 +1,8 @@
 use crate::damage_class::DamageClass;
-use crate::realised_pokemon::RealisedPokemon;
 use crate::pkm_move::PkmMove;
+use crate::realised_pokemon::RealisedPokemon;
 use async_graphql::Context;
 use rand::Rng;
-use std::any::Any;
 
 pub async fn calculate(
     ctx: &Context<'_>,
@@ -12,8 +11,8 @@ pub async fn calculate(
     defender: RealisedPokemon,
 ) -> async_graphql::Result<u32> {
     let move_type = move_used.pkm_type(ctx).await?;
-    let attacker_stats = attacker.species.pkm_stats(ctx).await?;
-    let defender_stats = defender.species.pkm_stats(ctx).await?;
+    let attacker_stats = attacker.species(ctx).await?.pkm_stats(ctx).await?;
+    let defender_stats = defender.species(ctx).await?.pkm_stats(ctx).await?;
     let (a, d) = match move_used.damage_class().await? {
         DamageClass::Physical => (attacker_stats.atk.base_stat, defender_stats.def.base_stat),
         DamageClass::Special => (
@@ -30,19 +29,21 @@ pub async fn calculate(
     let critical = 1.0; // TODO for critical hits
     let random = rand::thread_rng().gen_range(85..=100) as f64 / 100.0;
     let has_stab = attacker
-        .species
+        .species(ctx)
+        .await?
         .pkm_type(ctx)
         .await?
         .iter()
         .any(|typ| &move_type == typ);
     let stab = if has_stab { 1.5 } else { 1.0 };
     let effectiveness = move_type
-        .get_type_efficacy(ctx, &defender.species.pkm_type(ctx).await?)
+        .get_type_efficacy(ctx, &defender.species(ctx).await?.pkm_type(ctx).await?)
         .await?;
     let burn = 1.0; // TODO burn
 
     let unmodified = dr((dr(2 * level, 5) + 2) * power * dr(a, d), 50) + 2;
-    let factored = unmodified as f64 * targets * weather * critical * random * stab * effectiveness * burn;
+    let factored =
+        unmodified as f64 * targets * weather * critical * random * stab * effectiveness * burn;
     Ok(factored as u32)
 }
 
