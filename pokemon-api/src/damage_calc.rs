@@ -6,9 +6,9 @@ use rand::Rng;
 
 pub async fn calculate(
     ctx: &Context<'_>,
-    attacker: RealisedPokemon,
-    move_used: PkmMove,
-    defender: RealisedPokemon,
+    attacker: &RealisedPokemon,
+    move_used: &PkmMove,
+    defender: &RealisedPokemon,
 ) -> async_graphql::Result<u32> {
     let move_type = move_used.pkm_type(ctx).await?;
     let attacker_stats = attacker.species(ctx).await?.pkm_stats(ctx).await?;

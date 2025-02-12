@@ -1,5 +1,5 @@
 use crate::pkm_move::PkmMove;
-use crate::primitive_types::{PkmMoveId, RealisedId};
+use crate::primitive_types::{BattleId, PkmMoveId, RealisedId};
 use crate::realised_pokemon::RealisedPokemon;
 use crate::singles_battle::SinglesBattle;
 use async_graphql::{
@@ -11,6 +11,7 @@ use species::Species;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::error::Error;
+use crate::turn_choice::TurnChoice;
 
 mod ability;
 mod damage_calc;
@@ -63,6 +64,10 @@ impl Mutation {
         team_b: Vec<RealisedId>,
     ) -> async_graphql::Result<SinglesBattle> {
         SinglesBattle::insert(ctx, team_a, team_b).await
+    }
+
+    async fn play_turn(&self, ctx: &Context<'_>, id: BattleId, move_a: TurnChoice, move_b: TurnChoice) -> async_graphql::Result<SinglesBattle> {
+        SinglesBattle::play_turn(ctx, id, move_a, move_b).await
     }
 }
 

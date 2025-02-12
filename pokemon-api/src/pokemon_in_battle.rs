@@ -2,6 +2,7 @@ use crate::primitive_types::{BattleId, RealisedId};
 use crate::realised_pokemon::RealisedPokemon;
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use sqlx::{Pool, Sqlite};
+use std::cmp::max;
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -82,6 +83,27 @@ impl PokemonInBattle {
             });
         }
         Ok(team_done)
+    }
+
+    pub async fn update_for_battle(&self, ctx: &Context<'_>, battle_id: BattleId) -> async_graphql::Result<()> {
+        let pool = ctx.data::<Pool<Sqlite>>()?;
+        let _ = sqlx::query!(
+            "UPDATE pokemon_in_battle SET remaining_hp = $1 WHERE battle_id = $2 AND realised_pokemon_id = $3",
+            self.remaining_hp,
+            battle_id,
+            self.realised_id,
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub fn apply_damage(&mut self, damage: u32) {
+        self.remaining_hp = max(self.remaining_hp - damage as i64, 0);
+    }
+
+    pub fn fainted(&self) -> bool {
+        self.remaining_hp <= 0
     }
 }
 

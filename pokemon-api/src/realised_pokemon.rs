@@ -119,13 +119,13 @@ impl RealisedPokemon {
         PkmMove::get(ctx, self.move_1_id).await
     }
     pub async fn move_2(&self, ctx: &Context<'_>) -> async_graphql::Result<PkmMove> {
-        PkmMove::get(ctx, self.move_1_id).await
+        PkmMove::get(ctx, self.move_2_id).await
     }
     pub async fn move_3(&self, ctx: &Context<'_>) -> async_graphql::Result<PkmMove> {
-        PkmMove::get(ctx, self.move_1_id).await
+        PkmMove::get(ctx, self.move_3_id).await
     }
     pub async fn move_4(&self, ctx: &Context<'_>) -> async_graphql::Result<PkmMove> {
-        PkmMove::get(ctx, self.move_1_id).await
+        PkmMove::get(ctx, self.move_4_id).await
     }
 
     pub async fn nature(&self, ctx: &Context<'_>) -> async_graphql::Result<Nature> {

@@ -14,9 +14,9 @@ impl TryFrom<i64> for DamageClass {
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
         match value {
-            1 => Ok(DamageClass::Physical),
-            2 => Ok(DamageClass::Special),
-            3 => Ok(DamageClass::Status),
+            1 => Ok(DamageClass::Status),
+            2 => Ok(DamageClass::Physical),
+            3 => Ok(DamageClass::Special),
             _ => Err("Unknown damage class.")
         }
     }
