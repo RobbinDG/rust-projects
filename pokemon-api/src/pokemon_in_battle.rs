@@ -3,10 +3,13 @@ use crate::realised_pokemon::RealisedPokemon;
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use sqlx::{Pool, Sqlite};
 use std::cmp::{max, min};
+use crate::modifiers::StatModifier;
+use crate::stats::Stats;
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct PokemonInBattle {
+    battle_id: BattleId,
     realised_id: RealisedId,
     remaining_hp: i64,
 }
@@ -21,7 +24,7 @@ impl PokemonInBattle {
 
         let pkm = sqlx::query_as!(
             PokemonInBattle,
-            "SELECT remaining_hp, realised_pokemon_id as realised_id \
+            "SELECT battle_id, remaining_hp, realised_pokemon_id as realised_id \
             FROM pokemon_in_battle \
             WHERE battle_id = $1 AND realised_pokemon_id = $2 \
             ORDER BY position ASC",
@@ -42,7 +45,7 @@ impl PokemonInBattle {
 
         let team: Vec<_> = sqlx::query_as!(
             Self,
-            "SELECT realised_pokemon_id as realised_id, remaining_hp \
+            "SELECT battle_id, realised_pokemon_id as realised_id, remaining_hp \
             FROM pokemon_in_battle \
             WHERE battle_id = $1 AND team = $2 \
             ORDER BY position ASC",
@@ -78,6 +81,7 @@ impl PokemonInBattle {
                 battle_id, member, team_id, idx, max_hp
             ).execute(pool).await?;
             team_done.push(PokemonInBattle {
+                battle_id,
                 realised_id: member.clone(),
                 remaining_hp: max_hp,
             });
@@ -106,6 +110,13 @@ impl PokemonInBattle {
 
     pub fn fainted(&self) -> bool {
         self.remaining_hp <= 0
+    }
+
+    pub async fn stat(&self, ctx: &Context<'_>, stat: Stats) -> async_graphql::Result<i64> {
+        let base_stats = self.pokemon(ctx).await?.species(ctx).await?.pkm_stats(ctx).await?;
+        let base_stat = base_stats.base_stat(stat);
+        let modifier = StatModifier::get(ctx, self.battle_id, self.realised_id).await?;
+        Ok(modifier.apply(base_stat))
     }
 }
 

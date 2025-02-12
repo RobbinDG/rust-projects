@@ -1,6 +1,7 @@
 use crate::damage_class::DamageClass;
 use crate::pkm_move::PkmMove;
-use crate::realised_pokemon::RealisedPokemon;
+use crate::pokemon_in_battle::PokemonInBattle;
+use crate::stats::Stats;
 use crate::turn_outcome::TurnStepType;
 use async_graphql::Context;
 use rand::Rng;
@@ -8,9 +9,9 @@ use rand::Rng;
 /// Calculates damage according to the gen 8 damage formula: https://bulbapedia.bulbagarden.net/wiki/Damage
 pub async fn calculate(
     ctx: &Context<'_>,
-    attacker: &RealisedPokemon,
+    attacker: &PokemonInBattle,
     move_used: &PkmMove,
-    defender: &RealisedPokemon,
+    defender: &PokemonInBattle,
 ) -> async_graphql::Result<(u32, TurnStepType)> {
     if let Some(accuracy) = move_used.accuracy {
         if rand::random::<f32>() > accuracy as f32 / 100.0 {
@@ -19,13 +20,14 @@ pub async fn calculate(
     }
 
     let move_type = move_used.pkm_type(ctx).await?;
-    let attacker_stats = attacker.species(ctx).await?.pkm_stats(ctx).await?;
-    let defender_stats = defender.species(ctx).await?.pkm_stats(ctx).await?;
     let (a, d) = match move_used.damage_class().await? {
-        DamageClass::Physical => (attacker_stats.atk.base_stat, defender_stats.def.base_stat),
+        DamageClass::Physical => (
+            attacker.stat(ctx, Stats::Atk).await?,
+            defender.stat(ctx, Stats::Def).await?,
+        ),
         DamageClass::Special => (
-            attacker_stats.s_atk.base_stat,
-            defender_stats.s_def.base_stat,
+            attacker.stat(ctx, Stats::SAtk).await?,
+            defender.stat(ctx, Stats::SDef).await?,
         ),
         DamageClass::Status => (0, 1),
     };
@@ -37,6 +39,8 @@ pub async fn calculate(
     let critical = 1.0; // TODO for critical hits
     let random = rand::thread_rng().gen_range(85..=100) as f64 / 100.0;
     let has_stab = attacker
+        .pokemon(ctx)
+        .await?
         .species(ctx)
         .await?
         .pkm_type(ctx)
@@ -45,7 +49,7 @@ pub async fn calculate(
         .any(|typ| &move_type == typ);
     let stab = if has_stab { 1.5 } else { 1.0 };
     let effectiveness = move_type
-        .get_type_efficacy(ctx, &defender.species(ctx).await?.pkm_type(ctx).await?)
+        .get_type_efficacy(ctx, &defender.pokemon(ctx).await?.species(ctx).await?.pkm_type(ctx).await?)
         .await?;
     if effectiveness <= 0.001 {
         return Ok((0, TurnStepType::Immune));

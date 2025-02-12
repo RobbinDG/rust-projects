@@ -81,8 +81,8 @@ impl SinglesBattle {
             .spd
             .base_stat;
 
-        let (damage_a_b, outcome_a_b) = calculate(ctx, &pkm_a, &move_a, &pkm_b).await?;
-        let (damage_b_a, outcome_b_a) = calculate(ctx, &pkm_b, &move_b, &pkm_a).await?;
+        let (damage_a_b, outcome_a_b) = calculate(ctx, &active_a, &move_a, &active_b).await?;
+        let (damage_b_a, outcome_b_a) = calculate(ctx, &active_b, &move_b, &active_a).await?;
 
         let a_first = if speed_a > speed_b {
             true

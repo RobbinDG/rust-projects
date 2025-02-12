@@ -9,13 +9,13 @@ by [Veekun](https://github.com/veekun) at [GitHub](https://github.com/veekun/pok
 for any application to be built on top of the API to make e.g. a in-browser battle simulator.
 
 ## Features
-The API currently supports the following queries and mofications
+The API currently supports the following queries and modifications.
 ### Queries
 - Pokémon Species lookup to provide base stats, natures, abilities, and move pools.
 - Move lookup.
 - Battle lookup.
 ### Modifications
-- Random Pokémon generation: creates a pokemon with random species, nature, and 4 moves.
+- Random Pokémon generation: creates a Pokémon with random species, nature, and 4 moves.
 
 ## Setup
 
@@ -37,3 +37,4 @@ sqlx migrate run  # Add system tables
 - Status conditions are not implemented.
 - Stat changes are not currently implemented.
 - Weather, terrain, and other global effects (e.g. Trick Room and Tailwind) are not implemented.
+- Held items are not implemented

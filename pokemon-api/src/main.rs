@@ -29,6 +29,8 @@ mod singles_battle;
 mod species;
 mod turn_choice;
 mod turn_outcome;
+mod modifiers;
+mod stats;
 
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 

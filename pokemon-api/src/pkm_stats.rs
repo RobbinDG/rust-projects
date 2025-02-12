@@ -1,4 +1,5 @@
-use crate::primitive_types::PkmTypeId;
+use crate::primitive_types::{PkmTypeId, StatId};
+use crate::stats::Stats;
 use async_graphql::futures_util::StreamExt;
 use async_graphql::{Context, SimpleObject};
 use poem::EndpointExt;
@@ -37,6 +38,19 @@ impl PkmStats {
         Self::build_self(maybe_stats).ok_or(async_graphql::Error::new("Not all stats available for pokemon."))
     }
 
+    pub fn base_stat(&self, stat: Stats) -> i64 {
+        match stat {
+            Stats::Hp => self.hp.base_stat.clone(),
+            Stats::Atk => self.atk.base_stat.clone(),
+            Stats::Def => self.def.base_stat.clone(),
+            Stats::SAtk => self.s_atk.base_stat.clone(),
+            Stats::SDef => self.s_def.base_stat.clone(),
+            Stats::Spd => self.spd.base_stat.clone(),
+            Stats::Acc => 1,
+            Stats::Eva => 1,
+        }
+    }
+
     fn build_self(stats: [Option<PkmStat>; 6]) -> Option<Self> {
         let [hp, atk, def, s_atk, s_def, spd] = stats;
         Some(Self {
@@ -52,7 +66,7 @@ impl PkmStats {
 
 #[derive(SimpleObject)]
 pub struct PkmStat {
-    pub stat_id: i64,
+    pub stat_id: StatId,
     pub base_stat: i64,
     pub effort: i64,
 }
