@@ -3,6 +3,7 @@ use async_graphql::{Enum, SimpleObject};
 #[derive(Clone, Copy, PartialEq, Eq, Enum)]
 pub enum TurnStepType {
     Damage,
+    Missed,
     Fainted,
     Immune,
     Protected,

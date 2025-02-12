@@ -1,16 +1,23 @@
 use crate::damage_class::DamageClass;
 use crate::pkm_move::PkmMove;
 use crate::realised_pokemon::RealisedPokemon;
-use crate::turn_outcome::{TurnStep, TurnStepType};
+use crate::turn_outcome::TurnStepType;
 use async_graphql::Context;
 use rand::Rng;
 
+/// Calculates damage according to the gen 8 damage formula: https://bulbapedia.bulbagarden.net/wiki/Damage
 pub async fn calculate(
     ctx: &Context<'_>,
     attacker: &RealisedPokemon,
     move_used: &PkmMove,
     defender: &RealisedPokemon,
 ) -> async_graphql::Result<(u32, TurnStepType)> {
+    if let Some(accuracy) = move_used.accuracy {
+        if rand::random::<f32>() > accuracy as f32 / 100.0 {
+            return Ok((0, TurnStepType::Missed));
+        }
+    }
+
     let move_type = move_used.pkm_type(ctx).await?;
     let attacker_stats = attacker.species(ctx).await?.pkm_stats(ctx).await?;
     let defender_stats = defender.species(ctx).await?.pkm_stats(ctx).await?;

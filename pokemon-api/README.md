@@ -34,6 +34,6 @@ sqlx migrate run  # Add system tables
 - Switching is not supported.
 - Natures have no effect.
 - Abilities have no effect.
-- Accuracy is not checked.
 - Status conditions are not implemented.
+- Stat changes are not currently implemented.
 - Weather, terrain, and other global effects (e.g. Trick Room and Tailwind) are not implemented.
