@@ -5,6 +5,8 @@ use crate::primitive_types::{PkmEffectId, PkmId, PkmMoveId, PkmTypeId};
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use sqlx;
 use sqlx::{Pool, Sqlite};
+use crate::move_stat_changes::MoveStatChange;
+use crate::move_target::MoveTarget;
 
 #[derive(SimpleObject)]
 pub struct PkmEffect {
@@ -22,7 +24,8 @@ pub struct PkmMove {
     pub power: Option<i64>,
     pub pp: Option<i64>,
     pub accuracy: Option<i64>,
-    target: i64,
+    #[graphql(skip)]
+    target_id: i64,
     #[graphql(skip)]
     damage_class: i64,
     #[graphql(skip)]
@@ -38,7 +41,7 @@ impl PkmMove {
         let result = sqlx::query_as!(
             Self,
             "\
-            SELECT id, identifier as name, type_id, power, pp, accuracy, target_id as target, \
+            SELECT id, identifier as name, type_id, power, pp, accuracy, target_id, \
             damage_class_id as damage_class, effect_id, effect_chance \
             FROM moves WHERE id = $1
             ",
@@ -55,7 +58,7 @@ impl PkmMove {
         let result = sqlx::query_as!(
             Self,
             r#"
-            SELECT COALESCE(m.id, -1) id, COALESCE(m.identifier, "Error") name, COALESCE(type_id, -1) type_id, power, pp, accuracy, COALESCE(target_id, -1) target,
+            SELECT COALESCE(m.id, -1) id, COALESCE(m.identifier, "Error") name, COALESCE(type_id, -1) type_id, power, pp, accuracy, COALESCE(target_id, -1) target_id,
             COALESCE(damage_class_id, -1) damage_class, COALESCE(effect_id, -1) effect_id, effect_chance
             FROM moves m
             JOIN pokemon_moves pm ON m.id = pm.move_id AND pm.pokemon_id = $1
@@ -88,5 +91,13 @@ impl PkmMove {
             MoveEffect::get(ctx, self.effect_id).await?,
             self.effect_chance,
         ))
+    }
+
+    pub async fn target(&self) -> async_graphql::Result<MoveTarget> {
+        Ok(MoveTarget::try_from(self.target_id)?)
+    }
+
+    pub async fn stat_changes(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<MoveStatChange>> {
+        MoveStatChange::get(ctx, self.id).await
     }
 }

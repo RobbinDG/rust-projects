@@ -31,6 +31,8 @@ mod turn_choice;
 mod turn_outcome;
 mod modifiers;
 mod stats;
+mod move_stat_changes;
+mod move_target;
 
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 

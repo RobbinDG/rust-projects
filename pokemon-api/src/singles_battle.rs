@@ -125,31 +125,31 @@ impl SinglesBattle {
         second_type: TurnStepType,
     ) -> Vec<TurnStep> {
         let mut outcomes = Vec::new();
-        let true_damage = second.apply_damage(first_damage);
-        if second.fainted() {
-            outcomes.push(TurnStep {
-                damage_dealt: true_damage,
-                type_: TurnStepType::Fainted,
-            })
-        } else {
-            outcomes.push(TurnStep {
-                damage_dealt: true_damage,
-                type_: first_type,
-            });
-            let true_damage = first.apply_damage(second_damage);
-            if first.fainted() {
-                outcomes.push(TurnStep {
-                    damage_dealt: true_damage,
-                    type_: TurnStepType::Fainted,
-                })
-            } else {
-                outcomes.push(TurnStep {
-                    damage_dealt: true_damage,
-                    type_: second_type,
-                })
-            }
+        outcomes.push(Self::attack_target(second, first_damage, first_type));
+
+        if !second.fainted() {
+            outcomes.push(Self::attack_target(first, second_damage, second_type));
         }
         outcomes
+    }
+
+    fn attack_target(
+        target: &mut PokemonInBattle,
+        damage: u32,
+        second_type: TurnStepType,
+    ) -> TurnStep {
+        let true_damage = target.apply_damage(damage);
+        if target.fainted() {
+            TurnStep {
+                damage_dealt: true_damage,
+                type_: TurnStepType::FaintedTarget,
+            }
+        } else {
+            TurnStep {
+                damage_dealt: true_damage,
+                type_: second_type,
+            }
+        }
     }
 
     async fn get_selected_move(

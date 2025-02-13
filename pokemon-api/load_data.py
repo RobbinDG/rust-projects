@@ -10,6 +10,7 @@ data_sources = {
     'moves': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/moves.csv',
     'move_names': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/move_names.csv',
     'move_effects': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/move_effect_prose.csv',
+    'move_stat_changes': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/move_meta_stat_changes.csv',
     'natures': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/natures.csv',
     'abilities': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/abilities.csv',
     'ability_effects': 'https://raw.githubusercontent.com/veekun/pokedex/refs/heads/master/pokedex/data/csv/ability_prose.csv',

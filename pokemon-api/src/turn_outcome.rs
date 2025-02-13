@@ -4,7 +4,7 @@ use async_graphql::{Enum, SimpleObject};
 pub enum TurnStepType {
     Damage,
     Missed,
-    Fainted,
+    FaintedTarget,
     Immune,
     Protected,
     Failed,

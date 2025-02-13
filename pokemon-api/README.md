@@ -35,6 +35,12 @@ sqlx migrate run  # Add system tables
 - Natures have no effect.
 - Abilities have no effect.
 - Status conditions are not implemented.
-- Stat changes are not currently implemented.
+- Moves with specific effects do not work (entirely), most notably
+  - Stat changes are not currently implemented (as primary or secondary effect)
+  - Recovery is not implemented.
+  - Multi-turn moves (like wish and perish song) do not work.
+- PP tracking is not implemented
+  - Consequently, struggle is not implemented either.
+- Dynamic speed is not implemented (i.e. speed rules are like the earlier games)
 - Weather, terrain, and other global effects (e.g. Trick Room and Tailwind) are not implemented.
 - Held items are not implemented
