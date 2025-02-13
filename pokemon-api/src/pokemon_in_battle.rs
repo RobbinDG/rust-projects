@@ -112,11 +112,8 @@ impl PokemonInBattle {
         self.remaining_hp <= 0
     }
 
-    pub async fn stat(&self, ctx: &Context<'_>, stat: Stats) -> async_graphql::Result<i64> {
-        let base_stats = self.pokemon(ctx).await?.species(ctx).await?.pkm_stats(ctx).await?;
-        let base_stat = base_stats.base_stat(stat);
-        let modifier = StatModifier::get(ctx, self.battle_id, self.realised_id).await?;
-        Ok(modifier.apply(base_stat))
+    pub async fn stat_modifier(&self, ctx: &Context<'_>, stat: &Stats) -> async_graphql::Result<StatModifier> {
+        StatModifier::get(ctx, self.battle_id, self.realised_id, &stat).await
     }
 }
 
@@ -124,5 +121,12 @@ impl PokemonInBattle {
 impl PokemonInBattle {
     pub async fn pokemon(&self, ctx: &Context<'_>) -> async_graphql::Result<RealisedPokemon> {
         RealisedPokemon::get(ctx, self.realised_id).await
+    }
+
+    pub async fn stat(&self, ctx: &Context<'_>, stat: Stats) -> async_graphql::Result<i64> {
+        let base_stats = self.pokemon(ctx).await?.species(ctx).await?.pkm_stats(ctx).await?;
+        let base_stat = base_stats.base_stat(&stat);
+        let modifier = self.stat_modifier(ctx, &stat).await?;
+        Ok(modifier.apply(base_stat))
     }
 }

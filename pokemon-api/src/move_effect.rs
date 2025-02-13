@@ -21,18 +21,3 @@ impl MoveEffect {
         Ok(result)
     }
 }
-
-#[derive(SimpleObject)]
-pub struct BoundMoveEffect {
-    effect: MoveEffect,
-    chance: Option<i64>,
-}
-
-impl BoundMoveEffect {
-    pub fn new(effect: MoveEffect, chance: Option<i64>) -> Self {
-        Self {
-            effect,
-            chance,
-        }
-    }
-}

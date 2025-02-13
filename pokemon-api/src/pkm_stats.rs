@@ -38,7 +38,7 @@ impl PkmStats {
         Self::build_self(maybe_stats).ok_or(async_graphql::Error::new("Not all stats available for pokemon."))
     }
 
-    pub fn base_stat(&self, stat: Stats) -> i64 {
+    pub fn base_stat(&self, stat: &Stats) -> i64 {
         match stat {
             Stats::Hp => self.hp.base_stat.clone(),
             Stats::Atk => self.atk.base_stat.clone(),

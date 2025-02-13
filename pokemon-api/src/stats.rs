@@ -1,5 +1,7 @@
+use async_graphql::Enum;
 use crate::primitive_types::StatId;
 
+#[derive(Clone, Copy, PartialEq, Eq, Enum)]
 pub enum Stats {
     Hp,
     Atk,

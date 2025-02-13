@@ -1,12 +1,12 @@
 use crate::damage_class::DamageClass;
-use crate::move_effect::{BoundMoveEffect, MoveEffect};
+use crate::move_effect::MoveEffect;
+use crate::move_stat_changes::MoveStatChange;
+use crate::move_target::MoveTarget;
 use crate::pkm_type::PkmType;
 use crate::primitive_types::{PkmEffectId, PkmId, PkmMoveId, PkmTypeId};
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use sqlx;
 use sqlx::{Pool, Sqlite};
-use crate::move_stat_changes::MoveStatChange;
-use crate::move_target::MoveTarget;
 
 #[derive(SimpleObject)]
 pub struct PkmEffect {
@@ -30,8 +30,7 @@ pub struct PkmMove {
     damage_class: i64,
     #[graphql(skip)]
     effect_id: i64,
-    #[graphql(skip)]
-    effect_chance: Option<i64>,
+    pub effect_chance: Option<i64>,
 }
 
 impl PkmMove {
@@ -86,11 +85,8 @@ impl PkmMove {
         PkmType::get(self.type_id, ctx).await
     }
 
-    pub async fn effect(&self, ctx: &Context<'_>) -> async_graphql::Result<BoundMoveEffect> {
-        Ok(BoundMoveEffect::new(
-            MoveEffect::get(ctx, self.effect_id).await?,
-            self.effect_chance,
-        ))
+    pub async fn effect(&self, ctx: &Context<'_>) -> async_graphql::Result<MoveEffect> {
+        Ok(MoveEffect::get(ctx, self.effect_id).await?)
     }
 
     pub async fn target(&self) -> async_graphql::Result<MoveTarget> {

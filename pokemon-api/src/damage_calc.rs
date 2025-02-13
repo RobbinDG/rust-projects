@@ -56,9 +56,9 @@ pub async fn calculate(
     }
     let burn = 1.0; // TODO burn
 
-    let unmodified = dr((dr(2 * level, 5) + 2) * power * dr(a, d), 50) + 2;
+    let unmodified = ((2 * level) as f64 / 5.0 + 2.0) * ((power * a) as f64/ d as f64) / 50.0 + 2.0;
     let factored =
-        unmodified as f64 * targets * weather * critical * random * stab * effectiveness * burn;
+        unmodified * targets * weather * critical * random * stab * effectiveness * burn;
     Ok((factored as u32, TurnStepType::Damage))
 }
 

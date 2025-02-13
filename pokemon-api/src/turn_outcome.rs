@@ -14,6 +14,7 @@ pub enum TurnStepType {
 pub struct TurnStep {
     pub damage_dealt: i64,
     pub type_: TurnStepType,
+    pub effect_triggered: bool,
 }
 
 #[derive(SimpleObject)]

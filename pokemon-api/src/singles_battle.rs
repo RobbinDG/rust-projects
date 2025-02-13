@@ -1,4 +1,5 @@
 use crate::damage_calc::calculate;
+use crate::move_target::MoveTarget;
 use crate::pkm_move::PkmMove;
 use crate::pokemon_in_battle::PokemonInBattle;
 use crate::primitive_types::{BattleId, RealisedId};
@@ -6,6 +7,7 @@ use crate::realised_pokemon::RealisedPokemon;
 use crate::turn_choice::TurnChoice;
 use crate::turn_outcome::{TurnOutcome, TurnStep, TurnStepType};
 use async_graphql::{Context, SimpleObject};
+use rand::Rng;
 use sqlx::{Pool, Sqlite};
 
 #[derive(SimpleObject)]
@@ -81,9 +83,6 @@ impl SinglesBattle {
             .spd
             .base_stat;
 
-        let (damage_a_b, outcome_a_b) = calculate(ctx, &active_a, &move_a, &active_b).await?;
-        let (damage_b_a, outcome_b_a) = calculate(ctx, &active_b, &move_b, &active_a).await?;
-
         let a_first = if speed_a > speed_b {
             true
         } else if speed_b > speed_a {
@@ -93,62 +92,79 @@ impl SinglesBattle {
         };
 
         let outcomes = if a_first {
-            Self::perform_turn(
-                &mut active_a,
-                &mut active_b,
-                damage_a_b,
-                outcome_a_b,
-                damage_b_a,
-                outcome_b_a,
-            )
+            Self::perform_turn(ctx, &mut active_a, &mut active_b, &move_a, &move_b).await?
         } else {
-            Self::perform_turn(
-                &mut active_b,
-                &mut active_a,
-                damage_b_a,
-                outcome_b_a,
-                damage_a_b,
-                outcome_a_b,
-            )
+            Self::perform_turn(ctx, &mut active_b, &mut active_a, &move_b, &move_a).await?
         };
         active_a.update_for_battle(ctx, battle_id).await?;
         active_b.update_for_battle(ctx, battle_id).await?;
         Ok(TurnOutcome { order: outcomes })
     }
 
-    fn perform_turn(
-        first: &mut &mut PokemonInBattle,
-        second: &mut &mut PokemonInBattle,
-        first_damage: u32,
-        first_type: TurnStepType,
-        second_damage: u32,
-        second_type: TurnStepType,
-    ) -> Vec<TurnStep> {
+    async fn perform_turn(
+        ctx: &Context<'_>,
+        first: &mut PokemonInBattle,
+        second: &mut PokemonInBattle,
+        first_move: &PkmMove,
+        second_move: &PkmMove,
+    ) -> async_graphql::Result<Vec<TurnStep>> {
         let mut outcomes = Vec::new();
-        outcomes.push(Self::attack_target(second, first_damage, first_type));
+        outcomes.push(Self::execute_move(ctx, first, second, first_move).await?);
 
         if !second.fainted() {
-            outcomes.push(Self::attack_target(first, second_damage, second_type));
+            outcomes.push(Self::execute_move(ctx, second, first, second_move).await?);
         }
-        outcomes
+        Ok(outcomes)
     }
 
-    fn attack_target(
+    async fn execute_move(
+        ctx: &Context<'_>,
+        user: &mut PokemonInBattle,
         target: &mut PokemonInBattle,
-        damage: u32,
-        second_type: TurnStepType,
-    ) -> TurnStep {
-        let true_damage = target.apply_damage(damage);
-        if target.fainted() {
-            TurnStep {
-                damage_dealt: true_damage,
-                type_: TurnStepType::FaintedTarget,
+        move_used: &PkmMove,
+    ) -> async_graphql::Result<TurnStep> {
+        let (damage, turn) = calculate(ctx, user, move_used, target).await?;
+
+        let move_target: MoveTarget = move_used.target(ctx).await?;
+        let targeted = match move_target {
+            MoveTarget::UserOrAlly => Some(user),
+            MoveTarget::User => Some(user),
+            MoveTarget::RandomOpponent => Some(target),
+            MoveTarget::AllOtherPokemon => Some(target),
+            MoveTarget::SelectedPokemon => Some(target),
+            MoveTarget::AllOpponents => Some(target),
+            MoveTarget::UserAndAllies => Some(user),
+            _ => None,
+        };
+
+        let effect_trigger = match move_used.effect_chance {
+            None => true,
+            Some(c) => rand::thread_rng().gen_range(0..100) < c,
+        };
+
+        if let Some(targeted) = targeted {
+            let true_damage = targeted.apply_damage(damage);
+            if effect_trigger {
+                let stat_changes = move_used.stat_changes(ctx).await?;
+                for stat_change in stat_changes {
+                    targeted
+                        .stat_modifier(ctx, &stat_change.stat()?)
+                        .await?
+                        .raise(ctx, stat_change.change)
+                        .await?;
+                }
             }
+            Ok(TurnStep {
+                damage_dealt: true_damage,
+                type_: if targeted.fainted() {
+                    TurnStepType::FaintedTarget
+                } else {
+                    turn
+                },
+                effect_triggered: effect_trigger,
+            })
         } else {
-            TurnStep {
-                damage_dealt: true_damage,
-                type_: second_type,
-            }
+            Err(async_graphql::Error::new("Move target type not supported."))
         }
     }
 

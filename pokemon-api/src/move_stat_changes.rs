@@ -1,11 +1,13 @@
 use crate::primitive_types::{PkmMoveId, StatId};
 use async_graphql::{Context, SimpleObject};
 use sqlx::{Pool, Sqlite};
+use crate::stats::Stats;
 
 #[derive(SimpleObject)]
 pub struct MoveStatChange {
+    #[graphql(skip)]
     stat: StatId,
-    change: i64,
+    pub change: i64,
 }
 
 impl MoveStatChange {
@@ -23,5 +25,9 @@ impl MoveStatChange {
         .fetch_all(pool)
         .await?;
         Ok(result)
+    }
+
+    pub fn stat(&self) -> async_graphql::Result<Stats> {
+        Ok(Stats::try_from(self.stat).map_err(|_| "Stat Id not recognised")?)
     }
 }
