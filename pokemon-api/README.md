@@ -58,11 +58,11 @@ cargo install sqlx-cli  # Install `sqlx`
 sqlx migrate run  # Add system tables
 ```
 
-### Example
+### Examples
 <details>
 <summary>Generating a random Pokémon</summary>
 
-Input
+#### Input
 ```graphql
 mutation {
   randomPokemon{
@@ -88,7 +88,7 @@ mutation {
   }
 }
 ```
-Output
+#### Output
 ```json
 {
   "data": {
@@ -118,8 +118,9 @@ Output
 ```
 </details>
 
-#### Starting a Battle
-Input
+<details>
+<summary>Starting a Battle</summary>
+#### Input
 ```graphql
 mutation {
   startBattle(teamA:[5,6], teamB:[7,9]){
@@ -127,7 +128,7 @@ mutation {
   }
 }
 ```
-Output
+#### Output
 ```json
 {
   "data": {
@@ -137,3 +138,4 @@ Output
   }
 }
 ```
+</details>
