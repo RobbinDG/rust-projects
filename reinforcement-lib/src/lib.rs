@@ -1,3 +1,10 @@
+mod agent;
+mod agent_factory;
+mod environment;
+mod interpreter;
+mod learning;
+mod reward;
+
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }
