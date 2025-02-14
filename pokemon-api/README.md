@@ -120,6 +120,7 @@ mutation {
 
 <details>
 <summary>Starting a Battle</summary>
+
 #### Input
 ```graphql
 mutation {
@@ -138,4 +139,469 @@ mutation {
   }
 }
 ```
+</details>
+
+<details>
+<summary>Getting the current battle state</summary>
+
+#### Input
+```graphql
+{
+  battle(id:7){
+    activeA
+    activeB
+    teamA{
+      stat(stat:ATK)
+      pokemon{
+        species{
+          identifier
+          pkmStats{
+            atk{baseStat}
+            spd{
+              baseStat
+            }
+            hp{
+              baseStat
+            }
+          }
+        }
+        move1{
+          name
+          accuracy
+          power
+        }
+        move2{
+          name
+          accuracy
+          power
+        }
+        move3{
+          name
+          accuracy
+          power
+        }
+        move4{
+          name
+          accuracy
+          power
+        }
+      }
+      remainingHp
+    }
+    teamB{
+      stat(stat:ATK)
+      pokemon{
+        species{
+          identifier
+          pkmStats{
+            atk{baseStat}
+            spd{
+              baseStat
+            }
+            hp{
+              baseStat
+            }
+          }
+        }
+        move1{
+          name
+          power
+        }
+        move2{
+          name
+          power
+        }
+        move3{
+          name
+          power
+        }
+        move4{
+          name
+          power
+        }
+      }
+      remainingHp
+    }
+  }
+}
+```
+#### Output
+```json
+{
+  "data": {
+    "battle": {
+      "activeA": 0,
+      "activeB": 0,
+      "teamA": [
+        {
+          "stat": 95,
+          "pokemon": {
+            "species": {
+              "identifier": "cinccino",
+              "pkmStats": {
+                "atk": {
+                  "baseStat": 95
+                },
+                "spd": {
+                  "baseStat": 115
+                },
+                "hp": {
+                  "baseStat": 75
+                }
+              }
+            },
+            "move1": {
+              "name": "fling",
+              "accuracy": 100,
+              "power": null
+            },
+            "move2": {
+              "name": "thunder",
+              "accuracy": 70,
+              "power": 110
+            },
+            "move3": {
+              "name": "rest",
+              "accuracy": null,
+              "power": null
+            },
+            "move4": {
+              "name": "toxic",
+              "accuracy": 90,
+              "power": null
+            }
+          },
+          "remainingHp": 75
+        },
+        {
+          "stat": 120,
+          "pokemon": {
+            "species": {
+              "identifier": "luxray",
+              "pkmStats": {
+                "atk": {
+                  "baseStat": 120
+                },
+                "spd": {
+                  "baseStat": 70
+                },
+                "hp": {
+                  "baseStat": 80
+                }
+              }
+            },
+            "move1": {
+              "name": "light-screen",
+              "accuracy": null,
+              "power": null
+            },
+            "move2": {
+              "name": "substitute",
+              "accuracy": null,
+              "power": null
+            },
+            "move3": {
+              "name": "substitute",
+              "accuracy": null,
+              "power": null
+            },
+            "move4": {
+              "name": "flash",
+              "accuracy": 100,
+              "power": null
+            }
+          },
+          "remainingHp": 80
+        }
+      ],
+      "teamB": [
+        {
+          "stat": 73,
+          "pokemon": {
+            "species": {
+              "identifier": "swalot",
+              "pkmStats": {
+                "atk": {
+                  "baseStat": 73
+                },
+                "spd": {
+                  "baseStat": 55
+                },
+                "hp": {
+                  "baseStat": 100
+                }
+              }
+            },
+            "move1": {
+              "name": "water-pulse",
+              "power": 60
+            },
+            "move2": {
+              "name": "thunder-punch",
+              "power": 75
+            },
+            "move3": {
+              "name": "sleep-talk",
+              "power": null
+            },
+            "move4": {
+              "name": "substitute",
+              "power": null
+            }
+          },
+          "remainingHp": 100
+        },
+        {
+          "stat": 52,
+          "pokemon": {
+            "species": {
+              "identifier": "bastiodon",
+              "pkmStats": {
+                "atk": {
+                  "baseStat": 52
+                },
+                "spd": {
+                  "baseStat": 30
+                },
+                "hp": {
+                  "baseStat": 60
+                }
+              }
+            },
+            "move1": {
+              "name": "blizzard",
+              "power": 110
+            },
+            "move2": {
+              "name": "round",
+              "power": 60
+            },
+            "move3": {
+              "name": "mud-slap",
+              "power": 20
+            },
+            "move4": {
+              "name": "block",
+              "power": null
+            }
+          },
+          "remainingHp": 60
+        }
+      ]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Playing a turn</summary>
+
+#### Input
+```graphql
+mutation{
+  playTurn(id: 7, moveA: SELECT_MOVE_2, moveB: SWITCH_2){
+    switchPhase{
+      side,
+      into
+    }
+    attackPhase{
+      type
+      damageDealt
+      effectTriggered
+    }
+  }
+}
+```
+#### Output
+```json
+{
+  "data": {
+    "playTurn": {
+      "switchPhase": [
+        {
+          "side": "TEAM_B",
+          "into": 1
+        }
+      ],
+      "attackPhase": [
+        {
+          "type": "DAMAGE",
+          "damageDealt": 22,
+          "effectTriggered": false
+        }
+      ]
+    }
+  }
+}
+```
+
+#### Updated battle state output
+```json
+{
+  "data": {
+    "battle": {
+      "activeA": 0,
+      "activeB": 1,
+      "teamA": [
+        {
+          "stat": 95,
+          "pokemon": {
+            "species": {
+              "identifier": "cinccino",
+              "pkmStats": {
+                "atk": {
+                  "baseStat": 95
+                },
+                "spd": {
+                  "baseStat": 115
+                },
+                "hp": {
+                  "baseStat": 75
+                }
+              }
+            },
+            "move1": {
+              "name": "fling",
+              "accuracy": 100,
+              "power": null
+            },
+            "move2": {
+              "name": "thunder",
+              "accuracy": 70,
+              "power": 110
+            },
+            "move3": {
+              "name": "rest",
+              "accuracy": null,
+              "power": null
+            },
+            "move4": {
+              "name": "toxic",
+              "accuracy": 90,
+              "power": null
+            }
+          },
+          "remainingHp": 75
+        },
+        {
+          "stat": 120,
+          "pokemon": {
+            "species": {
+              "identifier": "luxray",
+              "pkmStats": {
+                "atk": {
+                  "baseStat": 120
+                },
+                "spd": {
+                  "baseStat": 70
+                },
+                "hp": {
+                  "baseStat": 80
+                }
+              }
+            },
+            "move1": {
+              "name": "light-screen",
+              "accuracy": null,
+              "power": null
+            },
+            "move2": {
+              "name": "substitute",
+              "accuracy": null,
+              "power": null
+            },
+            "move3": {
+              "name": "substitute",
+              "accuracy": null,
+              "power": null
+            },
+            "move4": {
+              "name": "flash",
+              "accuracy": 100,
+              "power": null
+            }
+          },
+          "remainingHp": 80
+        }
+      ],
+      "teamB": [
+        {
+          "stat": 73,
+          "pokemon": {
+            "species": {
+              "identifier": "swalot",
+              "pkmStats": {
+                "atk": {
+                  "baseStat": 73
+                },
+                "spd": {
+                  "baseStat": 55
+                },
+                "hp": {
+                  "baseStat": 100
+                }
+              }
+            },
+            "move1": {
+              "name": "water-pulse",
+              "power": 60
+            },
+            "move2": {
+              "name": "thunder-punch",
+              "power": 75
+            },
+            "move3": {
+              "name": "sleep-talk",
+              "power": null
+            },
+            "move4": {
+              "name": "substitute",
+              "power": null
+            }
+          },
+          "remainingHp": 100
+        },
+        {
+          "stat": 52,
+          "pokemon": {
+            "species": {
+              "identifier": "bastiodon",
+              "pkmStats": {
+                "atk": {
+                  "baseStat": 52
+                },
+                "spd": {
+                  "baseStat": 30
+                },
+                "hp": {
+                  "baseStat": 60
+                }
+              }
+            },
+            "move1": {
+              "name": "blizzard",
+              "power": 110
+            },
+            "move2": {
+              "name": "round",
+              "power": 60
+            },
+            "move3": {
+              "name": "mud-slap",
+              "power": 20
+            },
+            "move4": {
+              "name": "block",
+              "power": null
+            }
+          },
+          "remainingHp": 38
+        }
+      ]
+    }
+  }
+}
+```
+
 </details>
