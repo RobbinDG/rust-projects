@@ -2,7 +2,7 @@ use crate::damage_class::DamageClass;
 use crate::pkm_move::PkmMove;
 use crate::pokemon_in_battle::PokemonInBattle;
 use crate::stats::Stats;
-use crate::turn_outcome::TurnStepType;
+use crate::turn_outcome::AttackPhaseType;
 use async_graphql::Context;
 use rand::Rng;
 
@@ -12,10 +12,10 @@ pub async fn calculate(
     attacker: &PokemonInBattle,
     move_used: &PkmMove,
     defender: &PokemonInBattle,
-) -> async_graphql::Result<(u32, TurnStepType)> {
+) -> async_graphql::Result<(u32, AttackPhaseType)> {
     if let Some(accuracy) = move_used.accuracy {
         if rand::random::<f32>() > accuracy as f32 / 100.0 {
-            return Ok((0, TurnStepType::Missed));
+            return Ok((0, AttackPhaseType::Missed));
         }
     }
 
@@ -52,14 +52,14 @@ pub async fn calculate(
         .get_type_efficacy(ctx, &defender.pokemon(ctx).await?.species(ctx).await?.pkm_type(ctx).await?)
         .await?;
     if effectiveness <= 0.001 {
-        return Ok((0, TurnStepType::Immune));
+        return Ok((0, AttackPhaseType::Immune));
     }
     let burn = 1.0; // TODO burn
 
     let unmodified = ((2 * level) as f64 / 5.0 + 2.0) * ((power * a) as f64/ d as f64) / 50.0 + 2.0;
     let factored =
         unmodified * targets * weather * critical * random * stab * effectiveness * burn;
-    Ok((factored as u32, TurnStepType::Damage))
+    Ok((factored as u32, AttackPhaseType::Damage))
 }
 
 fn dr(numerator: i64, denominator: i64) -> i64 {

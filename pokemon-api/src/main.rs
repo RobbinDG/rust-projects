@@ -11,7 +11,7 @@ use species::Species;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::error::Error;
-use crate::turn_choice::TurnChoice;
+use crate::simple_turn_choice::SimpleTurnChoice;
 use crate::turn_outcome::TurnOutcome;
 
 mod ability;
@@ -27,12 +27,14 @@ mod primitive_types;
 mod realised_pokemon;
 mod singles_battle;
 mod species;
-mod turn_choice;
+mod simple_turn_choice;
 mod turn_outcome;
 mod modifiers;
 mod stats;
 mod move_stat_changes;
 mod move_target;
+mod turn_choice;
+mod side;
 
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
@@ -72,8 +74,9 @@ impl Mutation {
         SinglesBattle::insert(ctx, team_a, team_b).await
     }
 
-    async fn play_turn(&self, ctx: &Context<'_>, id: BattleId, move_a: TurnChoice, move_b: TurnChoice) -> async_graphql::Result<TurnOutcome> {
-        SinglesBattle::play_turn(ctx, id, move_a, move_b).await
+    async fn play_turn(&self, ctx: &Context<'_>, id: BattleId, move_a: SimpleTurnChoice, move_b: SimpleTurnChoice) -> async_graphql::Result<TurnOutcome> {
+        let mut battle = SinglesBattle::get(ctx, id).await?;
+        battle.play_turn(ctx, move_a, move_b).await
     }
 }
 
