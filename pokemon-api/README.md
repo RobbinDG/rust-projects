@@ -29,6 +29,11 @@ The API currently supports the following queries and modifications.
 - Play a turn in a created battle and get returned an abstract of the events occurred during 
   that turn.
 
+## Tech-stack
+- GraphQL (async-graphql crate)
+- SQLite (sqlx crate)
+- Poem
+
 ## Limitations (but may be patched)
 
 - Team sizes are currently unbounded, whereas the game requires at least 1 allows for a maximum
