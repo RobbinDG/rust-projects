@@ -275,7 +275,7 @@ impl Index<u16> for Memory {
     fn index(&self, addr: u16) -> &Self::Output {
         match addr {
             0x0000..=0x3FFF => &self.rom[addr as usize],
-            0x4000..=0x7FFF => &self.rom[(self.rom_bank_reg as u16 * 0x4000) as usize],
+            0x4000..=0x7FFF => &self.rom[(self.rom_bank_reg as u32 * 0x4000 + (addr as u32 - 0x4000)) as usize],
             0x8000..=0x97FF => &self.tile_ram[(addr - 0x8000) as usize],
             0x9800..=0x9FFF => &self.background_map[(addr - 0x9800) as usize],
             0xA000..=0xBFFF => &self.cartridge_ram[(addr - 0xA000) as usize],
@@ -293,10 +293,7 @@ impl Index<u16> for Memory {
 impl IndexMut<u16> for Memory {
     fn index_mut(&mut self, addr: u16) -> &mut Self::Output {
         match addr {
-            0x2000..=0x3FFF => {
-                println!("ROM BANK SWITCH");
-                &mut self.rom_bank_reg
-            },
+            0x2000..=0x3FFF => &mut self.rom_bank_reg,
             0x8000..=0x97FF => &mut self.tile_ram[(addr - 0x8000) as usize],
             0x9800..=0x9FFF => &mut self.background_map[(addr - 0x9800) as usize],
             0xA000..=0xBFFF => &mut self.cartridge_ram[(addr - 0xA000) as usize],
