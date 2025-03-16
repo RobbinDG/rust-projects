@@ -1,7 +1,6 @@
 use crate::memory::Memory;
 use minifb::{Key, Window, WindowOptions};
 
-
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
 const TILE_X: u8 = 8;
@@ -15,6 +14,8 @@ const MODE_2_MIN_DOTS: u16 = 172;
 const TOTAL_DOTS: u16 = 456;
 const TOTAL_SL: u8 = 154;
 const OAM_DMA_LENGTH: u16 = 160;
+const SPRITE_BYTES: usize = 4;
+const SL_SPRITE_CAPACITY: usize = 10;
 
 struct LCDC {
     lcd_ppu_enable: bool,
@@ -51,6 +52,8 @@ pub struct PPU {
     window: Window,
     oam_dma_start: u16,
     oam_dma_ctr: u16,
+    sl_objects: [u8; SPRITE_BYTES * 10],
+    sl_objects_nxt: usize,
 }
 
 impl PPU {
@@ -66,16 +69,18 @@ impl PPU {
                 HEIGHT,
                 WindowOptions::default(),
             )
-                .unwrap(),
+            .unwrap(),
             oam_dma_start: 0xFF,
             oam_dma_ctr: OAM_DMA_LENGTH,
+            sl_objects: [0; SPRITE_BYTES * 10],
+            sl_objects_nxt: 0,
         }
     }
 
     pub fn run_dot(&mut self, mut mem: Memory) -> Memory {
         let mut lcdc = LCDC::load(&mem);
         if !lcdc.lcd_ppu_enable {
-            return mem
+            return mem;
         }
 
         self.oam_dma_transfer(&mut mem);
@@ -85,16 +90,61 @@ impl PPU {
             if self.dot < MODE_0_DOTS {
                 // Mode 0: OAM scan
                 self.line_idx = 0;
+                // 40 sprites to check, 80 dots.
+                if self.dot % 2 == 0 && self.sl_objects_nxt < SL_SPRITE_CAPACITY {
+                    let sprite_idx = 0xFE00 + self.dot * (SPRITE_BYTES as u16) / 2;
+                    let sprite_y = mem[sprite_idx + 0];
+                    // TODO thet sl + 16 here depends on the mode, the one with sprite_y doesn't
+                    if sprite_y <= self.sl + 16 && self.sl + 16 < sprite_y + 16 {
+                        // Copy sprite data if it is in the scanline.
+                        self.sl_objects[self.sl_objects_nxt + 0] = mem[sprite_idx + 0];
+                        self.sl_objects[self.sl_objects_nxt + 1] = mem[sprite_idx + 1];
+                        self.sl_objects[self.sl_objects_nxt + 2] = mem[sprite_idx + 2];
+                        self.sl_objects[self.sl_objects_nxt + 3] = mem[sprite_idx + 3];
+                        self.sl_objects_nxt += SPRITE_BYTES;
+                    }
+                }
                 0
             } else if self.dot < MODE_0_DOTS + MODE_2_MIN_DOTS {
                 // Mode 2: Drawing
                 self.line_idx += 1;
                 if (self.line_idx as usize) < WIDTH {
-                    self.set_bg_pixel_for(&mem, self.line_idx, self.sl, &mut lcdc);
+                    // Load BG
+                    let mut pixel = self.get_bg_pixel_for(&mem, self.line_idx, self.sl, &mut lcdc);
+
+                    // Load sprites
+                    let mut sprite_min_x = WIDTH as u8 + 1;
+                    for i in (0..self.sl_objects_nxt).step_by(SPRITE_BYTES) {
+                        let sprite_y = self.sl_objects[i + 0];
+                        let sprite_x = self.sl_objects[i + 1];
+                        let tile_idx = self.sl_objects[i + 2];
+                        let sprite_attrs = self.sl_objects[i + 3];
+
+                        if !(sprite_x <= self.line_idx + 8 && self.line_idx + 8 < sprite_x + 8) {
+                            continue;
+                        }
+
+                        if sprite_x >= sprite_min_x {
+                            continue;
+                        }
+
+                        let in_sprite_x = self.line_idx + 8 - sprite_x;
+                        // println!("Drawing sprite: x {} {} {} y {} {}", self.line_idx, sprite_x, in_sprite_x, self.sl, sprite_y);
+                        let in_sprite_y = (self.sl + 16 - sprite_y) as u16;
+                        let tile_start = 0x8000 + tile_idx as u16;
+
+                        let lo_channel = (mem[tile_start + (2 * in_sprite_y)] >> in_sprite_x) & 1;
+                        let hi_channel = (mem[tile_start + (2 * in_sprite_y + 1)] >> in_sprite_x) & 1;
+                        pixel = hi_channel << 1 | lo_channel;
+                        sprite_min_x = sprite_x;
+                    }
+                    // println!("({}, {}) = {}  (sprites: {})", self.line_idx, self.sl, pixel, self.sl_objects_nxt);
+                    self.set_pixel(self.line_idx, self.sl, pixel);
                 }
                 2
             } else {
                 // Mode 3: Horizontal blank
+                self.sl_objects_nxt = 0;
                 3
             }
         } else {
@@ -146,11 +196,13 @@ impl PPU {
             //     }
             // }
 
-            self.window.update_with_buffer(&self.buffer, WIDTH, HEIGHT).unwrap();
+            self.window
+                .update_with_buffer(&self.buffer, WIDTH, HEIGHT)
+                .unwrap();
         }
     }
 
-    fn set_bg_pixel_for(&mut self, mem: &Memory, x: u8, y: u8, lcdc: &mut LCDC) {
+    fn get_bg_pixel_for(&self, mem: &Memory, x: u8, y: u8, lcdc: &mut LCDC) -> u8 {
         let scroll_x = mem[0xFF43];
         let scroll_y = mem[0xFF42];
         let x = x + scroll_x;
@@ -181,9 +233,12 @@ impl PPU {
 
         let hi_channel = (tile[(2 * tile_coord_y) as usize] >> tile_coord_x) & 1;
         let lo_channel = (tile[(2 * tile_coord_y + 1) as usize] >> tile_coord_x) & 1;
-        let colour = hi_channel << 1 | lo_channel;
+        hi_channel << 1 | lo_channel
+    }
 
-        let grayscale = (colour << 6) as u32;
-        self.buffer[x as usize * HEIGHT + y as usize] = grayscale << 16 | grayscale << 8 | grayscale;
+    fn set_pixel(&mut self, x: u8, y: u8, pixel: u8) {
+        let grayscale = (pixel << 6) as u32;
+        self.buffer[x as usize * HEIGHT + y as usize] =
+            grayscale << 16 | grayscale << 8 | grayscale;
     }
 }

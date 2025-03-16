@@ -59,7 +59,7 @@ impl CPU {
         let byte = self.next_byte(&mut mem);
         let dbg_current_pc = self.reg.pc - 1;
 
-        // if dbg_current_pc == 0x1c3a {
+        // if dbg_current_pc == 0x6150 {
         //     self.cpu_crash("Breakpoint".to_string());
         // }
 
@@ -446,9 +446,15 @@ impl CPU {
             },
             Instruction::LD5 => {
                 let addr = 0xFF00 | self.reg.c as u16;
+                if self.reg.c <= 0x40 {
+                    println!("Read from registers: {:02x} <- {:02x}", self.reg.c, mem[addr]);
+                }
                 self.reg.a = mem[addr];
             }
             Instruction::LD6 => {
+                if self.reg.c <= 0x40 {
+                    println!("Write to registers: {:02x} <- {:02x}", self.reg.c, self.reg.a);
+                }
                 let addr = 0xFF00 | self.reg.c as u16;
                 mem[addr] = self.reg.a;
             }
@@ -457,12 +463,18 @@ impl CPU {
                     0x41 => {
                         // STAT
                         println!("STAT: {:02x}", self.reg.a);
-                    },
-                    _ => {},
+                    }
+                    _ => {}
+                }
+                if o <= 0x40 {
+                    println!("Write to registers: {:02x} <- {:02x}", o, self.reg.a);
                 }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
+                if o <= 0x40 {
+                    println!("Read fromm registers: {:02x} <- {:02x}", o, mem[0xFF00 | o as u16]);
+                }
                 self.reg.a = mem[0xFF00 | o as u16];
             }
             Instruction::LDI1 => {

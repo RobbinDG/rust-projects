@@ -6,6 +6,8 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
 use std::ops::{Index, IndexMut};
+use std::sync::{Arc, Mutex};
+use crate::joypad::JoyPad;
 
 mod addrreg;
 mod cartridge_header;
@@ -17,7 +19,7 @@ mod memory;
 mod ppu;
 mod reg;
 mod register;
-
+mod joypad;
 
 const LS_BYTE_MASK: u16 = 0x00FF;
 const MS_BYTE_MASK: u16 = 0xFF00;
@@ -26,6 +28,7 @@ struct GameBoy {
     mem: Memory,
     cpu: CPU,
     ppu: PPU,
+    joy_pad: JoyPad,
 }
 
 impl GameBoy {
@@ -39,14 +42,16 @@ impl GameBoy {
         let header = CartridgeHeader::read(&rom);
         println!("{:x?}", header);
 
+        let jp = JoyPad::new();
         let mem = Memory::new(rom);
         let cpu = CPU::new();
         let ppu = PPU::new();
-        Self { mem, cpu, ppu }
+        Self { mem, cpu, ppu, joy_pad: jp }
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..300000 {
+        for _ in 0usize..1000000 {
+            self.joy_pad.update(&mut self.mem);
             self.mem = self.cpu.run_cycle(self.mem);
             self.mem = self.ppu.run_dot(self.mem);
             self.mem = self.ppu.run_dot(self.mem);

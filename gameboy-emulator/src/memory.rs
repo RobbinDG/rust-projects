@@ -1,4 +1,4 @@
-use std::cmp::{max, min};
+use std::cmp::max;
 use std::ops::{Index, IndexMut};
 
 pub struct Memory {
@@ -37,7 +37,10 @@ impl Index<u16> for Memory {
     fn index(&self, addr: u16) -> &Self::Output {
         match addr {
             0x0000..=0x3FFF => &self.rom[addr as usize],
-            0x4000..=0x7FFF => &self.rom[(max(self.rom_bank_reg, 1) as u32 * 0x4000 + (addr as u32 - 0x4000)) as usize],
+            0x4000..=0x7FFF => {
+                &self.rom
+                    [(max(self.rom_bank_reg, 1) as u32 * 0x4000 + (addr as u32 - 0x4000)) as usize]
+            }
             0x8000..=0x97FF => &self.tile_ram[(addr - 0x8000) as usize],
             0x9800..=0x9FFF => &self.background_map[(addr - 0x9800) as usize],
             0xA000..=0xBFFF => &self.cartridge_ram[(addr - 0xA000) as usize],
@@ -59,14 +62,12 @@ impl IndexMut<u16> for Memory {
             0x8000..=0x97FF => {
                 // println!("write to tile ram {:04x}", addr);
                 &mut self.tile_ram[(addr - 0x8000) as usize]
-            },
+            }
             0x9800..=0x9FFF => &mut self.background_map[(addr - 0x9800) as usize],
             0xA000..=0xBFFF => &mut self.cartridge_ram[(addr - 0xA000) as usize],
             0xC000..=0xDFFF => &mut self.wram[(addr - 0xC000) as usize],
             0xFE00..=0xFE9F => &mut self.sprite[(addr - 0xFE00) as usize],
-            0xFF00..=0xFF7F => {
-                &mut self.io[(addr - 0xFF00) as usize]
-            },
+            0xFF00..=0xFF7F => &mut self.io[(addr - 0xFF00) as usize],
             0xFF80..=0xFFFE => &mut self.high_ram[(addr - 0xFF80) as usize],
             0xFFFF => &mut self.ime,
             _ => panic!("Unused/unmapped memory"),
