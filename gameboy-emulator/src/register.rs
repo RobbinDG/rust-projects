@@ -2,7 +2,7 @@ use crate::addrreg::AddrReg;
 use crate::condition::Condition;
 use crate::reg::Reg;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Registers {
     /// A: accumulator
     pub a: u8,
