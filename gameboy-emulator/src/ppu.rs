@@ -14,6 +14,7 @@ const MODE_1_SL: u8 = 144;
 const MODE_2_MIN_DOTS: u16 = 172;
 const TOTAL_DOTS: u16 = 456;
 const TOTAL_SL: u8 = 154;
+const OAM_DMA_LENGTH: u16 = 160;
 
 struct LCDC {
     lcd_ppu_enable: bool,
@@ -48,6 +49,8 @@ pub struct PPU {
     line_idx: u8,
     buffer: [u32; WIDTH * HEIGHT],
     window: Window,
+    oam_dma_start: u16,
+    oam_dma_ctr: u16,
 }
 
 impl PPU {
@@ -64,6 +67,8 @@ impl PPU {
                 WindowOptions::default(),
             )
                 .unwrap(),
+            oam_dma_start: 0xFF,
+            oam_dma_ctr: OAM_DMA_LENGTH,
         }
     }
 
@@ -72,6 +77,8 @@ impl PPU {
         if !lcdc.lcd_ppu_enable {
             return mem
         }
+
+        self.oam_dma_transfer(&mut mem);
 
         mem[0xFF44] = self.sl;
         let ppu_mode = if self.sl < MODE_1_SL {
@@ -97,19 +104,36 @@ impl PPU {
 
         let lyc_eq: u8 = if mem[0xFF45] == mem[0xFF44] { 1 } else { 0 };
         let lcd_stat = lyc_eq << 2 | ppu_mode;
-        mem[0xFF46] = mem[0xFF46] & 0b11111000 | lcd_stat;
+        mem[0xFF41] = mem[0xFF41] & 0b11111000 | lcd_stat;
 
         self.dot += 1;
         if self.dot >= TOTAL_DOTS {
             self.dot = 0;
             self.sl += 1;
-            // println!("sl {}", self.sl);
             self.render(&mem);
             if self.sl >= TOTAL_SL {
                 self.sl = 0;
             }
         }
         mem
+    }
+
+    fn oam_dma_transfer(&mut self, mem: &mut Memory) {
+        let reg = mem[0xFF46];
+        if reg <= 0xDF {
+            self.oam_dma_start = (reg as u16) << 8;
+            self.oam_dma_ctr = 0;
+            mem[0xFF46] = 0xFF;
+        }
+        if self.oam_dma_ctr < OAM_DMA_LENGTH {
+            let src = self.oam_dma_start | self.oam_dma_ctr;
+            let dst = 0xFE00 | self.oam_dma_ctr;
+            mem[dst] = mem[src];
+            self.oam_dma_ctr += 1;
+            if self.oam_dma_ctr == OAM_DMA_LENGTH {
+                println!("COMPLETED OAM DMA")
+            }
+        }
     }
 
     fn render(&mut self, mem: &Memory) {

@@ -65,7 +65,6 @@ impl IndexMut<u16> for Memory {
             0xC000..=0xDFFF => &mut self.wram[(addr - 0xC000) as usize],
             0xFE00..=0xFE9F => &mut self.sprite[(addr - 0xFE00) as usize],
             0xFF00..=0xFF7F => {
-                println!("Writing flag {:02x}", addr - 0xFF00);
                 &mut self.io[(addr - 0xFF00) as usize]
             },
             0xFF80..=0xFFFE => &mut self.high_ram[(addr - 0xFF80) as usize],
