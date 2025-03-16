@@ -15,6 +15,33 @@ const MODE_2_MIN_DOTS: u16 = 172;
 const TOTAL_DOTS: u16 = 456;
 const TOTAL_SL: u8 = 154;
 
+struct LCDC {
+    lcd_ppu_enable: bool,
+    window_tile_map: bool,
+    window_enable: bool,
+    bg_window_tile_data_area: bool,
+    bg_tile_map: bool,
+    obj_size: bool,
+    obj_enable: bool,
+    bg_window_enable: bool,
+}
+
+impl LCDC {
+    pub fn load(mem: &Memory) -> Self {
+        let lcdc = mem[0xFF40];
+        Self {
+            lcd_ppu_enable: lcdc & (1 << 7) != 0,
+            window_tile_map: lcdc & (1 << 6) != 0,
+            window_enable: lcdc & (1 << 5) != 0,
+            bg_window_tile_data_area: lcdc & (1 << 4) != 0,
+            bg_tile_map: lcdc & (1 << 3) != 0,
+            obj_size: lcdc & (1 << 2) != 0,
+            obj_enable: lcdc & (1 << 1) != 0,
+            bg_window_enable: lcdc & (1 << 0) != 0,
+        }
+    }
+}
+
 pub struct PPU {
     sl: u8,
     dot: u16,
@@ -36,11 +63,16 @@ impl PPU {
                 HEIGHT,
                 WindowOptions::default(),
             )
-            .unwrap(),
+                .unwrap(),
         }
     }
 
     pub fn run_dot(&mut self, mut mem: Memory) -> Memory {
+        let mut lcdc = LCDC::load(&mem);
+        if !lcdc.lcd_ppu_enable {
+            return mem
+        }
+
         mem[0xFF44] = self.sl;
         let ppu_mode = if self.sl < MODE_1_SL {
             if self.dot < MODE_0_DOTS {
@@ -51,7 +83,7 @@ impl PPU {
                 // Mode 2: Drawing
                 self.line_idx += 1;
                 if (self.line_idx as usize) < WIDTH {
-                    self.set_bg_pixel_for(&mem, self.line_idx, self.sl);
+                    self.set_bg_pixel_for(&mem, self.line_idx, self.sl, &mut lcdc);
                 }
                 2
             } else {
@@ -62,6 +94,7 @@ impl PPU {
             // Mode 1: Vertical blank
             1
         };
+
         let lyc_eq: u8 = if mem[0xFF45] == mem[0xFF44] { 1 } else { 0 };
         let lcd_stat = lyc_eq << 2 | ppu_mode;
         mem[0xFF46] = mem[0xFF46] & 0b11111000 | lcd_stat;
@@ -82,8 +115,6 @@ impl PPU {
     fn render(&mut self, mem: &Memory) {
         // Rendering
 
-
-
         if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
             // for x in 0..WIDTH {
             //     for y in 0..HEIGHT {
@@ -95,17 +126,7 @@ impl PPU {
         }
     }
 
-    fn set_bg_pixel_for(&mut self, mem: &Memory, x: u8, y: u8) {
-        let lcdc = mem[0xFF40];
-        let lcd_ppu_enable = lcdc & (1 << 7) != 0;
-        let window_tile_map = lcdc & (1 << 6) != 0;
-        let window_enable = lcdc & (1 << 5) != 0;
-        let bg_window_tile_data_area = lcdc & (1 << 4) != 0;
-        let bg_tile_map = lcdc & (1 << 3) != 0;
-        let obj_size = lcdc & (1 << 2) != 0;
-        let obj_enable = lcdc & (1 << 1) != 0;
-        let bg_window_enable = lcdc & (1 << 0) != 0;
-
+    fn set_bg_pixel_for(&mut self, mem: &Memory, x: u8, y: u8, lcdc: &mut LCDC) {
         let scroll_x = mem[0xFF43];
         let scroll_y = mem[0xFF42];
         let x = x + scroll_x;
@@ -115,14 +136,14 @@ impl PPU {
         let tile_coord_x = x % TILE_X;
         let tile_coord_y = y % TILE_Y;
 
-        let tile_idx = if bg_tile_map {
+        let tile_idx = if lcdc.bg_tile_map {
             // 9C00–9FFF
             mem[0x9C00 + tile_x as u16 * TILE_TABLE_SIZE + tile_y as u16]
         } else {
             // 9800–9BFF
             mem[0x9800 + tile_x as u16 * TILE_TABLE_SIZE + tile_y as u16]
         };
-        let s = if bg_window_tile_data_area {
+        let s = if lcdc.bg_window_tile_data_area {
             // 8000–8FFF unsigned
             0x8000 + tile_idx as u16 * TILE_SIZE_BYTES
         } else {

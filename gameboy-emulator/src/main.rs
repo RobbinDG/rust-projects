@@ -4,7 +4,7 @@ use cartridge_header::CartridgeHeader;
 use cpu::CPU;
 use std::fs;
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufWriter, Read, Write};
 use std::ops::{Index, IndexMut};
 
 mod addrreg;
@@ -18,11 +18,7 @@ mod ppu;
 mod reg;
 mod register;
 
-const REG_INTERRUPT_FLAG: u16 = 0xFF0F;
-const REG_INTERRUPT_ENABLE: u16 = 0xFFFF;
 
-const MSB_MASK: u8 = 0b10000000;
-const LSB_MASK: u8 = 0b00000001;
 const LS_BYTE_MASK: u16 = 0x00FF;
 const MS_BYTE_MASK: u16 = 0xFF00;
 
@@ -50,14 +46,17 @@ impl GameBoy {
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..150000 {
+        for _ in 0usize..300000 {
             self.mem = self.cpu.run_cycle(self.mem);
             self.mem = self.ppu.run_dot(self.mem);
             self.mem = self.ppu.run_dot(self.mem);
             self.mem = self.ppu.run_dot(self.mem);
             self.mem = self.ppu.run_dot(self.mem);
         }
-        self.cpu.print_exec_log()
+        self.cpu.print_exec_log();
+        BufWriter::new(File::create("./tile_ram.bin").unwrap()).write_all(&self.mem.tile_ram).unwrap();
+        BufWriter::new(File::create("./background_map.bin").unwrap()).write_all(&self.mem.background_map).unwrap();
+        BufWriter::new(File::create("./sprite.bin").unwrap()).write_all(&self.mem.sprite).unwrap();
     }
 }
 

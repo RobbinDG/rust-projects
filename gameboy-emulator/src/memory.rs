@@ -4,11 +4,11 @@ use std::ops::{Index, IndexMut};
 pub struct Memory {
     rom: Vec<u8>,
     pub rom_bank_reg: u8,
-    tile_ram: [u8; 0x1800],
-    background_map: [u8; 0x0800],
+    pub tile_ram: [u8; 0x1800],
+    pub background_map: [u8; 0x0800],
     cartridge_ram: [u8; 0x2000],
     wram: [u8; 0x2000],
-    sprite: [u8; 0xA0],
+    pub sprite: [u8; 0xA0],
     io: [u8; 0x80],
     high_ram: [u8; 0x7F],
     ime: u8,
@@ -64,7 +64,10 @@ impl IndexMut<u16> for Memory {
             0xA000..=0xBFFF => &mut self.cartridge_ram[(addr - 0xA000) as usize],
             0xC000..=0xDFFF => &mut self.wram[(addr - 0xC000) as usize],
             0xFE00..=0xFE9F => &mut self.sprite[(addr - 0xFE00) as usize],
-            0xFF00..=0xFF7F => &mut self.io[(addr - 0xFF00) as usize],
+            0xFF00..=0xFF7F => {
+                println!("Writing flag {:02x}", addr - 0xFF00);
+                &mut self.io[(addr - 0xFF00) as usize]
+            },
             0xFF80..=0xFFFE => &mut self.high_ram[(addr - 0xFF80) as usize],
             0xFFFF => &mut self.ime,
             _ => panic!("Unused/unmapped memory"),

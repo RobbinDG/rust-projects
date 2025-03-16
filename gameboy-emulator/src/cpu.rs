@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-use std::fmt::format;
 use crate::addrreg::AddrReg;
 use crate::condition::Condition;
 use crate::dataloc::DataLoc;
@@ -7,7 +5,12 @@ use crate::instruction::Instruction;
 use crate::memory::Memory;
 use crate::reg::Reg;
 use crate::register::Registers;
-use crate::{MSB_MASK, REG_INTERRUPT_ENABLE, REG_INTERRUPT_FLAG};
+use std::collections::VecDeque;
+
+const REG_INTERRUPT_FLAG: u16 = 0xFF0F;
+const REG_INTERRUPT_ENABLE: u16 = 0xFFFF;
+const MSB_MASK: u8 = 0b10000000;
+const LSB_MASK: u8 = 0b00000001;
 
 struct ExecLog {
     pc: u16,
@@ -62,8 +65,6 @@ impl CPU {
 
         // Decode
         let instruction = match byte {
-            0x07 => Instruction::RLCA,
-
             // INC
             0x3C => Instruction::INC(DataLoc::Reg(Reg::A)),
             0x04 => Instruction::INC(DataLoc::Reg(Reg::B)),
@@ -274,10 +275,46 @@ impl CPU {
             0xF3 => Instruction::DI,
             0xFB => Instruction::EI,
 
+            // Rotates & Shifts
+            0x07 => Instruction::RLCA,
+            0x17 => Instruction::RLA,
+            0x0F => Instruction::RRCA,
+            0x1F => Instruction::RRA,
+
             0xCB => {
                 let prefixed = self.next_byte(&mut mem);
                 // println!("{:02x}", prefixed);
                 match prefixed {
+                    // Rotates & Shifts
+                    0x00..=0x07 => {
+                        let r = prefixed & 0x07;
+                        Instruction::RLC(Self::decode_register(r))
+                    }
+                    0x08..=0x0F => {
+                        let r = prefixed & 0x07;
+                        Instruction::RRC(Self::decode_register(r))
+                    }
+                    0x10..=0x17 => {
+                        let r = prefixed & 0x07;
+                        Instruction::RL(Self::decode_register(r))
+                    }
+                    0x18..=0x1F => {
+                        let r = prefixed & 0x07;
+                        Instruction::RR(Self::decode_register(r))
+                    }
+                    0x20..=0x27 => {
+                        let r = prefixed & 0x07;
+                        Instruction::SLA(Self::decode_register(r))
+                    }
+                    0x28..=0x2F => {
+                        let r = prefixed & 0x07;
+                        Instruction::SRA(Self::decode_register(r))
+                    }
+                    0x38..=0x3F => {
+                        let r = prefixed & 0x07;
+                        Instruction::SRL(Self::decode_register(r))
+                    }
+
                     // BIT: data is encoded as 0b01bbbrrr.
                     0b01000000..=0b01111111 => {
                         let b = (prefixed >> 3) & 0x07;
@@ -408,21 +445,24 @@ impl CPU {
                 _ => self.cpu_crash("Not in instruction set.".to_string()),
             },
             Instruction::LD5 => {
-                println!("Loading flag {:02x}", self.reg.c);
                 let addr = 0xFF00 | self.reg.c as u16;
                 self.reg.a = mem[addr];
             }
             Instruction::LD6 => {
-                println!("Writing flag {:02x}", self.reg.c);
                 let addr = 0xFF00 | self.reg.c as u16;
                 mem[addr] = self.reg.a;
             }
             Instruction::LDH1(o) => {
-                println!("Writing flag {:02x}", o);
+                match o {
+                    0x41 => {
+                        // STAT
+                        println!("STAT: {:02x}", self.reg.a);
+                    },
+                    _ => {},
+                }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
-                println!("Loading flag {:02x}", o);
                 self.reg.a = mem[0xFF00 | o as u16];
             }
             Instruction::LDI1 => {
@@ -458,24 +498,6 @@ impl CPU {
             Instruction::POP(r) => {
                 let val = self.pop(&mut mem);
                 self.reg.set_pair(r, val);
-            }
-            Instruction::RLA => {
-                let a_old = self.reg.a;
-                let a = a_old << 1 + self.reg.get_flag(4) as u8;
-                self.reg.a = a;
-                self.reg.set_flag(7, a == 0);
-                self.reg.set_flag(6, false);
-                self.reg.set_flag(5, false);
-                self.reg.set_flag(4, (a_old & MSB_MASK) != 0); // Set carry
-            }
-            Instruction::RLCA => {
-                let a_old = self.reg.a;
-                let a = a_old << 1;
-                self.reg.a = a;
-                self.reg.set_flag(7, a == 0);
-                self.reg.set_flag(6, false);
-                self.reg.set_flag(5, false);
-                self.reg.set_flag(4, (a_old & MSB_MASK) != 0); // Set carry
             }
             Instruction::ADD(l) => {
                 self.reg.a = self.add_set_flags(l, &mut mem);
@@ -659,9 +681,7 @@ impl CPU {
             Instruction::SCF => {
                 self.reg.set_flag(4, true);
             }
-            Instruction::NOP => {
-                println!("NOP")
-            }
+            Instruction::NOP => {}
             Instruction::HALT => {
                 todo!("Requires functioning interrupts")
             }
@@ -670,6 +690,39 @@ impl CPU {
             }
             Instruction::DI => self.ime = false,
             Instruction::EI => self.ie_delay = 1,
+            Instruction::RLCA => {
+                self.reg.a = Self::rotate_left_into_carry(self.reg.a, &mut self.reg);
+            }
+            Instruction::RLA => {
+                self.reg.a = Self::rotate_left_through_carry(self.reg.a, &mut self.reg);
+            }
+            Instruction::RRCA => {
+                self.reg.a = Self::rotate_right_into_carry(self.reg.a, &mut self.reg);
+            }
+            Instruction::RRA => {
+                self.reg.a = Self::rotate_right_through_carry(self.reg.a, &mut self.reg);
+            }
+            Instruction::RLC(r) => {
+                self.apply_to_7_bit_reg(Self::rotate_left_into_carry, r, &mut mem);
+            }
+            Instruction::RL(r) => {
+                self.apply_to_7_bit_reg(Self::rotate_left_through_carry, r, &mut mem);
+            }
+            Instruction::RRC(r) => {
+                self.apply_to_7_bit_reg(Self::rotate_right_into_carry, r, &mut mem);
+            }
+            Instruction::RR(r) => {
+                self.apply_to_7_bit_reg(Self::rotate_right_through_carry, r, &mut mem);
+            }
+            Instruction::SLA(r) => {
+                self.apply_to_7_bit_reg(Self::shift_left_into_carry, r, &mut mem);
+            }
+            Instruction::SRA(r) => {
+                self.apply_to_7_bit_reg(Self::shift_right_into_carry_keep_msb, r, &mut mem);
+            }
+            Instruction::SRL(r) => {
+                self.apply_to_7_bit_reg(Self::shift_right_into_carry, r, &mut mem);
+            }
             Instruction::RST(proc) => {
                 if proc == 0x38 {
                     self.cpu_crash("HIT RST 0x38".to_string());
@@ -709,6 +762,86 @@ impl CPU {
         mem
     }
 
+    fn apply_to_7_bit_reg<F>(&mut self, f: F, r: DataLoc, mem: &mut Memory)
+    where
+        F: Fn(u8, &mut Registers) -> u8,
+    {
+        let n = match r {
+            DataLoc::Reg(r) => self.reg.get(r),
+            DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
+            _ => self.cpu_crash("Not in instruction set.".to_string()),
+        };
+        let n_new = f(n, &mut self.reg);
+        match r {
+            DataLoc::Reg(r) => self.reg.set(r, n_new),
+            DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)] = n_new,
+            _ => self.cpu_crash("Not in instruction set.".to_string()),
+        };
+    }
+
+    fn rotate_left_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
+        let a = a_old.rotate_left(1);
+        reg.set_flag(7, a == 0);
+        reg.set_flag(6, false);
+        reg.set_flag(5, false);
+        reg.set_flag(4, (a_old & MSB_MASK) != 0);
+        a
+    }
+
+    fn rotate_left_through_carry(a_old: u8, reg: &mut Registers) -> u8 {
+        let a = (a_old << 1) | reg.get_flag(4) as u8;
+        reg.set_flag(7, a == 0);
+        reg.set_flag(6, false);
+        reg.set_flag(5, false);
+        reg.set_flag(4, (a_old & MSB_MASK) != 0);
+        a
+    }
+
+    fn rotate_right_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
+        let a = a_old.rotate_right(1);
+        reg.set_flag(7, a == 0);
+        reg.set_flag(6, false);
+        reg.set_flag(5, false);
+        reg.set_flag(4, (a_old & LSB_MASK) != 0);
+        a
+    }
+
+    fn rotate_right_through_carry(a_old: u8, reg: &mut Registers) -> u8 {
+        let a = (a_old >> 1) | ((reg.get_flag(4) as u8) << 7);
+        reg.set_flag(7, a == 0);
+        reg.set_flag(6, false);
+        reg.set_flag(5, false);
+        reg.set_flag(4, (a_old & LSB_MASK) != 0);
+        a
+    }
+
+    fn shift_left_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
+        let a = a_old << 1;
+        reg.set_flag(7, a == 0);
+        reg.set_flag(6, false);
+        reg.set_flag(5, false);
+        reg.set_flag(4, (a_old & MSB_MASK) != 0);
+        a
+    }
+
+    fn shift_right_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
+        let a = a_old >> 1;
+        reg.set_flag(7, a == 0);
+        reg.set_flag(6, false);
+        reg.set_flag(5, false);
+        reg.set_flag(4, (a_old & LSB_MASK) != 0);
+        a
+    }
+
+    fn shift_right_into_carry_keep_msb(a_old: u8, reg: &mut Registers) -> u8 {
+        let a = (a_old >> 1) | (a_old & MSB_MASK);
+        reg.set_flag(7, a == 0);
+        reg.set_flag(6, false);
+        reg.set_flag(5, false);
+        reg.set_flag(4, (a_old & LSB_MASK) != 0);
+        a
+    }
+
     fn cpu_crash(&mut self, message: String) -> ! {
         self.print_exec_log();
         panic!("{}", message);
@@ -716,7 +849,14 @@ impl CPU {
 
     pub fn print_exec_log(&mut self) {
         while let Some(entry) = self.dbg_exec_log.pop_back() {
-            println!("Executed {:04x} {:02x} {:<30} {:x?} {:02x}", entry.pc, entry.byte, format!("{:x?}", entry.instruction), entry.registers, entry.bank);
+            println!(
+                "Executed {:04x} {:02x} {:<30} {:x?} {:02x}",
+                entry.pc,
+                entry.byte,
+                format!("{:x?}", entry.instruction),
+                entry.registers,
+                entry.bank
+            );
         }
     }
 
