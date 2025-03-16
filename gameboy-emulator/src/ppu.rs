@@ -1,5 +1,5 @@
 use crate::memory::Memory;
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Scale, Window, WindowOptions};
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -67,7 +67,10 @@ impl PPU {
                 "Pixel Grid - ESC to exit",
                 WIDTH,
                 HEIGHT,
-                WindowOptions::default(),
+                WindowOptions {
+                    scale: Scale::X8,
+                    ..WindowOptions::default()
+                },
             )
             .unwrap(),
             oam_dma_start: 0xFF,
@@ -149,6 +152,9 @@ impl PPU {
             }
         } else {
             // Mode 1: Vertical blank
+            if self.dot == MODE_0_DOTS + MODE_2_MIN_DOTS {
+                mem[0xFF0F] |= 0b0000_0001;
+            }
             1
         };
 

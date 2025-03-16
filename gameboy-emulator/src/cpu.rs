@@ -11,6 +11,7 @@ const REG_INTERRUPT_FLAG: u16 = 0xFF0F;
 const REG_INTERRUPT_ENABLE: u16 = 0xFFFF;
 const MSB_MASK: u8 = 0b10000000;
 const LSB_MASK: u8 = 0b00000001;
+const INTERRUPT_HANDLERS: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
 
 struct ExecLog {
     pc: u16,
@@ -28,6 +29,7 @@ pub struct CPU {
     ie_delay: i8,
     /// Debug
     dbg_exec_log: VecDeque<ExecLog>,
+    halted: bool,
 }
 
 impl CPU {
@@ -38,11 +40,30 @@ impl CPU {
             ime: false,
             ie_delay: 0,
             dbg_exec_log: VecDeque::new(),
+            halted: false,
+        }
+    }
+
+    pub fn check_interrupts(&mut self, mem: &mut Memory) {
+        if !self.ime {
+            return;
+        }
+        let ie = mem[0xFFFF];
+        let if_ = mem[0xFF0F];
+        for b in 0..5 {
+            if (if_ >> b) & 1 != 0 && (ie >> b) & 1 != 0 {
+                println!("CALLING INTERRUPT {} {}", b, INTERRUPT_HANDLERS[b]);
+                mem[0xFF0F] &= !(1 << b);
+                self.ime = false;
+                self.halted = false;
+                self.call(INTERRUPT_HANDLERS[b], mem);
+                return;
+            }
         }
     }
 
     fn next_byte(&mut self, mem: &mut Memory) -> u8 {
-        if self.reg.pc > 0x7FFF {
+        if !matches!(self.reg.pc, 0..0x7FFF | 0xFF80..=0xFFFE) {
             self.cpu_crash("PC escaped valid code".to_string())
         }
         let byte = mem[self.reg.pc];
@@ -55,6 +76,10 @@ impl CPU {
     }
 
     pub fn run_cycle(&mut self, mut mem: Memory) -> Memory {
+        if self.halted {
+            return mem;
+        }
+
         // Fetch
         let byte = self.next_byte(&mut mem);
         let dbg_current_pc = self.reg.pc - 1;
@@ -169,6 +194,17 @@ impl CPU {
             0x86 => Instruction::ADD(DataLoc::AddrReg(AddrReg::HL)),
             0xC6 => Instruction::ADD(DataLoc::Value(self.next_byte(&mut mem))),
 
+            // ADC
+            0x8F => Instruction::ADC(DataLoc::Reg(Reg::A)),
+            0x88 => Instruction::ADC(DataLoc::Reg(Reg::B)),
+            0x89 => Instruction::ADC(DataLoc::Reg(Reg::C)),
+            0x8A => Instruction::ADC(DataLoc::Reg(Reg::D)),
+            0x8B => Instruction::ADC(DataLoc::Reg(Reg::E)),
+            0x8C => Instruction::ADC(DataLoc::Reg(Reg::H)),
+            0x8D => Instruction::ADC(DataLoc::Reg(Reg::L)),
+            0x8E => Instruction::ADC(DataLoc::AddrReg(AddrReg::HL)),
+            0xCE => Instruction::ADC(DataLoc::Value(self.next_byte(&mut mem))),
+
             // ADD 16-bit
             0x09 => Instruction::ADD16(AddrReg::BC),
             0x19 => Instruction::ADD16(AddrReg::DE),
@@ -177,6 +213,17 @@ impl CPU {
             0xE8 => Instruction::ADD16n(self.next_byte_signed(&mut mem)),
 
             // SUB
+            0x9F => Instruction::SBC(DataLoc::Reg(Reg::A)),
+            0x98 => Instruction::SBC(DataLoc::Reg(Reg::B)),
+            0x99 => Instruction::SBC(DataLoc::Reg(Reg::C)),
+            0x9A => Instruction::SBC(DataLoc::Reg(Reg::D)),
+            0x9B => Instruction::SBC(DataLoc::Reg(Reg::E)),
+            0x9C => Instruction::SBC(DataLoc::Reg(Reg::H)),
+            0x9D => Instruction::SBC(DataLoc::Reg(Reg::L)),
+            0x9E => Instruction::SBC(DataLoc::AddrReg(AddrReg::HL)),
+            0xDE => Instruction::SBC(DataLoc::Value(self.next_byte(&mut mem))),
+
+            // SBC
             0x97 => Instruction::SUB(DataLoc::Reg(Reg::A)),
             0x90 => Instruction::SUB(DataLoc::Reg(Reg::B)),
             0x91 => Instruction::SUB(DataLoc::Reg(Reg::C)),
@@ -283,7 +330,6 @@ impl CPU {
 
             0xCB => {
                 let prefixed = self.next_byte(&mut mem);
-                // println!("{:02x}", prefixed);
                 match prefixed {
                     // Rotates & Shifts
                     0x00..=0x07 => {
@@ -350,7 +396,10 @@ impl CPU {
             0xF7 => Instruction::RST(0x30),
             0xFF => Instruction::RST(0x38),
 
-            _ => todo!("Op Code {:02x} not implemented", byte),
+            _ => {
+                self.print_exec_log();
+                todo!("Op Code {:02x} not implemented", byte)
+            }
         };
 
         // Execute
@@ -408,7 +457,6 @@ impl CPU {
                 self.reg.pc = self.reg.pc.wrapping_add_signed(addr as i16);
             }
             Instruction::JR5(c, addr) => {
-                // println!("{}", self.reg.eval_condition(c));
                 if self.reg.eval_condition(c) {
                     self.reg.pc = self.reg.pc.wrapping_add_signed(addr as i16);
                 }
@@ -447,13 +495,19 @@ impl CPU {
             Instruction::LD5 => {
                 let addr = 0xFF00 | self.reg.c as u16;
                 if self.reg.c <= 0x40 {
-                    println!("Read from registers: {:02x} <- {:02x}", self.reg.c, mem[addr]);
+                    // println!(
+                    //     "Read from registers: {:02x} <- {:02x}",
+                    //     self.reg.c, mem[addr]
+                    // );
                 }
                 self.reg.a = mem[addr];
             }
             Instruction::LD6 => {
                 if self.reg.c <= 0x40 {
-                    println!("Write to registers: {:02x} <- {:02x}", self.reg.c, self.reg.a);
+                    // println!(
+                    //     "Write to registers: {:02x} <- {:02x}",
+                    //     self.reg.c, self.reg.a
+                    // );
                 }
                 let addr = 0xFF00 | self.reg.c as u16;
                 mem[addr] = self.reg.a;
@@ -467,13 +521,17 @@ impl CPU {
                     _ => {}
                 }
                 if o <= 0x40 {
-                    println!("Write to registers: {:02x} <- {:02x}", o, self.reg.a);
+                    // println!("Write to registers: {:02x} <- {:02x}", o, self.reg.a);
                 }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
                 if o <= 0x40 {
-                    println!("Read fromm registers: {:02x} <- {:02x}", o, mem[0xFF00 | o as u16]);
+                    // println!(
+                    //     "Read from registers: {:02x} <- {:02x}",
+                    //     o,
+                    //     mem[0xFF00 | o as u16]
+                    // );
                 }
                 self.reg.a = mem[0xFF00 | o as u16];
             }
@@ -512,7 +570,10 @@ impl CPU {
                 self.reg.set_pair(r, val);
             }
             Instruction::ADD(l) => {
-                self.reg.a = self.add_set_flags(l, &mut mem);
+                self.reg.a = self.add_set_flags(l, false, &mut mem);
+            }
+            Instruction::ADC(l) => {
+                self.reg.a = self.add_set_flags(l, true, &mut mem);
             }
             Instruction::ADD16(r) => {
                 let hl = self.reg.get_pair(AddrReg::HL);
@@ -545,7 +606,10 @@ impl CPU {
                 self.reg.set_pair(AddrReg::SP, r);
             }
             Instruction::SUB(l) => {
-                self.reg.a = self.sub_set_flags(l, &mut mem);
+                self.reg.a = self.sub_set_flags(l, false, &mut mem);
+            }
+            Instruction::SBC(l) => {
+                self.reg.a = self.sub_set_flags(l, true, &mut mem);
             }
             Instruction::AND(l) => {
                 self.reg.a = self.and_set_flags(l, &mut mem);
@@ -574,7 +638,7 @@ impl CPU {
                 }
             }
             Instruction::CP(l) => {
-                let _ = self.sub_set_flags(l, &mut mem);
+                let _ = self.sub_set_flags(l, false, &mut mem);
             }
             Instruction::CALL(addr) => {
                 self.call(addr, &mut mem);
@@ -651,7 +715,7 @@ impl CPU {
                 let h = self.reg.get_flag(5);
                 let lo = self.reg.a & 0xF;
                 let (added, c_after) = match self.last {
-                    Instruction::ADD(_) | Instruction::ADC | Instruction::INC(_) => {
+                    Instruction::ADD(_) | Instruction::ADC(_) | Instruction::INC(_) => {
                         match (c, hi, h, lo) {
                             (false, 0x0..=0x9, false, 0x0..=0x9) => (0x00, false),
                             (false, 0x0..=0x8, false, 0xA..=0xF) => (0x06, false),
@@ -666,7 +730,7 @@ impl CPU {
                         }
                     }
                     Instruction::SUB(_)
-                    | Instruction::SBC
+                    | Instruction::SBC(_)
                     | Instruction::DEC(_)
                     | Instruction::NEG => match (c, hi, h, lo) {
                         (false, 0x0..=0x9, false, 0x0..=0x9) => (0x00, false),
@@ -695,7 +759,7 @@ impl CPU {
             }
             Instruction::NOP => {}
             Instruction::HALT => {
-                todo!("Requires functioning interrupts")
+                self.halted = true;
             }
             Instruction::STOP => {
                 todo!("Wait for button press")
@@ -901,7 +965,7 @@ impl CPU {
         self.reg.pc = self.pop(mem);
     }
 
-    fn add_set_flags(&mut self, l: DataLoc, mem: &mut Memory) -> u8 {
+    fn add_set_flags(&mut self, l: DataLoc, add_carry: bool, mem: &mut Memory) -> u8 {
         let n = match l {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
@@ -909,7 +973,7 @@ impl CPU {
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let a = self.reg.a;
-        let r = a as u16 + n as u16;
+        let r = a as u16 + n as u16 + if add_carry { 1 } else { 0 };
         self.reg.set_flag(7, r == 0);
         self.reg.set_flag(6, false);
         self.reg.set_flag(5, (a & 0x0F) + (n & 0x0F) > 0x0F);
@@ -917,7 +981,7 @@ impl CPU {
         r as u8
     }
 
-    fn sub_set_flags(&mut self, l: DataLoc, mem: &mut Memory) -> u8 {
+    fn sub_set_flags(&mut self, l: DataLoc, add_carry: bool, mem: &mut Memory) -> u8 {
         let n = match l {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
@@ -925,7 +989,7 @@ impl CPU {
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let a = self.reg.a;
-        let r = 0x0100 + a as u16 - n as u16;
+        let r = 0x0100 + a as u16 + if add_carry { 1 } else { 0 } - n as u16;
         // 0x0156
         self.reg.set_flag(7, r == 0x0100);
         self.reg.set_flag(6, true);
