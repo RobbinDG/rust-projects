@@ -18,6 +18,8 @@ pub enum Instruction {
     LDH2(u8),
     LDI1,
     LDI2,
+    LDD1,
+    LDD2,
     LD16(AddrReg, u16),
     LDSPHL,
     LDHL(i8),

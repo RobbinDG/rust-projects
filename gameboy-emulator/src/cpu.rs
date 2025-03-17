@@ -167,6 +167,10 @@ impl CPU {
             0x2A => Instruction::LDI1,
             0x22 => Instruction::LDI2,
 
+            // LDD
+            0x3A => Instruction::LDD1,
+            0x32 => Instruction::LDD2,
+
             // LD 16-bit
             0x01 => Instruction::LD16(AddrReg::BC, self.next_addr_lsb_first(&mut mem)),
             0x11 => Instruction::LD16(AddrReg::DE, self.next_addr_lsb_first(&mut mem)),
@@ -498,7 +502,7 @@ impl CPU {
             },
             Instruction::LD5 => {
                 let addr = 0xFF00 | self.reg.c as u16;
-                if matches!(self.reg.c, (0..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                if matches!(self.reg.c, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
                     println!(
                         "Read from registers: {:02x} <- {:02x}",
                         self.reg.c, mem[addr]
@@ -507,7 +511,7 @@ impl CPU {
                 self.reg.a = mem[addr];
             }
             Instruction::LD6 => {
-                if matches!(self.reg.c, (0..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                if matches!(self.reg.c, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
                     println!(
                         "Write to registers: {:02x} <- {:02x}",
                         self.reg.c, self.reg.a
@@ -524,13 +528,13 @@ impl CPU {
                     }
                     _ => {}
                 }
-                if matches!(o, (0..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                if matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
                     println!("Write to registers: {:02x} <- {:02x} {:x?}", o, self.reg.a, instruction);
                 }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
-                if matches!(o, (0..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                if matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
                     println!(
                         "Read from registers: {:02x} <- {:02x}",
                         o,
@@ -542,12 +546,22 @@ impl CPU {
             Instruction::LDI1 => {
                 self.reg.a = mem[self.reg.get_pair(AddrReg::HL)];
                 self.reg
-                    .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL) + 1);
+                    .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_add(1));
             }
             Instruction::LDI2 => {
                 mem[self.reg.get_pair(AddrReg::HL)] = self.reg.a;
                 self.reg
-                    .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL) + 1);
+                    .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_add(1));
+            }
+            Instruction::LDD1 => {
+                self.reg.a = mem[self.reg.get_pair(AddrReg::HL)];
+                self.reg
+                    .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_sub(1));
+            }
+            Instruction::LDD2 => {
+                mem[self.reg.get_pair(AddrReg::HL)] = self.reg.a;
+                self.reg
+                    .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_sub(1));
             }
             Instruction::LD16(reg, v) => {
                 self.reg.set_pair(reg, v);

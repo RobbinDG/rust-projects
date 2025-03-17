@@ -34,17 +34,15 @@ struct GameBoy {
 
 impl GameBoy {
     fn from_cartridge(cartridge_filename: &'static str) -> Self {
-        let mut f = File::open(&cartridge_filename).expect("no file found");
-        let metadata = fs::metadata(&cartridge_filename).expect("unable to read metadata");
-        let mut rom = vec![0; metadata.len() as usize];
-        f.read(&mut rom).expect("buffer overflow");
+        let boot_rom = Self::read_bin_file(&"dmg_boot.bin");
+        let rom = Self::read_bin_file(&cartridge_filename);
 
         // Read cartridge header
         let header = CartridgeHeader::read(&rom);
         println!("{:x?}", header);
 
         let jp = JoyPad::new();
-        let mem = Memory::new(rom);
+        let mem = Memory::new(boot_rom, rom);
         let cpu = CPU::new();
         let ppu = PPU::new();
         Self {
@@ -55,8 +53,16 @@ impl GameBoy {
         }
     }
 
+    fn read_bin_file(cartridge_filename: &&str) -> Vec<u8> {
+        let mut f = File::open(&cartridge_filename).expect("no file found");
+        let metadata = fs::metadata(&cartridge_filename).expect("unable to read metadata");
+        let mut rom = vec![0; metadata.len() as usize];
+        f.read(&mut rom).expect("buffer overflow");
+        rom
+    }
+
     pub fn start(mut self) {
-        for _ in 0usize..1_100_000 {
+        for _ in 0usize..10_000_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
             // TIMA register
