@@ -195,33 +195,11 @@ impl PPU {
         let scroll_y = mem[0xFF42];
         let x = x.wrapping_add(scroll_x);
         let y = y.wrapping_add(scroll_y);
-        let tile_x = x / TILE_X;
-        let tile_y = y / TILE_Y;
-        let tile_coord_x = x % TILE_X;
-        let tile_coord_y = y % TILE_Y;
 
-        let tile_idx = if lcdc.bg_tile_map {
-            // 9C00–9FFF
-            mem[0x9C00 + tile_x as u16 * TILE_TABLE_SIZE + tile_y as u16]
-        } else {
-            // 9800–9BFF
-            mem[0x9800 + tile_x as u16 * TILE_TABLE_SIZE + tile_y as u16]
-        };
-        let s = if lcdc.bg_window_tile_data_area {
-            // 8000–8FFF unsigned
-            0x8000 + tile_idx as u16 * TILE_SIZE_BYTES
-        } else {
-            // 8800–97FF signed
-            0x9000u16.wrapping_add_signed((tile_idx as i8) as i16 * 16)
-        };
-        Self::get_pixel_in_tile(mem, tile_coord_x, tile_coord_y, s)
+        Self::get_pixel_from_tile_map(mem, lcdc, x, y)
     }
 
-    fn render_window_layer(&mut self, x: u8, y: u8, mem: &Memory, lcdc: &mut LCDC) -> u8 {
-        let win_x = mem[0xFF4B];
-        let win_y = mem[0xFF4A];
-        let x = x.wrapping_add(win_x).wrapping_sub(7);
-        let y = y.wrapping_add(win_y);
+    fn get_pixel_from_tile_map(mem: &Memory, lcdc: &LCDC, x: u8, y: u8) -> u8 {
         let tile_x = x / TILE_X;
         let tile_y = y / TILE_Y;
         let tile_coord_x = x % TILE_X;
@@ -250,6 +228,14 @@ impl PPU {
         Self::get_pixel_in_tile(mem, tile_coord_x, tile_coord_y, s)
     }
 
+    fn render_window_layer(&mut self, x: u8, y: u8, mem: &Memory, lcdc: &mut LCDC) -> u8 {
+        let win_x = mem[0xFF4B];
+        let win_y = mem[0xFF4A];
+        let x = x.wrapping_add(win_x).wrapping_sub(7);
+        let y = y.wrapping_add(win_y);
+        Self::get_pixel_from_tile_map(mem, lcdc, x, y)
+    }
+
     fn render_sprite_layer(&mut self, mem: &mut Memory, pixel: &mut u8) {
         let mut sprite_min_x = WIDTH as u8 + 1;
         for i in (0..self.sl_objects_nxt).step_by(SPRITE_BYTES) {
@@ -276,9 +262,9 @@ impl PPU {
         }
     }
 
-    fn get_pixel_in_tile(mem: &Memory, in_sprite_x: u8, in_sprite_y: u8, tile_start: u16) -> u8 {
-        let lo_channel = (mem[tile_start + (2 * in_sprite_y as u16)] >> in_sprite_x) & 1;
-        let hi_channel = (mem[tile_start + (2 * in_sprite_y as u16 + 1)] >> in_sprite_x) & 1;
+    fn get_pixel_in_tile(mem: &Memory, in_tile_x: u8, in_tile_y: u8, tile_start: u16) -> u8 {
+        let lo_channel = (mem[tile_start + (2 * in_tile_y as u16)] >> (7 - in_tile_x)) & 1;
+        let hi_channel = (mem[tile_start + (2 * in_tile_y as u16 + 1)] >> (7 - in_tile_x)) & 1;
         let pixel_value = hi_channel << 1 | lo_channel;
         pixel_value
     }
@@ -311,7 +297,7 @@ impl PPU {
 
     fn set_pixel(&mut self, x: u8, y: u8, pixel: u8) {
         let grayscale = (pixel << 6) as u32;
-        self.buffer[x as usize * HEIGHT + y as usize] =
+        self.buffer[x as usize + y as usize * WIDTH] =
             grayscale << 16 | grayscale << 8 | grayscale;
     }
 }
