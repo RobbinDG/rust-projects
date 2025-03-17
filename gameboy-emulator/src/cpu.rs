@@ -50,10 +50,14 @@ impl CPU {
         }
         let ie = mem[0xFFFF];
         let if_ = mem[0xFF0F];
+        if (ie & if_ > 0) {
+            println!("interrupts {:08b} {:08b}", ie, if_);
+        }
         for b in 0..5 {
             if (if_ >> b) & 1 != 0 && (ie >> b) & 1 != 0 {
                 println!("CALLING INTERRUPT {} {}", b, INTERRUPT_HANDLERS[b]);
                 mem[0xFF0F] &= !(1 << b);
+                println!("cleared, {:08b}", mem[0xFF0F]);
                 self.ime = false;
                 self.halted = false;
                 self.call(INTERRUPT_HANDLERS[b], mem);
@@ -494,20 +498,20 @@ impl CPU {
             },
             Instruction::LD5 => {
                 let addr = 0xFF00 | self.reg.c as u16;
-                if self.reg.c <= 0x40 {
-                    // println!(
-                    //     "Read from registers: {:02x} <- {:02x}",
-                    //     self.reg.c, mem[addr]
-                    // );
+                if matches!(self.reg.c, (0..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                    println!(
+                        "Read from registers: {:02x} <- {:02x}",
+                        self.reg.c, mem[addr]
+                    );
                 }
                 self.reg.a = mem[addr];
             }
             Instruction::LD6 => {
-                if self.reg.c <= 0x40 {
-                    // println!(
-                    //     "Write to registers: {:02x} <- {:02x}",
-                    //     self.reg.c, self.reg.a
-                    // );
+                if matches!(self.reg.c, (0..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                    println!(
+                        "Write to registers: {:02x} <- {:02x}",
+                        self.reg.c, self.reg.a
+                    );
                 }
                 let addr = 0xFF00 | self.reg.c as u16;
                 mem[addr] = self.reg.a;
@@ -520,18 +524,18 @@ impl CPU {
                     }
                     _ => {}
                 }
-                if o <= 0x40 {
-                    // println!("Write to registers: {:02x} <- {:02x}", o, self.reg.a);
+                if matches!(o, (0..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                    println!("Write to registers: {:02x} <- {:02x} {:x?}", o, self.reg.a, instruction);
                 }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
-                if o <= 0x40 {
-                    // println!(
-                    //     "Read from registers: {:02x} <- {:02x}",
-                    //     o,
-                    //     mem[0xFF00 | o as u16]
-                    // );
+                if matches!(o, (0..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                    println!(
+                        "Read from registers: {:02x} <- {:02x}",
+                        o,
+                        mem[0xFF00 | o as u16]
+                    );
                 }
                 self.reg.a = mem[0xFF00 | o as u16];
             }
@@ -659,6 +663,7 @@ impl CPU {
             Instruction::RETI => {
                 self.ret(&mut mem);
                 self.ime = true;
+                println!("IME enabled");
             }
             Instruction::BIT(data, n) => {
                 let b = (data >> 3) & 0x7;
@@ -813,6 +818,7 @@ impl CPU {
 
         if self.ie_delay == 0 {
             self.ime = true;
+            println!("IME enabled");
         }
         if self.ie_delay >= 0 {
             self.ie_delay -= 1;
@@ -830,7 +836,7 @@ impl CPU {
             };
             // println!("Executed {:04x} {:02x} {:x?} \t\t {:x?}", entry.pc, entry.byte, entry.instruction, entry.registers);
             self.dbg_exec_log.push_front(entry);
-            if self.dbg_exec_log.len() > 100 {
+            if self.dbg_exec_log.len() > 200 {
                 let _ = self.dbg_exec_log.pop_back();
             }
         }

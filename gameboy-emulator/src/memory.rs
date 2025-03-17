@@ -46,7 +46,9 @@ impl Index<u16> for Memory {
             0xE000..=0xFDFF => &self.wram[(addr - 0xE000) as usize], // Echo RAM
             0xFE00..=0xFE9F => &self.sprite[(addr - 0xFE00) as usize],
             0xFF00..=0xFF7F => &self.io[(addr - 0xFF00) as usize],
-            0xFF80..=0xFFFF => &self.high_ram[(addr - 0xFF80) as usize],
+            0xFF80..=0xFFFF => {
+                &self.high_ram[(addr - 0xFF80) as usize]
+            },
             _ => panic!("Unused memory"),
         }
     }
@@ -60,7 +62,10 @@ impl IndexMut<u16> for Memory {
                 // println!("write to tile ram {:04x}", addr);
                 &mut self.tile_ram[(addr - 0x8000) as usize]
             }
-            0x9800..=0x9FFF => &mut self.background_map[(addr - 0x9800) as usize],
+            0x9800..=0x9FFF => {
+                // println!("write to background map {:04x}", addr - 0x9800);
+                &mut self.background_map[(addr - 0x9800) as usize]
+            },
             0xA000..=0xBFFF => &mut self.cartridge_ram[(addr - 0xA000) as usize],
             0xC000..=0xDFFF => &mut self.wram[(addr - 0xC000) as usize],
             0xFE00..=0xFE9F => &mut self.sprite[(addr - 0xFE00) as usize],

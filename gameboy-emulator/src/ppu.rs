@@ -1,5 +1,6 @@
 use crate::memory::Memory;
 use minifb::{Key, Scale, Window, WindowOptions};
+use std::time::SystemTime;
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -54,6 +55,9 @@ pub struct PPU {
     oam_dma_ctr: u16,
     sl_objects: [u8; SPRITE_BYTES * 10],
     sl_objects_nxt: usize,
+    frame_start_time: SystemTime,
+    in_vblank: bool,
+    stat_line: bool,
 }
 
 impl PPU {
@@ -77,12 +81,16 @@ impl PPU {
             oam_dma_ctr: OAM_DMA_LENGTH,
             sl_objects: [0; SPRITE_BYTES * 10],
             sl_objects_nxt: 0,
+            frame_start_time: SystemTime::now(),
+            in_vblank: false,
+            stat_line: false,
         }
     }
 
     pub fn run_dot(&mut self, mut mem: Memory) -> Memory {
         let mut lcdc = LCDC::load(&mem);
         if !lcdc.lcd_ppu_enable {
+            mem[0xFF41] &= 0b1111_1100;
             return mem;
         }
 
@@ -90,6 +98,7 @@ impl PPU {
 
         mem[0xFF44] = self.sl;
         let ppu_mode = if self.sl < MODE_1_SL {
+            self.in_vblank = false;
             if self.dot < MODE_0_DOTS {
                 // Mode 0: OAM scan
                 self.line_idx = 0;
@@ -113,33 +122,17 @@ impl PPU {
                 self.line_idx += 1;
                 if (self.line_idx as usize) < WIDTH {
                     // Load BG
-                    let mut pixel = self.get_bg_pixel_for(&mem, self.line_idx, self.sl, &mut lcdc);
-
-                    // Load sprites
-                    let mut sprite_min_x = WIDTH as u8 + 1;
-                    for i in (0..self.sl_objects_nxt).step_by(SPRITE_BYTES) {
-                        let sprite_y = self.sl_objects[i + 0];
-                        let sprite_x = self.sl_objects[i + 1];
-                        let tile_idx = self.sl_objects[i + 2];
-                        let sprite_attrs = self.sl_objects[i + 3];
-
-                        if !(sprite_x <= self.line_idx + 8 && self.line_idx + 8 < sprite_x + 8) {
-                            continue;
+                    let mut pixel = 0u8;
+                    if lcdc.bg_window_enable {
+                        pixel = self.get_bg_pixel_for(&mem, self.line_idx, self.sl, &mut lcdc);
+                        if lcdc.window_enable {
+                            pixel =
+                                self.render_window_layer(self.line_idx, self.sl, &mem, &mut lcdc)
                         }
+                    }
 
-                        if sprite_x >= sprite_min_x {
-                            continue;
-                        }
-
-                        let in_sprite_x = self.line_idx + 8 - sprite_x;
-                        // println!("Drawing sprite: x {} {} {} y {} {}", self.line_idx, sprite_x, in_sprite_x, self.sl, sprite_y);
-                        let in_sprite_y = (self.sl + 16 - sprite_y) as u16;
-                        let tile_start = 0x8000 + tile_idx as u16;
-
-                        let lo_channel = (mem[tile_start + (2 * in_sprite_y)] >> in_sprite_x) & 1;
-                        let hi_channel = (mem[tile_start + (2 * in_sprite_y + 1)] >> in_sprite_x) & 1;
-                        pixel = hi_channel << 1 | lo_channel;
-                        sprite_min_x = sprite_x;
+                    if lcdc.obj_enable {
+                        self.render_sprite_layer(&mut mem, &mut pixel);
                     }
                     // println!("({}, {}) = {}  (sprites: {})", self.line_idx, self.sl, pixel, self.sl_objects_nxt);
                     self.set_pixel(self.line_idx, self.sl, pixel);
@@ -152,67 +145,56 @@ impl PPU {
             }
         } else {
             // Mode 1: Vertical blank
-            if self.dot == MODE_0_DOTS + MODE_2_MIN_DOTS {
-                mem[0xFF0F] |= 0b0000_0001;
+            if !self.in_vblank {
+                if mem[0xFFFF] & 1 != 0 {
+                    mem[0xFF0F] |= 0b0000_0001;
+                }
+                self.in_vblank = true;
+                self.render(&mem);
             }
             1
         };
 
+        let mut new_stat_line = false;
+        // Check LY == LYC
+        new_stat_line |= mem[0xFF45] == mem[0xFF44];
         let lyc_eq: u8 = if mem[0xFF45] == mem[0xFF44] { 1 } else { 0 };
         let lcd_stat = lyc_eq << 2 | ppu_mode;
         mem[0xFF41] = mem[0xFF41] & 0b11111000 | lcd_stat;
+        // Check mode triggers
+        new_stat_line |= (mem[0xFF41] >> (ppu_mode + 3)) & 1 != 0;
+
+        // Trigger stat interrupt on rising edge
+        if !self.stat_line && new_stat_line {
+            mem[0xFF0F] |= 1 << 1;
+        }
+        self.stat_line = new_stat_line;
 
         self.dot += 1;
         if self.dot >= TOTAL_DOTS {
             self.dot = 0;
             self.sl += 1;
-            self.render(&mem);
             if self.sl >= TOTAL_SL {
                 self.sl = 0;
+                let now = SystemTime::now();
+                println!(
+                    "FPS {:?}",
+                    1.0 / now
+                        .duration_since(self.frame_start_time)
+                        .unwrap()
+                        .as_secs_f32()
+                );
+                self.frame_start_time = now;
             }
         }
         mem
     }
 
-    fn oam_dma_transfer(&mut self, mem: &mut Memory) {
-        let reg = mem[0xFF46];
-        if reg <= 0xDF {
-            self.oam_dma_start = (reg as u16) << 8;
-            self.oam_dma_ctr = 0;
-            mem[0xFF46] = 0xFF;
-        }
-        if self.oam_dma_ctr < OAM_DMA_LENGTH {
-            let src = self.oam_dma_start | self.oam_dma_ctr;
-            let dst = 0xFE00 | self.oam_dma_ctr;
-            mem[dst] = mem[src];
-            self.oam_dma_ctr += 1;
-            if self.oam_dma_ctr == OAM_DMA_LENGTH {
-                println!("COMPLETED OAM DMA")
-            }
-        }
-    }
-
-    fn render(&mut self, mem: &Memory) {
-        // Rendering
-
-        if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-            // for x in 0..WIDTH {
-            //     for y in 0..HEIGHT {
-            //         self.set_bg_pixel_for(mem, x as u8, y as u8);
-            //     }
-            // }
-
-            self.window
-                .update_with_buffer(&self.buffer, WIDTH, HEIGHT)
-                .unwrap();
-        }
-    }
-
     fn get_bg_pixel_for(&self, mem: &Memory, x: u8, y: u8, lcdc: &mut LCDC) -> u8 {
         let scroll_x = mem[0xFF43];
         let scroll_y = mem[0xFF42];
-        let x = x + scroll_x;
-        let y = y + scroll_y;
+        let x = x.wrapping_add(scroll_x);
+        let y = y.wrapping_add(scroll_y);
         let tile_x = x / TILE_X;
         let tile_y = y / TILE_Y;
         let tile_coord_x = x % TILE_X;
@@ -230,16 +212,101 @@ impl PPU {
             0x8000 + tile_idx as u16 * TILE_SIZE_BYTES
         } else {
             // 8800–97FF signed
-            0x8800u16.wrapping_add_signed((tile_idx as i8) as i16 * 32)
+            0x9000u16.wrapping_add_signed((tile_idx as i8) as i16 * 16)
         };
-        let mut tile = [0; 32];
-        for i in 0u16..32 {
-            tile[i as usize] = mem[s + i];
-        }
+        Self::get_pixel_in_tile(mem, tile_coord_x, tile_coord_y, s)
+    }
 
-        let hi_channel = (tile[(2 * tile_coord_y) as usize] >> tile_coord_x) & 1;
-        let lo_channel = (tile[(2 * tile_coord_y + 1) as usize] >> tile_coord_x) & 1;
-        hi_channel << 1 | lo_channel
+    fn render_window_layer(&mut self, x: u8, y: u8, mem: &Memory, lcdc: &mut LCDC) -> u8 {
+        let win_x = mem[0xFF4B];
+        let win_y = mem[0xFF4A];
+        let x = x.wrapping_add(win_x).wrapping_sub(7);
+        let y = y.wrapping_add(win_y);
+        let tile_x = x / TILE_X;
+        let tile_y = y / TILE_Y;
+        let tile_coord_x = x % TILE_X;
+        let tile_coord_y = y % TILE_Y;
+
+        let tile_idx = if lcdc.bg_tile_map {
+            // 9C00–9FFF
+            mem[0x9C00 + tile_x as u16 + tile_y as u16 * TILE_TABLE_SIZE]
+        } else {
+            // 9800–9BFF
+            mem[0x9800 + tile_x as u16 + tile_y as u16 * TILE_TABLE_SIZE]
+        };
+        let s = if lcdc.bg_window_tile_data_area {
+            // 8000–8FFF unsigned
+            0x8000 + tile_idx as u16 * TILE_SIZE_BYTES
+        } else {
+            // 8800–97FF signed
+            0x9000u16.wrapping_add_signed((tile_idx as i8) as i16 * 16)
+        };
+        if tile_idx != 127 || true {
+            // println!(
+            //     "({}, {}) ({}, {}) ({}, {}) ({}, {}) {:04x} {} {}",
+            //     win_x, win_y, x, y, tile_x, tile_y, tile_coord_x, tile_coord_y, 0x9800 + tile_x as u16 + tile_y as u16 * TILE_TABLE_SIZE, tile_idx, s
+            // );
+        }
+        Self::get_pixel_in_tile(mem, tile_coord_x, tile_coord_y, s)
+    }
+
+    fn render_sprite_layer(&mut self, mem: &mut Memory, pixel: &mut u8) {
+        let mut sprite_min_x = WIDTH as u8 + 1;
+        for i in (0..self.sl_objects_nxt).step_by(SPRITE_BYTES) {
+            let sprite_y = self.sl_objects[i + 0];
+            let sprite_x = self.sl_objects[i + 1];
+            let tile_idx = self.sl_objects[i + 2];
+            let sprite_attrs = self.sl_objects[i + 3];
+
+            if !(sprite_x <= self.line_idx + 8 && self.line_idx + 8 < sprite_x + 8) {
+                continue;
+            }
+
+            if sprite_x >= sprite_min_x {
+                continue;
+            }
+
+            let in_sprite_x = self.line_idx + 8 - sprite_x;
+            // println!("Drawing sprite: x {} {} {} y {} {}", self.line_idx, sprite_x, in_sprite_x, self.sl, sprite_y);
+            let in_sprite_y = self.sl + 16 - sprite_y;
+            let tile_start = 0x8000 + tile_idx as u16;
+
+            sprite_min_x = sprite_x;
+            *pixel = Self::get_pixel_in_tile(mem, in_sprite_x, in_sprite_y, tile_start);
+        }
+    }
+
+    fn get_pixel_in_tile(mem: &Memory, in_sprite_x: u8, in_sprite_y: u8, tile_start: u16) -> u8 {
+        let lo_channel = (mem[tile_start + (2 * in_sprite_y as u16)] >> in_sprite_x) & 1;
+        let hi_channel = (mem[tile_start + (2 * in_sprite_y as u16 + 1)] >> in_sprite_x) & 1;
+        let pixel_value = hi_channel << 1 | lo_channel;
+        pixel_value
+    }
+
+    fn oam_dma_transfer(&mut self, mem: &mut Memory) {
+        let reg = mem[0xFF46];
+        if reg <= 0xDF {
+            self.oam_dma_start = (reg as u16) << 8;
+            self.oam_dma_ctr = 0;
+            mem[0xFF46] = 0xFF;
+        }
+        if self.oam_dma_ctr < OAM_DMA_LENGTH {
+            let src = self.oam_dma_start | self.oam_dma_ctr;
+            let dst = 0xFE00 | self.oam_dma_ctr;
+            mem[dst] = mem[src];
+            self.oam_dma_ctr += 1;
+            if self.oam_dma_ctr == OAM_DMA_LENGTH {
+                // println!("COMPLETED OAM DMA")
+            }
+        }
+    }
+
+    fn render(&mut self, mem: &Memory) {
+        if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
+            self.window
+                .update_with_buffer(&self.buffer, WIDTH, HEIGHT)
+                .unwrap();
+        }
     }
 
     fn set_pixel(&mut self, x: u8, y: u8, pixel: u8) {
