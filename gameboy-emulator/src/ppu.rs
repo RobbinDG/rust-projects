@@ -1,3 +1,4 @@
+use crate::joypad_input_handler::JoypadInputHandler;
 use crate::memory::Memory;
 use minifb::{Key, Scale, Window, WindowOptions};
 use std::time::SystemTime;
@@ -61,22 +62,24 @@ pub struct PPU {
 }
 
 impl PPU {
-    pub fn new() -> Self {
+    pub fn new(ih: JoypadInputHandler) -> Self {
+        let mut window = Window::new(
+            "Pixel Grid - ESC to exit",
+            WIDTH,
+            HEIGHT,
+            WindowOptions {
+                scale: Scale::X8,
+                ..WindowOptions::default()
+            },
+        )
+        .unwrap();
+        window.set_input_callback(Box::new(ih));
         Self {
             sl: 0,
             dot: 0,
             line_idx: 0,
             buffer: [0; WIDTH * HEIGHT],
-            window: Window::new(
-                "Pixel Grid - ESC to exit",
-                WIDTH,
-                HEIGHT,
-                WindowOptions {
-                    scale: Scale::X8,
-                    ..WindowOptions::default()
-                },
-            )
-            .unwrap(),
+            window,
             oam_dma_start: 0xFF,
             oam_dma_ctr: OAM_DMA_LENGTH,
             sl_objects: [0; SPRITE_BYTES * 10],
@@ -297,7 +300,6 @@ impl PPU {
 
     fn set_pixel(&mut self, x: u8, y: u8, pixel: u8) {
         let grayscale = (pixel << 6) as u32;
-        self.buffer[x as usize + y as usize * WIDTH] =
-            grayscale << 16 | grayscale << 8 | grayscale;
+        self.buffer[x as usize + y as usize * WIDTH] = grayscale << 16 | grayscale << 8 | grayscale;
     }
 }

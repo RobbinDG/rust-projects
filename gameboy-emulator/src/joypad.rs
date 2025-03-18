@@ -18,13 +18,24 @@ impl JoyPad {
             previous: 0x0F,
             start: false,
             select: false,
-            a: true,
+            a: false,
             b: false,
             up: false,
             down: false,
             left: false,
             right: false,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.start = false;
+        self.select = false;
+        self.a = false;
+        self.b = false;
+        self.up = false;
+        self.down = false;
+        self.left = false;
+        self.right = false;
     }
 
     pub fn update(&mut self, mem: &mut Memory) {

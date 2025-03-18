@@ -7,8 +7,10 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
 use std::ops::{Index, IndexMut};
+use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
+use crate::joypad_input_handler::JoypadInputHandler;
 
 mod addrreg;
 mod cartridge_header;
@@ -21,6 +23,7 @@ mod memory;
 mod ppu;
 mod reg;
 mod register;
+mod joypad_input_handler;
 
 const LS_BYTE_MASK: u16 = 0x00FF;
 const MS_BYTE_MASK: u16 = 0xFF00;
@@ -29,7 +32,7 @@ struct GameBoy {
     mem: Memory,
     cpu: CPU,
     ppu: PPU,
-    joy_pad: JoyPad,
+    joy_pad: Arc<Mutex<JoyPad>>,
 }
 
 impl GameBoy {
@@ -41,10 +44,10 @@ impl GameBoy {
         let header = CartridgeHeader::read(&rom);
         println!("{:x?}", header);
 
-        let jp = JoyPad::new();
+        let jp = Arc::new(Mutex::new(JoyPad::new()));
         let mem = Memory::new(boot_rom, rom);
         let cpu = CPU::new();
-        let ppu = PPU::new();
+        let ppu = PPU::new(JoypadInputHandler::new(jp.clone()));
         Self {
             mem,
             cpu,
@@ -85,7 +88,7 @@ impl GameBoy {
                 }
             }
 
-            self.joy_pad.update(&mut self.mem);
+            self.joy_pad.lock().unwrap().update(&mut self.mem);
             self.cpu.check_interrupts(&mut self.mem);
             self.mem = self.cpu.run_cycle(self.mem);
             self.mem = self.ppu.run_dot(self.mem);
