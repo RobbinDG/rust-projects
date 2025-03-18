@@ -529,7 +529,10 @@ impl CPU {
                     _ => {}
                 }
                 if matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
-                    println!("Write to registers: {:02x} <- {:02x} {:x?}", o, self.reg.a, instruction);
+                    println!(
+                        "Write to registers: {:02x} <- {:02x} {:x?}",
+                        o, self.reg.a, instruction
+                    );
                 }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
@@ -995,7 +998,14 @@ impl CPU {
         };
         let a = self.reg.a;
         let r = a as u16 + n as u16 + if add_carry { 1 } else { 0 };
-        println!("{}+{}+{}={} {}", a, n, if add_carry { 1 } else { 0 }, r, r as u8);
+        println!(
+            "{}+{}+{}={} {}",
+            a,
+            n,
+            if add_carry { 1 } else { 0 },
+            r,
+            r as u8
+        );
         self.reg.set_flag(7, (r as u8) == 0);
         self.reg.set_flag(6, false);
         self.reg.set_flag(5, (a & 0x0F) + (n & 0x0F) > 0x0F);
@@ -1010,14 +1020,14 @@ impl CPU {
             DataLoc::Value(v) => v,
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
-        let a = self.reg.a;
-        let r = 0x0100 + a as u16 + if add_carry { 1 } else { 0 } - n as u16;
-        // 0x0156
+        let a = self.reg.a as u16;
+        let rhs = n as u16 + if add_carry { 1 } else { 0 };
+        let r = 0x0100 + a - rhs;
         self.reg.set_flag(7, r == 0x0100);
         self.reg.set_flag(6, true);
-        self.reg.set_flag(5, (a << 4) >= (n << 4));
-        self.reg.set_flag(4, (r >> 8) == 0);
-        (r << 8 >> 8) as u8
+        self.reg.set_flag(5, (a & 0x0F) >= (rhs & 0x0F));
+        self.reg.set_flag(4, (r >> 8) != 0);
+        (r & 0x00FF) as u8
     }
 
     fn and_set_flags(&mut self, l: DataLoc, mem: &mut Memory) -> u8 {
