@@ -854,6 +854,7 @@ impl CPU {
                 let _ = self.dbg_exec_log.pop_back();
             }
         }
+
         self.last = instruction;
         mem
     }
@@ -994,7 +995,8 @@ impl CPU {
         };
         let a = self.reg.a;
         let r = a as u16 + n as u16 + if add_carry { 1 } else { 0 };
-        self.reg.set_flag(7, r == 0);
+        println!("{}+{}+{}={} {}", a, n, if add_carry { 1 } else { 0 }, r, r as u8);
+        self.reg.set_flag(7, (r as u8) == 0);
         self.reg.set_flag(6, false);
         self.reg.set_flag(5, (a & 0x0F) + (n & 0x0F) > 0x0F);
         self.reg.set_flag(4, (r >> 8) != 0);

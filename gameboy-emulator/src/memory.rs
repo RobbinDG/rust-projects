@@ -2,7 +2,6 @@ use std::cmp::max;
 use std::ops::{Index, IndexMut};
 
 pub struct Memory {
-    pub in_boot_rom: bool,
     boot_rom: Vec<u8>,
     rom: Vec<u8>,
     pub rom_bank_reg: u8,
@@ -18,7 +17,6 @@ pub struct Memory {
 impl Memory {
     pub fn new(boot_rom: Vec<u8>, rom: Vec<u8>) -> Self {
         Self {
-            in_boot_rom: true,
             boot_rom,
             rom,
             rom_bank_reg: 1,
@@ -39,7 +37,7 @@ impl Index<u16> for Memory {
     fn index(&self, addr: u16) -> &Self::Output {
         match addr {
             0x0000..=0x00FF => {
-                if self.in_boot_rom {
+                if self[0xFF50] == 0 {
                     &self.boot_rom[addr as usize]
                 } else {
                     &self.rom[addr as usize]
