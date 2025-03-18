@@ -22,7 +22,7 @@ struct ExecLog {
 }
 
 pub struct CPU {
-    reg: Registers,
+    pub reg: Registers,
     last: Instruction,
     /// Master interrupt enable (IME) flag
     ime: bool,
@@ -413,41 +413,45 @@ impl CPU {
         // Execute
         match instruction.clone() {
             Instruction::INC(l) => {
-                let res = match l {
+                let (old, res) = match l {
                     DataLoc::Reg(r) => {
-                        let res = self.reg.get(r).wrapping_add(1);
+                        let old = self.reg.get(r);
+                        let res = old.wrapping_add(1);
                         self.reg.set(r, res);
-                        res
+                        (old, res)
                     }
                     DataLoc::AddrReg(AddrReg::HL) => {
                         let addr = self.reg.get_pair(AddrReg::HL);
-                        mem[addr] = mem[addr].wrapping_add(1);
-                        mem[addr]
+                        let old = mem[addr];
+                        mem[addr] = old.wrapping_add(1);
+                        (old, mem[addr])
                     }
                     _ => self.cpu_crash("Not in instruction set.".to_string()),
                 };
                 self.reg.set_flag(7, res == 0);
                 self.reg.set_flag(6, false);
-                self.reg.set_flag(5, res.wrapping_sub(1) & 0x0F == 0x0F);
+                self.reg.set_flag(5, old & 0x0F == 0x0F);
             }
             Instruction::INC16(r) => self.reg.set_pair(r, self.reg.get_pair(r).wrapping_add(1)),
             Instruction::DEC(l) => {
-                let res = match l {
+                let (_, res) = match l {
                     DataLoc::Reg(r) => {
-                        let res = self.reg.get(r).wrapping_sub(1);
+                        let old = self.reg.get(r);
+                        let res = old.wrapping_sub(1);
                         self.reg.set(r, res);
-                        res
+                        (old, res)
                     }
                     DataLoc::AddrReg(AddrReg::HL) => {
                         let addr = self.reg.get_pair(AddrReg::HL);
-                        mem[addr] = mem[addr].wrapping_sub(1);
-                        mem[addr]
+                        let old = mem[addr];
+                        mem[addr] = old.wrapping_sub(1);
+                        (old, mem[addr])
                     }
                     _ => self.cpu_crash("Not in instruction set.".to_string()),
                 };
                 self.reg.set_flag(7, res == 0);
                 self.reg.set_flag(6, true);
-                self.reg.set_flag(5, res.wrapping_add(1) & 0x0F == 0x0F);
+                self.reg.set_flag(5, res & 0x0F == 0x0F);
             }
             Instruction::DEC16(r) => self.reg.set_pair(r, self.reg.get_pair(r).wrapping_sub(1)),
             Instruction::JP1(addr) => {
@@ -577,7 +581,7 @@ impl CPU {
                 let r = self.reg.sp.wrapping_add_signed(offset as i16);
                 self.reg.set_pair(AddrReg::HL, r);
                 self.reg.set_flag(7, false);
-                self.reg.set_flag(6, true);
+                self.reg.set_flag(6, false);
                 self.reg
                     .set_flag(5, ((self.reg.sp >> 3) | 1) ^ ((r >> 3) | 0x1) != 0);
                 self.reg
@@ -618,6 +622,8 @@ impl CPU {
                     let rhs = (-n) as u16;
                     let (_, h) = (hl << 4).overflowing_sub(rhs << 4);
                     let (r, c) = hl.overflowing_sub(rhs);
+                    println!("ADD16n sub {} {} {} {} {}", hl, rhs, r, h, c);
+                    self.cpu_crash("Test".to_string());
                     (r, h, c)
                 };
                 self.reg.set_flag(7, false);
@@ -998,14 +1004,6 @@ impl CPU {
         };
         let a = self.reg.a;
         let r = a as u16 + n as u16 + if add_carry { 1 } else { 0 };
-        println!(
-            "{}+{}+{}={} {}",
-            a,
-            n,
-            if add_carry { 1 } else { 0 },
-            r,
-            r as u8
-        );
         self.reg.set_flag(7, (r as u8) == 0);
         self.reg.set_flag(6, false);
         self.reg.set_flag(5, (a & 0x0F) + (n & 0x0F) > 0x0F);
@@ -1086,42 +1084,6 @@ impl CPU {
             0x5 => DataLoc::Reg(Reg::L),
             0x6 => DataLoc::AddrReg(AddrReg::HL),
             _ => panic!("Invalid register encoding."),
-        }
-    }
-
-    fn get_if(&self, bit: u8, mem: &mut Memory) -> bool {
-        if bit > 4 {
-            panic!("Invalid IF bit.");
-        }
-        (mem[REG_INTERRUPT_FLAG] >> bit & 1) == 1
-    }
-
-    fn set_if(&mut self, bit: u8, value: bool, mem: &mut Memory) {
-        if bit > 4 {
-            panic!("Invalid IF bit.");
-        }
-        if value {
-            mem[REG_INTERRUPT_FLAG] |= 1 << bit;
-        } else {
-            mem[REG_INTERRUPT_FLAG] &= !(1 << bit);
-        }
-    }
-
-    fn get_ie(&self, bit: u8, mem: &mut Memory) -> bool {
-        if bit > 4 {
-            panic!("Invalid IE bit.");
-        }
-        (mem[REG_INTERRUPT_ENABLE] >> bit & 1) == 1
-    }
-
-    fn set_ie(&mut self, bit: u8, value: bool, mem: &mut Memory) {
-        if bit > 4 {
-            panic!("Invalid IE bit.");
-        }
-        if value {
-            mem[REG_INTERRUPT_ENABLE] |= 1 << bit;
-        } else {
-            mem[REG_INTERRUPT_ENABLE] &= !(1 << bit);
         }
     }
 }

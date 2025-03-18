@@ -12,6 +12,8 @@ pub struct Memory {
     pub sprite: [u8; 0xA0],
     io: [u8; 0x80],
     high_ram: [u8; 0x80],
+    unused_response: u8,
+    unused_write_dummy: u8,
 }
 
 impl Memory {
@@ -27,6 +29,8 @@ impl Memory {
             sprite: [0; 0xA0],
             io: [0; 0x80],
             high_ram: [0; 0x80],
+            unused_response: 0xFF,
+            unused_write_dummy: 0,
         }
     }
 }
@@ -58,7 +62,10 @@ impl Index<u16> for Memory {
             0xFF80..=0xFFFF => {
                 &self.high_ram[(addr - 0xFF80) as usize]
             },
-            _ => panic!("Unused memory"),
+            _ => {
+                println!("Unused memory {:04x}", addr);
+                &self.unused_response
+            },
         }
     }
 }
@@ -80,7 +87,10 @@ impl IndexMut<u16> for Memory {
             0xFE00..=0xFE9F => &mut self.sprite[(addr - 0xFE00) as usize],
             0xFF00..=0xFF7F => &mut self.io[(addr - 0xFF00) as usize],
             0xFF80..=0xFFFF => &mut self.high_ram[(addr - 0xFF80) as usize],
-            _ => panic!("Unused/unmapped memory"),
+            _ => {
+                println!("Unused/unmapped memory");
+                &mut self.unused_write_dummy
+            },
         }
     }
 }

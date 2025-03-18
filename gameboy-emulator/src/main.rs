@@ -33,7 +33,7 @@ struct GameBoy {
 }
 
 impl GameBoy {
-    fn from_cartridge(cartridge_filename: &'static str) -> Self {
+    pub fn from_cartridge(cartridge_filename: &'static str) -> Self {
         let boot_rom = Self::read_bin_file(&"dmg_boot.bin");
         let rom = Self::read_bin_file(&cartridge_filename);
 
@@ -51,6 +51,11 @@ impl GameBoy {
             ppu,
             joy_pad: jp,
         }
+    }
+
+    pub fn skip_boot_rom(&mut self) {
+        self.cpu.reg.pc = 0x100;
+        self.mem[0xFF50] = 0x01;
     }
 
     fn read_bin_file(cartridge_filename: &&str) -> Vec<u8> {
@@ -105,7 +110,9 @@ impl GameBoy {
 }
 
 fn main() {
-    let filename = "./Pokemon Red (UE) [S][!].gb";
+    // let filename = "./Pokemon Red (UE) [S][!].gb";
+    let filename = "./Tetris (JUE) (V1.1) [!].gb";
     let mut gb = GameBoy::from_cartridge(filename);
+    gb.skip_boot_rom();
     gb.start();
 }
