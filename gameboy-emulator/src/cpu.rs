@@ -1093,7 +1093,7 @@ impl CPU {
         self.reg.set_flag(7, r == 0x0100);
         self.reg.set_flag(6, true);
         self.reg.set_flag(5, (a & 0x0F) >= (rhs & 0x0F));
-        self.reg.set_flag(4, (r >> 8) != 0);
+        self.reg.set_flag(4, (r >> 8) == 0);
         (r & 0x00FF) as u8
     }
 
