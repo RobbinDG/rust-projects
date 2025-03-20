@@ -70,7 +70,7 @@ impl GameBoy {
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..5_000_000 {
+        for _ in 0usize..100_000_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
             // TIMA register
@@ -92,9 +92,9 @@ impl GameBoy {
             self.cpu.check_interrupts(&mut self.mem);
             self.mem = self.cpu.run_cycle(self.mem);
             self.mem = self.ppu.run_dot(self.mem);
-            self.mem = self.ppu.run_dot(self.mem);
-            self.mem = self.ppu.run_dot(self.mem);
-            self.mem = self.ppu.run_dot(self.mem);
+            // self.mem = self.ppu.run_dot(self.mem);
+            // self.mem = self.ppu.run_dot(self.mem);
+            // self.mem = self.ppu.run_dot(self.mem);
         }
         self.cpu.print_exec_log();
         BufWriter::new(File::create("./tile_ram.bin").unwrap())
@@ -106,6 +106,9 @@ impl GameBoy {
         BufWriter::new(File::create("./sprite.bin").unwrap())
             .write_all(&self.mem.sprite)
             .unwrap();
+        BufWriter::new(File::create("./high_ram.bin").unwrap())
+            .write_all(&self.mem.high_ram)
+            .unwrap();
         loop {
             sleep(Duration::from_millis(1000));
         }
@@ -114,7 +117,8 @@ impl GameBoy {
 
 fn main() {
     // let filename = "./Pokemon Red (UE) [S][!].gb";
-    let filename = "./Tetris (JUE) (V1.1) [!].gb";
+    // let filename = "./Tetris (JUE) (V1.1) [!].gb";
+    let filename = "./cpu_instrs.gb";
     let mut gb = GameBoy::from_cartridge(filename);
     gb.skip_boot_rom();
     gb.start();

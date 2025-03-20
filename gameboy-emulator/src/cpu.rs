@@ -30,6 +30,8 @@ pub struct CPU {
     /// Debug
     dbg_exec_log: VecDeque<ExecLog>,
     halted: bool,
+    breakpoint_delay: usize,
+    instructions_out_of_interrupt: usize,
 }
 
 impl CPU {
@@ -38,9 +40,11 @@ impl CPU {
             reg: Registers::new(),
             last: Instruction::NOP,
             ime: false,
-            ie_delay: 0,
+            ie_delay: -1,
             dbg_exec_log: VecDeque::new(),
             halted: false,
+            breakpoint_delay: 0,
+            instructions_out_of_interrupt: 0,
         }
     }
 
@@ -55,7 +59,7 @@ impl CPU {
         }
         for b in 0..5 {
             if (if_ >> b) & 1 != 0 && (ie >> b) & 1 != 0 {
-                println!("CALLING INTERRUPT {} {}", b, INTERRUPT_HANDLERS[b]);
+                println!("CALLING INTERRUPT {} {}, instructions: {}", b, INTERRUPT_HANDLERS[b], self.instructions_out_of_interrupt);
                 mem[0xFF0F] &= !(1 << b);
                 println!("cleared, {:08b}", mem[0xFF0F]);
                 self.ime = false;
@@ -68,7 +72,7 @@ impl CPU {
 
     fn next_byte(&mut self, mem: &mut Memory) -> u8 {
         if !matches!(self.reg.pc, 0..0x7FFF | 0xFF80..=0xFFFE) {
-            self.cpu_crash("PC escaped valid code".to_string())
+            // self.cpu_crash("PC escaped valid code".to_string())
         }
         let byte = mem[self.reg.pc];
         self.reg.pc += 1;
@@ -178,6 +182,7 @@ impl CPU {
             0x31 => Instruction::LD16(AddrReg::SP, self.next_addr_lsb_first(&mut mem)),
             0xF9 => Instruction::LDSPHL,
             0xF8 => Instruction::LDHL(self.next_byte_signed(&mut mem)),
+            0x08 => Instruction::LDnn(self.next_addr_lsb_first(&mut mem)),
 
             // PUSH
             0xF5 => Instruction::PUSH(AddrReg::AF),
@@ -371,8 +376,8 @@ impl CPU {
 
                     // BIT: data is encoded as 0b01bbbrrr.
                     0b01000000..=0b01111111 => {
-                        let b = (prefixed >> 3) & 0x07;
-                        let r = prefixed & 0x07;
+                        let b = (prefixed >> 3) & 0b0000_0111;
+                        let r = prefixed & 0b0000_0111;
                         Instruction::BIT(b, Self::decode_register(r))
                     }
                     0x30..=0x37 => {
@@ -532,16 +537,20 @@ impl CPU {
                     }
                     _ => {}
                 }
-                if matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
-                    // println!(
-                    //     "Write to registers: {:02x} <- {:02x} {:x?}",
-                    //     o, self.reg.a, instruction
-                    // );
+                if matches!(o, 0x85 | 0xE0..=0xEF) {// matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                    println!(
+                        "Write to registers: {:02x} <- {:02x} {:x?} @ {:04x}",
+                        o, self.reg.a, instruction, self.reg.pc
+                    );
+                }
+                if o == 0x85 && self.reg.pc == 0x2f5 {
+                    self.cpu_crash("test".to_string())
                 }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
-                if matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                if matches!(o, 0x85) && mem[0xFF00 | o as u16] > 1 {
+                    self.breakpoint_delay = 200;
                     // println!(
                     //     "Read from registers: {:02x} <- {:02x}",
                     //     o,
@@ -587,6 +596,10 @@ impl CPU {
                 self.reg
                     .set_flag(4, ((self.reg.sp >> 7) | 1) ^ ((r >> 7) | 0x1) != 0);
             }
+            Instruction::LDnn(r) => {
+                mem[r] = (self.reg.sp & 0x00FF) as u8;
+                mem[r + 1] = (self.reg.sp >> 8) as u8;
+            }
             Instruction::PUSH(r) => {
                 self.push(self.reg.get_pair(r), &mut mem);
             }
@@ -623,7 +636,7 @@ impl CPU {
                     let (_, h) = (hl << 4).overflowing_sub(rhs << 4);
                     let (r, c) = hl.overflowing_sub(rhs);
                     println!("ADD16n sub {} {} {} {} {}", hl, rhs, r, h, c);
-                    self.cpu_crash("Test".to_string());
+                    // self.cpu_crash("Test".to_string());
                     (r, h, c)
                 };
                 self.reg.set_flag(7, false);
@@ -686,7 +699,9 @@ impl CPU {
             Instruction::RETI => {
                 self.ret(&mut mem);
                 self.ime = true;
+                self.instructions_out_of_interrupt = 0;
                 println!("IME enabled");
+                // self.cpu_crash("test".to_string());
             }
             Instruction::BIT(data, n) => {
                 let b = (data >> 3) & 0x7;
@@ -767,7 +782,10 @@ impl CPU {
                         (true, 0x6..=0xF, true, 0x6..=0xF) => (0x9A, true),
                         _ => self.cpu_crash("Couldn't DAA convert".to_string()),
                     },
-                    _ => self.cpu_crash("DAA not supported for last instruction".to_string()),
+                    _ => {
+                        println!("ERROR: DAA not supported for last instruction {:?}", self.last);
+                        (0, false)
+                    },
                 };
                 self.reg.set_flag(7, self.reg.a == 0);
                 self.reg.set_flag(5, false);
@@ -780,9 +798,13 @@ impl CPU {
                 self.reg.set_flag(5, true);
             }
             Instruction::CCF => {
+                self.reg.set_flag(6, false);
+                self.reg.set_flag(5, false);
                 self.reg.set_flag(4, !self.reg.get_flag(4));
             }
             Instruction::SCF => {
+                self.reg.set_flag(6, false);
+                self.reg.set_flag(5, false);
                 self.reg.set_flag(4, true);
             }
             Instruction::NOP => {}
@@ -790,9 +812,45 @@ impl CPU {
                 self.halted = true;
             }
             Instruction::STOP => {
-                todo!("Wait for button press")
+                let button_pressed = mem[0xFF00] & 0x0F == 0;
+                let interrupt_pending = mem[0xFF0F] & mem[0xFFFF] > 0;
+                let speed_key_requested: bool = false;
+                if button_pressed {
+                    if interrupt_pending {
+                        // 1 byte OP code
+                    } else {
+                        self.next_byte(&mut mem);
+                        self.halted = true;
+                    }
+                } else {
+                    if speed_key_requested {
+                        if interrupt_pending {
+                            if self.ime {
+                                println!("Speed change");
+                            } else {
+                                self.cpu_crash("CPU glitch".to_string());
+                            }
+                        } else {
+                            self.next_byte(&mut mem);
+                            mem[0xFF04] = 0x00;
+                            self.halted = true;
+                            println!("Speed change");
+                        }
+                    } else {
+                        if interrupt_pending {
+                            mem[0xFF04] = 0x00;
+                            println!("STOP MODE");
+                        } else {
+                            mem[0xFF04] = 0x00;
+                            self.next_byte(&mut mem);
+                            println!("STOP MODE");
+                        }
+                    }
+                }
             }
-            Instruction::DI => self.ime = false,
+            Instruction::DI => {
+                self.ime = false
+            },
             Instruction::EI => self.ie_delay = 1,
             Instruction::RLCA => {
                 self.reg.a = Self::rotate_left_into_carry(self.reg.a, &mut self.reg);
@@ -829,7 +887,7 @@ impl CPU {
             }
             Instruction::RST(proc) => {
                 if proc == 0x38 {
-                    self.cpu_crash("HIT RST 0x38".to_string());
+                    // self.cpu_crash("HIT RST 0x38".to_string());
                 }
                 let curr = self.reg.pc; // PC was incremented, decrement to get current
                 self.push(curr, &mut mem);
@@ -847,6 +905,13 @@ impl CPU {
             self.ie_delay -= 1;
         }
 
+        if self.breakpoint_delay > 0 {
+            self.breakpoint_delay -= 1;
+            if self.breakpoint_delay == 0 {
+                self.cpu_crash("Breakpoint".to_string());
+            }
+        }
+
         // Debug log
         #[cfg(debug_assertions)]
         {
@@ -862,6 +927,10 @@ impl CPU {
             if self.dbg_exec_log.len() > 200 {
                 let _ = self.dbg_exec_log.pop_back();
             }
+        }
+
+        if self.ime {
+            self.instructions_out_of_interrupt += 1;
         }
 
         self.last = instruction;

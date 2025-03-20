@@ -23,6 +23,7 @@ pub enum Instruction {
     LD16(AddrReg, u16),
     LDSPHL,
     LDHL(i8),
+    LDnn(u16),
     PUSH(AddrReg),
     POP(AddrReg),
     ADD(DataLoc),

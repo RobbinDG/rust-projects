@@ -11,7 +11,7 @@ pub struct Memory {
     wram: [u8; 0x2000],
     pub sprite: [u8; 0xA0],
     io: [u8; 0x80],
-    high_ram: [u8; 0x80],
+    pub high_ram: [u8; 0x80],
     unused_response: u8,
     unused_write_dummy: u8,
 }

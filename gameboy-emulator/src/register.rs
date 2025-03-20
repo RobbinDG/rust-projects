@@ -92,7 +92,7 @@ impl Registers {
             AddrReg::DE => (self.d, self.e),
             AddrReg::HL => (self.h, self.l),
             AddrReg::AF => (self.a, self.f),
-            _ => panic!("Not in instruction set."),
+            AddrReg::SP => ((self.sp >> 8) as u8, (self.sp & 0xFF) as u8),
         };
         (ms as u16) << 8 | ls as u16
     }
@@ -120,7 +120,6 @@ impl Registers {
                 self.a = ms;
                 self.f = ls;
             }
-            _ => panic!("Not in instruction set."),
         };
     }
 
