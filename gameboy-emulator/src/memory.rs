@@ -79,6 +79,9 @@ impl IndexMut<u16> for Memory {
                 &mut self.tile_ram[(addr - 0x8000) as usize]
             }
             0x9800..=0x9FFF => {
+                if addr - 0x9800 == 0x43 {
+                    // panic!()
+                }
                 // println!("write to background map {:04x}", addr - 0x9800);
                 &mut self.background_map[(addr - 0x9800) as usize]
             },

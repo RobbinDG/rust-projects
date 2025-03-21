@@ -94,7 +94,7 @@ impl Registers {
             AddrReg::AF => (self.a, self.f),
             AddrReg::SP => ((self.sp >> 8) as u8, (self.sp & 0xFF) as u8),
         };
-        (ms as u16) << 8 | ls as u16
+        ((ms as u16) << 8) | (ls as u16)
     }
 
     pub fn set_pair(&mut self, reg: AddrReg, value: u16) {

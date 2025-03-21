@@ -59,7 +59,10 @@ impl CPU {
         }
         for b in 0..5 {
             if (if_ >> b) & 1 != 0 && (ie >> b) & 1 != 0 {
-                println!("CALLING INTERRUPT {} {}, instructions: {}", b, INTERRUPT_HANDLERS[b], self.instructions_out_of_interrupt);
+                println!(
+                    "CALLING INTERRUPT {} {}, instructions: {}",
+                    b, INTERRUPT_HANDLERS[b], self.instructions_out_of_interrupt
+                );
                 mem[0xFF0F] &= !(1 << b);
                 println!("cleared, {:08b}", mem[0xFF0F]);
                 self.ime = false;
@@ -537,7 +540,8 @@ impl CPU {
                     }
                     _ => {}
                 }
-                if matches!(o, 0x85 | 0xE0..=0xEF) {// matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                if matches!(o, 0x85 | 0xE0..=0xEF) {
+                    // matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
                     println!(
                         "Write to registers: {:02x} <- {:02x} {:x?} @ {:04x}",
                         o, self.reg.a, instruction, self.reg.pc
@@ -587,14 +591,22 @@ impl CPU {
                     .set_pair(AddrReg::SP, self.reg.get_pair(AddrReg::HL));
             }
             Instruction::LDHL(offset) => {
-                let r = self.reg.sp.wrapping_add_signed(offset as i16);
+                let orig = self.reg.sp;
+                let (r, c, h) = if offset >= 0 {
+                    let (r, c) = orig.overflowing_add(offset as u16);
+                    let (_, h) = (orig << 4).overflowing_add((offset as u16) << 4);
+                    (r, c, h)
+                } else {
+                    let offset = (-offset) as u16;
+                    let (r, c) = orig.overflowing_sub(offset);
+                    let (_, h) = (orig << 4).overflowing_sub(offset << 4);
+                    (r, c, h)
+                };
                 self.reg.set_pair(AddrReg::HL, r);
                 self.reg.set_flag(7, false);
                 self.reg.set_flag(6, false);
-                self.reg
-                    .set_flag(5, ((self.reg.sp >> 3) | 1) ^ ((r >> 3) | 0x1) != 0);
-                self.reg
-                    .set_flag(4, ((self.reg.sp >> 7) | 1) ^ ((r >> 7) | 0x1) != 0);
+                self.reg.set_flag(5, h);
+                self.reg.set_flag(4, c);
             }
             Instruction::LDnn(r) => {
                 mem[r] = (self.reg.sp & 0x00FF) as u8;
@@ -757,40 +769,59 @@ impl CPU {
                 let hi = self.reg.a >> 4;
                 let h = self.reg.get_flag(5);
                 let lo = self.reg.a & 0xF;
-                let (added, c_after) = match self.last {
+                let a_before = self.reg.a;
+                match self.last {
                     Instruction::ADD(_) | Instruction::ADC(_) | Instruction::INC(_) => {
-                        match (c, hi, h, lo) {
-                            (false, 0x0..=0x9, false, 0x0..=0x9) => (0x00, false),
-                            (false, 0x0..=0x8, false, 0xA..=0xF) => (0x06, false),
-                            (false, 0x0..=0x9, true, 0x0..=0x3) => (0x06, false),
-                            (false, 0xA..=0xF, false, 0x0..=0x9) => (0x60, true),
-                            (false, 0x9..=0xF, false, 0xA..=0xF) => (0x66, true),
-                            (false, 0xA..=0xF, true, 0x0..=0x3) => (0x66, true),
-                            (true, 0x0..=0x2, false, 0x0..=0x9) => (0x60, true),
-                            (true, 0x0..=0x2, false, 0xA..=0xF) => (0x66, true),
-                            (true, 0x0..=0x3, true, 0x0..=0x3) => (0x66, true),
-                            _ => self.cpu_crash("Couldn't DAA convert".to_string()),
+                        // match (c, hi, h, lo) {
+                        //     (false, 0x0..=0x9, false, 0x0..=0x9) => (0x00, false),
+                        //     (false, 0x0..=0x8, false, 0xA..=0xF) => (0x06, false),
+                        //     (false, 0x0..=0x9, true, 0x0..=0x3) => (0x06, false),
+                        //     (false, 0xA..=0xF, false, 0x0..=0x9) => (0x60, true),
+                        //     (false, 0x9..=0xF, false, 0xA..=0xF) => (0x66, true),
+                        //     (false, 0xA..=0xF, true, 0x0..=0x3) => (0x66, true),
+                        //     (true, 0x0..=0x2, false, 0x0..=0x9) => (0x60, true),
+                        //     (true, 0x0..=0x2, false, 0xA..=0xF) => (0x66, true),
+                        //     (true, 0x0..=0x3, true, 0x0..=0x3) => (0x66, true),
+                        //     _ => self.cpu_crash("Couldn't DAA convert".to_string()),
+                        // }
+                        if self.reg.a > 0x99 || c {
+                            self.reg.a += 0x60;
+                            self.reg.set_flag(4, true);
+                        } else if lo > 0x09 || h {
+                            self.reg.a += 0x06;
+                            self.reg.set_flag(4, false);
                         }
                     }
                     Instruction::SUB(_)
                     | Instruction::SBC(_)
                     | Instruction::DEC(_)
-                    | Instruction::NEG => match (c, hi, h, lo) {
-                        (false, 0x0..=0x9, false, 0x0..=0x9) => (0x00, false),
-                        (false, 0x0..=0x8, true, 0x6..=0xF) => (0xFA, false),
-                        (true, 0x7..=0xF, false, 0x0..=0x9) => (0xA0, true),
-                        (true, 0x6..=0xF, true, 0x6..=0xF) => (0x9A, true),
-                        _ => self.cpu_crash("Couldn't DAA convert".to_string()),
-                    },
+                    | Instruction::NEG => {
+                        if c {
+                            self.reg.a -= 0x60;
+                        } else if h {
+                            self.reg.a -= 0x06;
+                        }
+                        //     match (c, hi, h, lo) {
+                        //     (false, 0x0..=0x9, false, 0x0..=0x9) => (0x00, false),
+                        //     (false, 0x0..=0x8, true, 0x6..=0xF) => (0xFA, false),
+                        //     (true, 0x7..=0xF, false, 0x0..=0x9) => (0xA0, true),
+                        //     (true, 0x6..=0xF, true, 0x6..=0xF) => (0x9A, true),
+                        //     _ => self.cpu_crash("Couldn't DAA convert".to_string()),
+                        // }
+                    }
                     _ => {
-                        println!("ERROR: DAA not supported for last instruction {:?}", self.last);
-                        (0, false)
-                    },
+                        println!(
+                            "ERROR: DAA not supported for last instruction {:?}",
+                            self.last
+                        );
+                        // (0, false)
+                    }
                 };
+                println!("Performed DAA {} -> {}", a_before, self.reg.a);
+                // self.reg.a = self.reg.a.wrapping_add(added);
                 self.reg.set_flag(7, self.reg.a == 0);
                 self.reg.set_flag(5, false);
-                self.reg.set_flag(4, c_after);
-                self.reg.a = self.reg.a.wrapping_add(added);
+                // self.reg.set_flag(4, c_after);
             }
             Instruction::CPL => {
                 self.reg.a = !self.reg.a;
@@ -848,9 +879,7 @@ impl CPU {
                     }
                 }
             }
-            Instruction::DI => {
-                self.ime = false
-            },
+            Instruction::DI => self.ime = false,
             Instruction::EI => self.ie_delay = 1,
             Instruction::RLCA => {
                 self.reg.a = Self::rotate_left_into_carry(self.reg.a, &mut self.reg);
@@ -1035,6 +1064,10 @@ impl CPU {
         }
     }
 
+    fn next_addr_msb_first(&mut self, mem: &mut Memory) -> u16 {
+        ((self.next_byte(mem) as u16) << 8) | (self.next_byte(mem) as u16)
+    }
+
     fn next_addr_lsb_first(&mut self, mem: &mut Memory) -> u16 {
         (self.next_byte(mem) as u16) | ((self.next_byte(mem) as u16) << 8)
     }
@@ -1077,6 +1110,7 @@ impl CPU {
         self.reg.set_flag(6, false);
         self.reg.set_flag(5, (a & 0x0F) + (n & 0x0F) > 0x0F);
         self.reg.set_flag(4, (r >> 8) != 0);
+        println!("Performed addition {} + {} -> {}", a, n, r as u8);
         r as u8
     }
 
