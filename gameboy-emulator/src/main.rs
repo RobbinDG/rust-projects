@@ -1,12 +1,12 @@
 use crate::joypad::JoyPad;
 use crate::joypad_input_handler::JoypadInputHandler;
-use crate::memory::{Memory, MemoryBankController, MBC3};
+use crate::memory::Memory;
 use crate::ppu::PPU;
 use cartridge_header::CartridgeHeader;
 use cpu::CPU;
 use std::fs;
 use std::fs::File;
-use std::io::{BufWriter, Read, Write};
+use std::io::{Read, Write};
 use std::ops::{Index, IndexMut};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -28,16 +28,14 @@ mod register;
 const LS_BYTE_MASK: u16 = 0x00FF;
 const MS_BYTE_MASK: u16 = 0xFF00;
 
-struct GameBoy
-{
+struct GameBoy {
     mem: Memory,
     cpu: CPU,
     ppu: PPU,
     joy_pad: Arc<Mutex<JoyPad>>,
 }
 
-impl GameBoy
-{
+impl GameBoy {
     pub fn from_cartridge(cartridge_filename: &'static str) -> Self {
         let boot_rom = Self::read_bin_file(&"dmg_boot.bin");
         let rom = Self::read_bin_file(&cartridge_filename);
@@ -73,7 +71,7 @@ impl GameBoy
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..0_400_000 {
+        for _ in 0usize..1000_400_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
             // TIMA register
@@ -124,10 +122,10 @@ impl GameBoy
 }
 
 fn main() {
-    let filename = "./Pokemon Red (UE) [S][!].gb";
+    // let filename = "./Pokemon Red (UE) [S][!].gb";
     // let filename = "./Tetris (JUE) (V1.1) [!].gb";
-    // let filename = "./cpu_instrs.gb";
+    let filename = "./cpu_instrs.gb";
     let mut gb = GameBoy::from_cartridge(filename);
-    // gb.skip_boot_rom();
+    gb.skip_boot_rom();
     gb.start();
 }

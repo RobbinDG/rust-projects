@@ -1,4 +1,4 @@
-use crate::memory::{MemoryBankController, MBC3};
+use crate::memory::{MemoryBankController, MBC1, MBC3};
 
 #[derive(Debug)]
 pub struct CartridgeHeader {
@@ -40,7 +40,7 @@ impl CartridgeHeader {
 
     pub fn memory_bank_controller(&self) -> Result<MemoryBankController, String> {
         match self.cartridge_type {
-            // 0x01..=0x03 => Ok(MemoryBankController::MBC1(..)),
+            0x01..=0x03 => Ok(MemoryBankController::MBC1(MBC1::new())),
             0x0F..=0x13 => Ok(MemoryBankController::MBC3(MBC3::new())),
             _ => Err("Cartridge type's MemoryBankController not implemented".to_string()),
         }

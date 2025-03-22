@@ -909,7 +909,7 @@ impl CPU {
                 if proc == 0x38 {
                     // self.cpu_crash("HIT RST 0x38".to_string());
                 }
-                let curr = self.reg.pc - 1; // PC was incremented, decrement to get current
+                let curr = self.reg.pc; // PC was incremented, decrement to get current
                 self.push(curr, &mut mem);
                 self.reg.pc = 0x0000 | proc as u16;
             }

@@ -4,20 +4,66 @@ use std::io;
 use std::io::{BufWriter, Write};
 use std::ops::{Index, IndexMut};
 
-pub struct MBC3 {
-    pub rom_bank_reg: u8,
+pub struct MBC1 {
+    ram_bank_enable: u8,
+    memory_model: u8, // last bit is: false == 16/8, true == 32/4
+    rom_bank: u8,
+    upper_rom_bank_bits: u8,
+    ram_bank: u8,
 }
 
-impl MBC3{
+impl MBC1 {
+    pub fn new() -> Self {
+        Self {
+            ram_bank_enable: 0,
+            memory_model: 0,
+            rom_bank: 1,
+            upper_rom_bank_bits: 0,
+            ram_bank: 0,
+        }
+    }
+
+    pub fn rom_read_addr(&self, addr: u16) -> usize {
+        let bank_number = self.rom_bank & 0b0001_1111 | ((self.upper_rom_bank_bits & 0b11) << 5);
+        max(bank_number, 1) as usize * 0x4000 + (addr as usize - 0x4000)
+    }
+
+    pub fn rom_write(&mut self, addr: u16) -> &mut u8 {
+        match addr {
+            0x0000..=0x1FFF => {
+                if self.memory_model & 1 == 1 {
+                    &mut self.ram_bank_enable
+                } else {
+                    panic!("Memory model not set to 32/4");
+                }
+            }
+            0x2000..=0x3FFF => &mut self.rom_bank,
+            0x4000..=0x5FFF => {
+                if self.memory_model & 1 == 1 {
+                    // 32/4
+                    &mut self.ram_bank
+                } else {
+                    // 16/8
+                    &mut self.upper_rom_bank_bits
+                }
+            }
+            0x6000..=0x7FFF => &mut self.memory_model,
+            _ => panic!("Invalid write to memory bank: {:04x}", addr),
+        }
+    }
+}
+
+pub struct MBC3 {
+    rom_bank_reg: u8,
+}
+
+impl MBC3 {
     pub fn new() -> Self {
         Self { rom_bank_reg: 1 }
     }
 
-    pub fn rom_read_addr(&self, addr: u16) -> u32 {
-        if !matches!(addr, 0x2000..=0x3FFF) {
-            panic!("Invalid write to memory bank: {:04x}", addr);
-        }
-        max(self.rom_bank_reg, 1) as u32 * 0x4000 + (addr as u32 - 0x4000)
+    pub fn rom_read_addr(&self, addr: u16) -> usize {
+        max(self.rom_bank_reg, 1) as usize * 0x4000 + (addr as usize - 0x4000)
     }
 
     pub fn rom_write(&mut self, addr: u16) -> &mut u8 {
@@ -29,18 +75,21 @@ impl MBC3{
 }
 
 pub enum MemoryBankController {
+    MBC1(MBC1),
     MBC3(MBC3),
 }
 
 impl MemoryBankController {
-    pub fn rom_read_addr(&self, addr: u16) -> u32 {
+    pub fn rom_read_addr(&self, addr: u16) -> usize {
         match self {
+            MemoryBankController::MBC1(c) => c.rom_read_addr(addr),
             MemoryBankController::MBC3(c) => c.rom_read_addr(addr),
         }
     }
 
     pub fn rom_write(&mut self, addr: u16) -> &mut u8 {
         match self {
+            MemoryBankController::MBC1(c) => c.rom_write(addr),
             MemoryBankController::MBC3(c) => c.rom_write(addr),
         }
     }
@@ -101,7 +150,7 @@ impl Index<u16> for Memory {
                 }
             }
             0x0100..=0x3FFF => &self.rom[addr as usize],
-            0x4000..=0x7FFF => &self.rom[self.bank_ctrl.rom_read_addr(addr) as usize],
+            0x4000..=0x7FFF => &self.rom[self.bank_ctrl.rom_read_addr(addr)],
             0x8000..=0x97FF => &self.tile_ram[(addr - 0x8000) as usize],
             0x9800..=0x9FFF => &self.background_map[(addr - 0x9800) as usize],
             0xA000..=0xBFFF => &self.cartridge_ram[(addr - 0xA000) as usize],
