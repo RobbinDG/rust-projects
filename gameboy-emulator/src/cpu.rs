@@ -94,10 +94,6 @@ impl CPU {
         let byte = self.next_byte(&mut mem);
         let dbg_current_pc = self.reg.pc - 1;
 
-        // if dbg_current_pc == 0x6150 {
-        //     self.cpu_crash("Breakpoint".to_string());
-        // }
-
         // Decode
         let instruction = match byte {
             // INC
@@ -503,14 +499,28 @@ impl CPU {
                 self.reg.a = match r {
                     DataLoc::Reg(r) => self.reg.get(r),
                     DataLoc::AddrReg(r) => mem[self.reg.get_pair(r)],
-                    DataLoc::Addr(addr) => mem[addr],
+                    DataLoc::Addr(addr) => {
+                        if addr == 0xdef8 {
+                            println!(
+                                "FAILED INSTRUCTION: {:02x} {:02x}",
+                                mem[addr],
+                                mem[addr + 1]
+                            );
+                        }
+                        mem[addr]
+                    }
                     DataLoc::Value(v) => v,
                 }
             }
             Instruction::LD4(r) => match r {
                 DataLoc::Reg(r) => self.reg.set(r, self.reg.a),
                 DataLoc::AddrReg(r) => mem[self.reg.get_pair(r)] = self.reg.a,
-                DataLoc::Addr(addr) => mem[addr] = self.reg.a,
+                DataLoc::Addr(addr) => {
+                    if addr == 0xdef8 {
+                        println!("TESTED INSTRUCTION: {:02x}", self.reg.a);
+                    }
+                    mem[addr] = self.reg.a
+                }
                 _ => self.cpu_crash("Not in instruction set.".to_string()),
             },
             Instruction::LD5 => {
@@ -575,6 +585,9 @@ impl CPU {
                     .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_sub(1));
             }
             Instruction::LD16(reg, v) => {
+                if matches!(reg, AddrReg::BC) && v == 0x0123 {
+                    // self.breakpoint_delay = 50;
+                }
                 self.reg.set_pair(reg, v);
             }
             Instruction::LDSPHL => {
@@ -582,17 +595,36 @@ impl CPU {
                     .set_pair(AddrReg::SP, self.reg.get_pair(AddrReg::HL));
             }
             Instruction::LDHL(offset) => {
-                let orig = self.reg.sp;
-                let (r, c, h) = if offset >= 0 {
-                    let (r, c) = orig.overflowing_add(offset as u16);
-                    let (_, h) = (orig << 4).overflowing_add((offset as u16) << 4);
-                    (r, c, h)
+                // let orig = self.reg.sp;
+                // let (r, c, h) = if offset >= 0 {
+                //     let (r, _) = orig.overflowing_add(offset as u16);
+                //     let (_, c) = (orig << 8).overflowing_add((offset as u16) << 8);
+                //     let (_, h) = (orig << 12).overflowing_add((offset as u16) << 12);
+                //     (r, c, h)
+                // } else {
+                //     let offset = (-offset) as u16;
+                //     let (r, _) = orig.overflowing_sub(offset);
+                //     let (_, c) = (orig << 8).overflowing_sub(offset << 8);
+                //     let (_, h) = (orig << 12).overflowing_sub(offset << 12);
+                //     println!("LDHL sub {:04x} {:04x} {:04x} {} {}", orig, offset, r, h, c);
+                //     (r, c, h)
+                // };
+
+                let hi = (self.reg.sp >> 8) as u8;
+                let lo = (self.reg.sp & 0x00FF) as u8;
+                let s = ((offset as u8) & MSB_MASK) != 0;
+
+                let (r_lo, c) = lo.overflowing_add(offset as u8);
+                let (_, h) = (lo << 4).overflowing_add((offset as u8) << 4);
+
+                let r_hi = if c && !s {
+                    hi.wrapping_add(1)
+                } else if s && !c {
+                    hi.wrapping_sub(1)
                 } else {
-                    let offset = (-offset) as u16;
-                    let (r, c) = orig.overflowing_sub(offset);
-                    let (_, h) = (orig << 4).overflowing_sub(offset << 4);
-                    (r, c, h)
+                    hi
                 };
+                let r = ((r_hi as u16) << 8) | (r_lo as u16);
                 self.reg.set_pair(AddrReg::HL, r);
                 self.reg.set_flag(7, false);
                 self.reg.set_flag(6, false);
@@ -627,21 +659,21 @@ impl CPU {
                 self.reg.set_pair(AddrReg::HL, r);
             }
             Instruction::ADD16n(n) => {
-                let (r, h, c) = if n >= 0 {
-                    let hl = self.reg.get_pair(AddrReg::SP);
-                    let rhs = n as u16;
-                    let (_, h) = (hl << 4).overflowing_add(rhs << 4);
-                    let (r, c) = hl.overflowing_add(rhs);
-                    (r, h, c)
+                let hi = (self.reg.sp >> 8) as u8;
+                let lo = (self.reg.sp & 0x00FF) as u8;
+                let s = ((n as u8) & MSB_MASK) != 0;
+
+                let (r_lo, c) = lo.overflowing_add(n as u8);
+                let (_, h) = (lo << 4).overflowing_add((n as u8) << 4);
+
+                let r_hi = if c && !s {
+                    hi.wrapping_add(1)
+                } else if s && !c {
+                    hi.wrapping_sub(1)
                 } else {
-                    let hl = self.reg.get_pair(AddrReg::SP);
-                    let rhs = (-n) as u16;
-                    let (_, h) = (hl << 4).overflowing_sub(rhs << 4);
-                    let (r, c) = hl.overflowing_sub(rhs);
-                    println!("ADD16n sub {} {} {} {} {}", hl, rhs, r, h, c);
-                    // self.cpu_crash("Test".to_string());
-                    (r, h, c)
+                    hi
                 };
+                let r = ((r_hi as u16) << 8) | (r_lo as u16);
                 self.reg.set_flag(7, false);
                 self.reg.set_flag(6, false);
                 self.reg.set_flag(5, h);
@@ -1100,7 +1132,13 @@ impl CPU {
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let a = self.reg.a;
-        let r = a as u16 + n as u16 + if add_carry { self.reg.get_flag(4) as u16 } else { 0 };
+        let r = a as u16
+            + n as u16
+            + if add_carry {
+                self.reg.get_flag(4) as u16
+            } else {
+                0
+            };
         let h = (a & 0x0F) + (n & 0x0F) > 0x0F;
         let c = (r >> 8) != 0;
         // println!("Performed addition ({} {}) {} + {} -> {} ({} {})", add_carry, self.reg.get_flag(4), a, n, r as u8, h, c);
@@ -1119,7 +1157,11 @@ impl CPU {
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let a = self.reg.a;
-        let rhs = n.wrapping_add(if add_carry { self.reg.get_flag(4) as u8  } else { 0 });
+        let rhs = n.wrapping_add(if add_carry {
+            self.reg.get_flag(4) as u8
+        } else {
+            0
+        });
         let (r, c) = a.overflowing_sub(rhs);
         let (_, h) = (a << 4).overflowing_sub(rhs << 4);
         self.reg.set_flag(7, r == 0);
