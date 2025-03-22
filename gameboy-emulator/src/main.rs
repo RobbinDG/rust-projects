@@ -46,7 +46,7 @@ impl GameBoy {
         assert_ne!(header.cgb, 0xC0, "Not compatible with Monochrome");
 
         let jp = Arc::new(Mutex::new(JoyPad::new()));
-        let mem = Memory::new(boot_rom, rom, header.memory_bank_controller().unwrap());
+        let mem = Memory::new(boot_rom, rom, header).unwrap();
         let cpu = CPU::new();
         let ppu = PPU::new(JoypadInputHandler::new(jp.clone()));
         GameBoy {

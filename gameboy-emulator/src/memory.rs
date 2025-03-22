@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::ops::{Index, IndexMut};
+use crate::cartridge_header::CartridgeHeader;
 
 pub struct MBC1 {
     ram_bank_enable: u8,
@@ -23,9 +24,9 @@ impl MBC1 {
         }
     }
 
-    pub fn rom_read_addr(&self, addr: u16) -> usize {
-        let bank_number = self.rom_bank & 0b0001_1111 | ((self.upper_rom_bank_bits & 0b11) << 5);
-        max(bank_number, 1) as usize * 0x4000 + (addr as usize - 0x4000)
+    pub fn rom_bank(&self) -> usize {
+        let bank_number = (self.rom_bank & 0b0001_1111) | ((self.upper_rom_bank_bits & 0b11) << 5);
+        max(bank_number, 1) as usize
     }
 
     pub fn rom_write(&mut self, addr: u16) -> &mut u8 {
@@ -62,8 +63,8 @@ impl MBC3 {
         Self { rom_bank_reg: 1 }
     }
 
-    pub fn rom_read_addr(&self, addr: u16) -> usize {
-        max(self.rom_bank_reg, 1) as usize * 0x4000 + (addr as usize - 0x4000)
+    pub fn rom_bank(&self) -> usize {
+        max(self.rom_bank_reg, 1) as usize
     }
 
     pub fn rom_write(&mut self, addr: u16) -> &mut u8 {
@@ -80,10 +81,10 @@ pub enum MemoryBankController {
 }
 
 impl MemoryBankController {
-    pub fn rom_read_addr(&self, addr: u16) -> usize {
+    pub fn rom_bank(&self) -> usize {
         match self {
-            MemoryBankController::MBC1(c) => c.rom_read_addr(addr),
-            MemoryBankController::MBC3(c) => c.rom_read_addr(addr),
+            MemoryBankController::MBC1(c) => c.rom_bank(),
+            MemoryBankController::MBC3(c) => c.rom_bank(),
         }
     }
 
@@ -97,6 +98,7 @@ impl MemoryBankController {
 
 pub struct Memory {
     bank_ctrl: MemoryBankController,
+    num_rom_banks: usize,
     boot_rom: Vec<u8>,
     rom: Vec<u8>,
     pub tile_ram: [u8; 0x1800],
@@ -111,9 +113,10 @@ pub struct Memory {
 }
 
 impl Memory {
-    pub fn new(boot_rom: Vec<u8>, rom: Vec<u8>, bank_ctrl: MemoryBankController) -> Self {
-        Self {
-            bank_ctrl,
+    pub fn new(boot_rom: Vec<u8>, rom: Vec<u8>, header: CartridgeHeader) -> Result<Self, String> {
+        Ok(Self {
+            bank_ctrl: header.memory_bank_controller()?,
+            num_rom_banks: 2usize.pow(header.rom_size as u32 + 1),
             boot_rom,
             rom,
             tile_ram: [0; 0x1800],
@@ -125,7 +128,7 @@ impl Memory {
             high_ram: [0; 0x80],
             unused_response: 0xFF,
             unused_write_dummy: 0,
-        }
+        })
     }
 
     pub fn write_contents(&self) -> io::Result<()> {
@@ -150,7 +153,13 @@ impl Index<u16> for Memory {
                 }
             }
             0x0100..=0x3FFF => &self.rom[addr as usize],
-            0x4000..=0x7FFF => &self.rom[self.bank_ctrl.rom_read_addr(addr)],
+            0x4000..=0x7FFF => {
+                let bank = self.bank_ctrl.rom_bank();
+                if bank >= self.num_rom_banks {
+                    panic!("Selected bank {bank} not available.")
+                }
+                &self.rom[bank * 0x4000 + (addr as usize - 0x4000)]
+            },
             0x8000..=0x97FF => &self.tile_ram[(addr - 0x8000) as usize],
             0x9800..=0x9FFF => &self.background_map[(addr - 0x9800) as usize],
             0xA000..=0xBFFF => &self.cartridge_ram[(addr - 0xA000) as usize],
