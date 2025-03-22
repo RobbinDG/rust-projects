@@ -7,10 +7,8 @@ use crate::reg::Reg;
 use crate::register::Registers;
 use std::collections::VecDeque;
 
-const REG_INTERRUPT_FLAG: u16 = 0xFF0F;
-const REG_INTERRUPT_ENABLE: u16 = 0xFFFF;
-const MSB_MASK: u8 = 0b10000000;
-const LSB_MASK: u8 = 0b00000001;
+const MSB_MASK: u8 = 0b1000_0000;
+const LSB_MASK: u8 = 0b0000_0001;
 const INTERRUPT_HANDLERS: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
 
 struct ExecLog {
@@ -18,7 +16,6 @@ struct ExecLog {
     byte: u8,
     instruction: Instruction,
     registers: Registers,
-    bank: u8,
 }
 
 pub struct CPU {
@@ -32,6 +29,7 @@ pub struct CPU {
     halted: bool,
     breakpoint_delay: usize,
     instructions_out_of_interrupt: usize,
+    pub instructions_count: [usize; 2 * 256],
 }
 
 impl CPU {
@@ -45,6 +43,7 @@ impl CPU {
             halted: false,
             breakpoint_delay: 0,
             instructions_out_of_interrupt: 0,
+            instructions_count: [0; 2 * 256],
         }
     }
 
@@ -346,6 +345,7 @@ impl CPU {
 
             0xCB => {
                 let prefixed = self.next_byte(&mut mem);
+                self.instructions_count[256 + prefixed as usize] += 1;
                 match prefixed {
                     // Rotates & Shifts
                     0x00..=0x07 => {
@@ -417,6 +417,7 @@ impl CPU {
                 todo!("Op Code {:02x} not implemented", byte)
             }
         };
+        self.instructions_count[byte as usize] += 1;
 
         // Execute
         match instruction.clone() {
@@ -533,22 +534,12 @@ impl CPU {
                 mem[addr] = self.reg.a;
             }
             Instruction::LDH1(o) => {
-                match o {
-                    0x41 => {
-                        // STAT
-                        println!("STAT: {:02x}", self.reg.a);
-                    }
-                    _ => {}
-                }
                 if matches!(o, 0x85 | 0xE0..=0xEF) {
                     // matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
                     println!(
                         "Write to registers: {:02x} <- {:02x} {:x?} @ {:04x}",
                         o, self.reg.a, instruction, self.reg.pc
                     );
-                }
-                if o == 0x85 && self.reg.pc == 0x2f5 {
-                    self.cpu_crash("test".to_string())
                 }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
@@ -850,7 +841,7 @@ impl CPU {
                     if interrupt_pending {
                         // 1 byte OP code
                     } else {
-                        self.next_byte(&mut mem);
+                        // self.next_byte(&mut mem);
                         self.halted = true;
                     }
                 } else {
@@ -862,7 +853,7 @@ impl CPU {
                                 self.cpu_crash("CPU glitch".to_string());
                             }
                         } else {
-                            self.next_byte(&mut mem);
+                            // self.next_byte(&mut mem);
                             mem[0xFF04] = 0x00;
                             self.halted = true;
                             println!("Speed change");
@@ -873,7 +864,7 @@ impl CPU {
                             println!("STOP MODE");
                         } else {
                             mem[0xFF04] = 0x00;
-                            self.next_byte(&mut mem);
+                            // self.next_byte(&mut mem);
                             println!("STOP MODE");
                         }
                     }
@@ -918,7 +909,7 @@ impl CPU {
                 if proc == 0x38 {
                     // self.cpu_crash("HIT RST 0x38".to_string());
                 }
-                let curr = self.reg.pc; // PC was incremented, decrement to get current
+                let curr = self.reg.pc - 1; // PC was incremented, decrement to get current
                 self.push(curr, &mut mem);
                 self.reg.pc = 0x0000 | proc as u16;
             }
@@ -949,7 +940,6 @@ impl CPU {
                 byte,
                 instruction: instruction.clone(),
                 registers: self.reg.clone(),
-                bank: mem.rom_bank_reg,
             };
             // println!("Executed {:04x} {:02x} {:x?} \t\t {:x?}", entry.pc, entry.byte, entry.instruction, entry.registers);
             self.dbg_exec_log.push_front(entry);
@@ -985,7 +975,9 @@ impl CPU {
 
     fn rotate_left_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
         let a = a_old.rotate_left(1);
-        reg.set_flag(7, a == 0);
+        // TODO gameboy manual says to set Z, z80 manual says not to. Not setting it gets
+        //  test further with the same amount of instructions
+        // reg.set_flag(7, a == 0);
         reg.set_flag(6, false);
         reg.set_flag(5, false);
         reg.set_flag(4, (a_old & MSB_MASK) != 0);
@@ -1054,12 +1046,11 @@ impl CPU {
     pub fn print_exec_log(&mut self) {
         while let Some(entry) = self.dbg_exec_log.pop_back() {
             println!(
-                "Executed {:04x} {:02x} {:<30} {:x?} {:02x}",
+                "Executed {:04x} {:02x} {:<30} {:x?}",
                 entry.pc,
                 entry.byte,
                 format!("{:x?}", entry.instruction),
                 entry.registers,
-                entry.bank
             );
         }
     }
@@ -1075,13 +1066,17 @@ impl CPU {
     fn push(&mut self, val: u16, mem: &mut Memory) {
         let ls = (val & 0xFF) as u8;
         let ms = (val >> 8) as u8;
-        mem[self.reg.sp] = ls;
+        // mem[self.reg.sp] = ls;
+        // mem[self.reg.sp - 1] = ms;
         mem[self.reg.sp - 1] = ms;
+        mem[self.reg.sp - 2] = ls;
         self.reg.sp -= 2;
     }
 
     fn pop(&mut self, mem: &mut Memory) -> u16 {
-        let ls = mem[self.reg.sp + 2];
+        // let ls = mem[self.reg.sp + 2];
+        // let ms = mem[self.reg.sp + 1];
+        let ls = mem[self.reg.sp];
         let ms = mem[self.reg.sp + 1];
         self.reg.sp += 2;
         ((ms as u16) << 8) | (ls as u16)
@@ -1105,12 +1100,14 @@ impl CPU {
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let a = self.reg.a;
-        let r = a as u16 + n as u16 + if add_carry { 1 } else { 0 };
+        let r = a as u16 + n as u16 + if add_carry { self.reg.get_flag(4) as u16 } else { 0 };
+        let h = (a & 0x0F) + (n & 0x0F) > 0x0F;
+        let c = (r >> 8) != 0;
+        // println!("Performed addition ({} {}) {} + {} -> {} ({} {})", add_carry, self.reg.get_flag(4), a, n, r as u8, h, c);
         self.reg.set_flag(7, (r as u8) == 0);
         self.reg.set_flag(6, false);
-        self.reg.set_flag(5, (a & 0x0F) + (n & 0x0F) > 0x0F);
-        self.reg.set_flag(4, (r >> 8) != 0);
-        println!("Performed addition {} + {} -> {}", a, n, r as u8);
+        self.reg.set_flag(5, h);
+        self.reg.set_flag(4, c);
         r as u8
     }
 
@@ -1121,13 +1118,16 @@ impl CPU {
             DataLoc::Value(v) => v,
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
-        let a = self.reg.a as u16;
-        let rhs = n as u16 + if add_carry { 1 } else { 0 };
-        let r = 0x0100 + a - rhs;
-        self.reg.set_flag(7, r == 0x0100);
+        let a = self.reg.a;
+        let rhs = n.wrapping_add(if add_carry { self.reg.get_flag(4) as u8  } else { 0 });
+        let (r, c) = a.overflowing_sub(rhs);
+        let (_, h) = (a << 4).overflowing_sub(rhs << 4);
+        self.reg.set_flag(7, r == 0);
         self.reg.set_flag(6, true);
-        self.reg.set_flag(5, (a & 0x0F) >= (rhs & 0x0F));
-        self.reg.set_flag(4, (r >> 8) == 0);
+        self.reg.set_flag(5, h);
+        self.reg.set_flag(4, c);
+
+        // println!("Performed subtraction ({} {}) {} - {} -> {} ({} {})", add_carry, self.reg.get_flag(4), a, n, r as u8, h, c);
         (r & 0x00FF) as u8
     }
 

@@ -1,5 +1,6 @@
 use crate::joypad::JoyPad;
-use crate::memory::Memory;
+use crate::joypad_input_handler::JoypadInputHandler;
+use crate::memory::{Memory, MemoryBankController, MBC3};
 use crate::ppu::PPU;
 use cartridge_header::CartridgeHeader;
 use cpu::CPU;
@@ -10,7 +11,6 @@ use std::ops::{Index, IndexMut};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
-use crate::joypad_input_handler::JoypadInputHandler;
 
 mod addrreg;
 mod cartridge_header;
@@ -19,23 +19,25 @@ mod cpu;
 mod dataloc;
 mod instruction;
 mod joypad;
+mod joypad_input_handler;
 mod memory;
 mod ppu;
 mod reg;
 mod register;
-mod joypad_input_handler;
 
 const LS_BYTE_MASK: u16 = 0x00FF;
 const MS_BYTE_MASK: u16 = 0xFF00;
 
-struct GameBoy {
+struct GameBoy
+{
     mem: Memory,
     cpu: CPU,
     ppu: PPU,
     joy_pad: Arc<Mutex<JoyPad>>,
 }
 
-impl GameBoy {
+impl GameBoy
+{
     pub fn from_cartridge(cartridge_filename: &'static str) -> Self {
         let boot_rom = Self::read_bin_file(&"dmg_boot.bin");
         let rom = Self::read_bin_file(&cartridge_filename);
@@ -43,12 +45,13 @@ impl GameBoy {
         // Read cartridge header
         let header = CartridgeHeader::read(&rom);
         println!("{:x?}", header);
+        assert_ne!(header.cgb, 0xC0, "Not compatible with Monochrome");
 
         let jp = Arc::new(Mutex::new(JoyPad::new()));
-        let mem = Memory::new(boot_rom, rom);
+        let mem = Memory::new(boot_rom, rom, header.memory_bank_controller().unwrap());
         let cpu = CPU::new();
         let ppu = PPU::new(JoypadInputHandler::new(jp.clone()));
-        Self {
+        GameBoy {
             mem,
             cpu,
             ppu,
@@ -70,7 +73,7 @@ impl GameBoy {
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..5_000_000 {
+        for _ in 0usize..0_400_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
             // TIMA register
@@ -97,18 +100,23 @@ impl GameBoy {
             // self.mem = self.ppu.run_dot(self.mem);
         }
         self.cpu.print_exec_log();
-        BufWriter::new(File::create("./tile_ram.bin").unwrap())
-            .write_all(&self.mem.tile_ram)
-            .unwrap();
-        BufWriter::new(File::create("./background_map.bin").unwrap())
-            .write_all(&self.mem.background_map)
-            .unwrap();
-        BufWriter::new(File::create("./sprite.bin").unwrap())
-            .write_all(&self.mem.sprite)
-            .unwrap();
-        BufWriter::new(File::create("./high_ram.bin").unwrap())
-            .write_all(&self.mem.high_ram)
-            .unwrap();
+
+        for i in 0..256 {
+            if self.cpu.instructions_count[i] > 0 {
+                println!("{:02x}: {}", i as u8, self.cpu.instructions_count[i]);
+            }
+        }
+        for i in 256..(2 * 256) {
+            if self.cpu.instructions_count[i] > 0 {
+                println!(
+                    "cb {:02x}: {}",
+                    (i - 256) as u8,
+                    self.cpu.instructions_count[i]
+                );
+            }
+        }
+
+        self.mem.write_contents();
         loop {
             sleep(Duration::from_millis(1000));
         }
@@ -116,10 +124,10 @@ impl GameBoy {
 }
 
 fn main() {
-    // let filename = "./Pokemon Red (UE) [S][!].gb";
+    let filename = "./Pokemon Red (UE) [S][!].gb";
     // let filename = "./Tetris (JUE) (V1.1) [!].gb";
-    let filename = "./cpu_instrs.gb";
+    // let filename = "./cpu_instrs.gb";
     let mut gb = GameBoy::from_cartridge(filename);
-    gb.skip_boot_rom();
+    // gb.skip_boot_rom();
     gb.start();
 }

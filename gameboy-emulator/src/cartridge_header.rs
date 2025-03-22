@@ -1,19 +1,21 @@
+use crate::memory::{MemoryBankController, MBC3};
+
 #[derive(Debug)]
 pub struct CartridgeHeader {
-    logo: [u8; 0x30],
-    title: [u8; 0x10],
-    manufacturer: [u8; 0x4],
-    cgb: u8,
-    licensee: [u8; 0x2],
-    sgb: u8,
-    cartridge_type: u8,
-    rom_size: u8,
-    ram_size: u8,
-    destination_code: u8,
-    licensee_old: u8,
-    rom_version: u8,
-    header_checksum: u8,
-    global_checksum: [u8; 2],
+    pub logo: [u8; 0x30],
+    pub title: [u8; 0x10],
+    pub manufacturer: [u8; 0x4],
+    pub cgb: u8,
+    pub licensee: [u8; 0x2],
+    pub sgb: u8,
+    pub cartridge_type: u8,
+    pub rom_size: u8,
+    pub ram_size: u8,
+    pub destination_code: u8,
+    pub licensee_old: u8,
+    pub rom_version: u8,
+    pub header_checksum: u8,
+    pub global_checksum: [u8; 2],
 }
 
 impl CartridgeHeader {
@@ -33,6 +35,14 @@ impl CartridgeHeader {
             rom_version: rom[0x14C],
             header_checksum: rom[0x14D],
             global_checksum: rom[0x14E..=0x14F].try_into().unwrap(),
+        }
+    }
+
+    pub fn memory_bank_controller(&self) -> Result<MemoryBankController, String> {
+        match self.cartridge_type {
+            // 0x01..=0x03 => Ok(MemoryBankController::MBC1(..)),
+            0x0F..=0x13 => Ok(MemoryBankController::MBC3(MBC3::new())),
+            _ => Err("Cartridge type's MemoryBankController not implemented".to_string()),
         }
     }
 }
