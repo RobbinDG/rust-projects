@@ -71,7 +71,6 @@ pub enum Instruction {
 impl Instruction {
     pub fn clock_cycles(&self) -> u8 {
         match self {
-            // DONE UNTIL HERE
             Instruction::LD(a, b) => match (a, b) {
                 (DataLoc::Reg(_), DataLoc::Reg(_)) => 4,
                 (DataLoc::Reg(_), DataLoc::AddrReg(_)) => 8,

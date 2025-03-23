@@ -30,6 +30,7 @@ pub struct CPU {
     breakpoint_delay: usize,
     instructions_out_of_interrupt: usize,
     pub instructions_count: [usize; 2 * 256],
+    m_cycle_counter: u32,
 }
 
 impl CPU {
@@ -44,29 +45,30 @@ impl CPU {
             breakpoint_delay: 0,
             instructions_out_of_interrupt: 0,
             instructions_count: [0; 2 * 256],
+            m_cycle_counter: 0,
         }
     }
 
     pub fn check_interrupts(&mut self, mem: &mut Memory) {
+        let ie = mem[0xFFFF];
+        let if_ = mem[0xFF0F];
+
+        if ie & if_ > 0 {
+            self.halted = false;
+        }
+
         if !self.ime {
             return;
         }
-        let ie = mem[0xFFFF];
-        let if_ = mem[0xFF0F];
-        if (ie & if_ > 0) {
-            println!("interrupts {:08b} {:08b}", ie, if_);
-        }
+
         for b in 0..5 {
             if (if_ >> b) & 1 != 0 && (ie >> b) & 1 != 0 {
-                println!(
-                    "CALLING INTERRUPT {} {}, instructions: {}",
-                    b, INTERRUPT_HANDLERS[b], self.instructions_out_of_interrupt
-                );
                 mem[0xFF0F] &= !(1 << b);
-                println!("cleared, {:08b}", mem[0xFF0F]);
-                self.ime = false;
-                self.halted = false;
-                self.call(INTERRUPT_HANDLERS[b], mem);
+                if self.ime {
+                    self.ime = false;
+                    self.call(INTERRUPT_HANDLERS[b], mem);
+                    self.m_cycle_counter += 5;
+                }
                 return;
             }
         }
@@ -87,6 +89,7 @@ impl CPU {
 
     pub fn run_cycle(&mut self, mut mem: Memory) -> Memory {
         if self.halted {
+            self.update_timer(&mut mem, 1);
             return mem;
         }
 
@@ -129,13 +132,34 @@ impl CPU {
             0x3B => Instruction::DEC16(AddrReg::SP),
 
             // 1. LD
-            0x06 => Instruction::LD(DataLoc::Reg(Reg::B), DataLoc::Value(self.next_byte(&mut mem))),
-            0x0E => Instruction::LD(DataLoc::Reg(Reg::C), DataLoc::Value(self.next_byte(&mut mem))),
-            0x16 => Instruction::LD(DataLoc::Reg(Reg::D), DataLoc::Value(self.next_byte(&mut mem))),
-            0x1E => Instruction::LD(DataLoc::Reg(Reg::E), DataLoc::Value(self.next_byte(&mut mem))),
-            0x26 => Instruction::LD(DataLoc::Reg(Reg::H), DataLoc::Value(self.next_byte(&mut mem))),
-            0x2E => Instruction::LD(DataLoc::Reg(Reg::L), DataLoc::Value(self.next_byte(&mut mem))),
-            0x36 => Instruction::LD(DataLoc::AddrReg(AddrReg::HL), DataLoc::Value(self.next_byte(&mut mem))),
+            0x06 => Instruction::LD(
+                DataLoc::Reg(Reg::B),
+                DataLoc::Value(self.next_byte(&mut mem)),
+            ),
+            0x0E => Instruction::LD(
+                DataLoc::Reg(Reg::C),
+                DataLoc::Value(self.next_byte(&mut mem)),
+            ),
+            0x16 => Instruction::LD(
+                DataLoc::Reg(Reg::D),
+                DataLoc::Value(self.next_byte(&mut mem)),
+            ),
+            0x1E => Instruction::LD(
+                DataLoc::Reg(Reg::E),
+                DataLoc::Value(self.next_byte(&mut mem)),
+            ),
+            0x26 => Instruction::LD(
+                DataLoc::Reg(Reg::H),
+                DataLoc::Value(self.next_byte(&mut mem)),
+            ),
+            0x2E => Instruction::LD(
+                DataLoc::Reg(Reg::L),
+                DataLoc::Value(self.next_byte(&mut mem)),
+            ),
+            0x36 => Instruction::LD(
+                DataLoc::AddrReg(AddrReg::HL),
+                DataLoc::Value(self.next_byte(&mut mem)),
+            ),
 
             // 2. LD
             0b01000000..0b01110110 | 0b01110111..=0b01111111 => {
@@ -147,13 +171,22 @@ impl CPU {
             // 3. LD
             0x0A => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::AddrReg(AddrReg::BC)),
             0x1A => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::AddrReg(AddrReg::DE)),
-            0xFA => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::Addr(self.next_addr_lsb_first(&mut mem))),
-            0x3E => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::Value(self.next_byte(&mut mem))),
+            0xFA => Instruction::LD(
+                DataLoc::Reg(Reg::A),
+                DataLoc::Addr(self.next_addr_lsb_first(&mut mem)),
+            ),
+            0x3E => Instruction::LD(
+                DataLoc::Reg(Reg::A),
+                DataLoc::Value(self.next_byte(&mut mem)),
+            ),
 
             // 4. LD
             0x02 => Instruction::LD(DataLoc::AddrReg(AddrReg::BC), DataLoc::Reg(Reg::A)),
             0x12 => Instruction::LD(DataLoc::AddrReg(AddrReg::DE), DataLoc::Reg(Reg::A)),
-            0xEA => Instruction::LD(DataLoc::Addr(self.next_addr_lsb_first(&mut mem)), DataLoc::Reg(Reg::A)),
+            0xEA => Instruction::LD(
+                DataLoc::Addr(self.next_addr_lsb_first(&mut mem)),
+                DataLoc::Reg(Reg::A),
+            ),
 
             // 5. LD
             0xF2 => Instruction::LD5,
@@ -488,7 +521,11 @@ impl CPU {
             Instruction::LD5 => {
                 // let addr = 0xFF00 | self.reg.c as u16;
                 // self.reg.a = mem[addr];
-                self.ld_8_bit(DataLoc::Reg(Reg::A), DataLoc::Addr(0xFF00 | self.reg.c as u16), &mut mem);
+                self.ld_8_bit(
+                    DataLoc::Reg(Reg::A),
+                    DataLoc::Addr(0xFF00 | self.reg.c as u16),
+                    &mut mem,
+                );
             }
             Instruction::LD6 => {
                 // if matches!(self.reg.c, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
@@ -499,7 +536,11 @@ impl CPU {
                 // }
                 // let addr = 0xFF00 | self.reg.c as u16;
                 // mem[addr] = self.reg.a;
-                self.ld_8_bit(DataLoc::Addr(0xFF00 | self.reg.c as u16), DataLoc::Reg(Reg::A), &mut mem);
+                self.ld_8_bit(
+                    DataLoc::Addr(0xFF00 | self.reg.c as u16),
+                    DataLoc::Reg(Reg::A),
+                    &mut mem,
+                );
             }
             Instruction::LDH1(o) => {
                 if matches!(o, 0x85 | 0xE0..=0xEF) {
@@ -762,6 +803,9 @@ impl CPU {
             }
             Instruction::NOP => {}
             Instruction::HALT => {
+                if !self.ime && mem[0xFF0F] & mem[0xFFFF] != 0 {
+                    self.cpu_crash("HALT BUG".to_string());
+                }
                 self.halted = true;
             }
             Instruction::STOP => {
@@ -801,7 +845,10 @@ impl CPU {
                     }
                 }
             }
-            Instruction::DI => self.ime = false,
+            Instruction::DI => {
+                println!("IME disabled");
+                self.ime = false
+            }
             Instruction::EI => self.ie_delay = 1,
             Instruction::RLCA => {
                 self.reg.a = Self::rotate_left_into_carry(self.reg.a, &mut self.reg);
@@ -862,21 +909,8 @@ impl CPU {
                 self.cpu_crash("Breakpoint".to_string());
             }
         }
-        
-        // TIMA register
-            // TODO 4 is placeholder since any cpu instruction takes at least 4 cycles
-            let tima_old = mem[0xFF05];
-            // Check TAC enable TODO TAC clock select
-            if (mem[0xFF07] >> 2) & 1 != 0 {
-                mem[0xFF05] = mem[0xFF05].wrapping_add(instruction.machine_cycles());
-                if mem[0xFF05] < tima_old {
-                    mem[0xFF05] = mem[0xFF06];
-                    // Timer interrupt
-                    if (mem[0xFFFF] >> 2) & 1 != 0 {
-                        mem[0xFF0F] |= 1 << 2;
-                    }
-                }
-            }
+
+        self.update_timer(&mut mem, instruction.machine_cycles() as u32);
 
         // Debug log
         #[cfg(debug_assertions)]
@@ -900,6 +934,41 @@ impl CPU {
 
         self.last = instruction;
         mem
+    }
+
+    fn update_timer(&mut self, mem: &mut Memory, value: u32) {
+        // TIMA register
+        // TODO 4 is placeholder since any cpu instruction takes at least 4 cycles
+        let tima_old = mem[0xFF05];
+        let tma = mem[0xFF06];
+        let tac = mem[0xFF07];
+        let tac_clock_select = tac & 0b11;
+        let tac_enable = (tac >> 2) & 1 != 0;
+
+        if tac_enable {
+            self.m_cycle_counter += value;
+            // TODO I know there's a nice pattern with big magic here, but I can't figure it out.
+            let inc_per_cycles = match tac_clock_select {
+                0 => 256,
+                1 => 4,
+                2 => 16,
+                3 => 64,
+                _ => unreachable!(),
+            };
+            if self.m_cycle_counter >= inc_per_cycles {
+                self.m_cycle_counter -= inc_per_cycles;
+                let mut tima_new = tima_old.wrapping_add(1);
+                // println!("{} {} {:08b} {:08b} {}", tima_old, tima_new, mem[0xFFFF], mem[0xFF0F], self.ime);
+                if tima_new < tima_old {
+                    tima_new = tma;
+                    // Timer interrupt
+                    if (mem[0xFFFF] >> 2) & 1 != 0 {
+                        mem[0xFF0F] |= 1 << 2;
+                    }
+                }
+                mem[0xFF05] = tima_new;
+            }
+        }
     }
 
     fn apply_to_7_bit_reg<F>(&mut self, f: F, r: DataLoc, mem: &mut Memory)
