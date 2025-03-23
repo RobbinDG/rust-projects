@@ -6,8 +6,7 @@ use cartridge_header::CartridgeHeader;
 use cpu::CPU;
 use std::fs;
 use std::fs::File;
-use std::io::{Read, Write};
-use std::ops::{Index, IndexMut};
+use std::io::{Read};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
@@ -24,9 +23,6 @@ mod memory;
 mod ppu;
 mod reg;
 mod register;
-
-const LS_BYTE_MASK: u16 = 0x00FF;
-const MS_BYTE_MASK: u16 = 0xFF00;
 
 struct GameBoy {
     mem: Memory,
@@ -99,7 +95,7 @@ impl GameBoy {
             }
         }
 
-        self.mem.write_contents();
+        self.mem.write_contents().unwrap();
         loop {
             sleep(Duration::from_millis(1000));
         }
@@ -109,7 +105,8 @@ impl GameBoy {
 fn main() {
     // let filename = "./Pokemon Red (UE) [S][!].gb";
     // let filename = "./Tetris (JUE) (V1.1) [!].gb";
-    let filename = "./cpu_instrs.gb";
+    // let filename = "./cpu_instrs.gb";
+    let filename = "./instr_timing.gb";
     let mut gb = GameBoy::from_cartridge(filename);
     gb.skip_boot_rom();
     gb.start();

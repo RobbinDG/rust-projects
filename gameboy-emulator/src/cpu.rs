@@ -448,6 +448,8 @@ impl CPU {
         self.instructions_count[byte as usize] += 1;
 
         // Execute
+
+        let mut conditional_taken = false;
         match instruction.clone() {
             Instruction::INC(l) => {
                 let (old, res) = match l {
@@ -496,9 +498,9 @@ impl CPU {
             }
             Instruction::JP2(c, addr) => {
                 if self.reg.eval_condition(c) {
+                    conditional_taken = true;
                     if addr == 0xc1b9 {
                         println!("FAILED TEST");
-                        // self.breakpoint_delay = 50;
                     }
                     self.reg.pc = addr;
                 }
@@ -511,6 +513,7 @@ impl CPU {
             }
             Instruction::JR5(c, addr) => {
                 if self.reg.eval_condition(c) {
+                    conditional_taken = true;
                     self.reg.pc = self.reg.pc.wrapping_add_signed(addr as i16);
                 }
             }
@@ -518,8 +521,6 @@ impl CPU {
                 self.ld_8_bit(a, b, &mut mem);
             }
             Instruction::LD5 => {
-                // let addr = 0xFF00 | self.reg.c as u16;
-                // self.reg.a = mem[addr];
                 self.ld_8_bit(
                     DataLoc::Reg(Reg::A),
                     DataLoc::Addr(0xFF00 | self.reg.c as u16),
@@ -527,14 +528,6 @@ impl CPU {
                 );
             }
             Instruction::LD6 => {
-                // if matches!(self.reg.c, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
-                //     // println!(
-                //     //     "Write to registers: {:02x} <- {:02x}",
-                //     //     self.reg.c, self.reg.a
-                //     // );
-                // }
-                // let addr = 0xFF00 | self.reg.c as u16;
-                // mem[addr] = self.reg.a;
                 self.ld_8_bit(
                     DataLoc::Addr(0xFF00 | self.reg.c as u16),
                     DataLoc::Reg(Reg::A),
@@ -542,24 +535,9 @@ impl CPU {
                 );
             }
             Instruction::LDH1(o) => {
-                if matches!(o, 0x85 | 0xE0..=0xEF) {
-                    // matches!(o, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
-                    println!(
-                        "Write to registers: {:02x} <- {:02x} {:x?} @ {:04x}",
-                        o, self.reg.a, instruction, self.reg.pc
-                    );
-                }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
-                if matches!(o, 0x85) && mem[0xFF00 | o as u16] > 1 {
-                    // self.breakpoint_delay = 200;
-                    // println!(
-                    //     "Read from registers: {:02x} <- {:02x}",
-                    //     o,
-                    //     mem[0xFF00 | o as u16]
-                    // );
-                }
                 self.reg.a = mem[0xFF00 | o as u16];
             }
             Instruction::LDI(a, b) => {
@@ -683,7 +661,10 @@ impl CPU {
             }
             Instruction::CP(l) => {
                 if matches!(l, DataLoc::Value(0xCB)) {
-                    println!("TEST FAILED {:02x} {:02x} {:02x}", mem[0xdef8], mem[0xdef9], mem[0xdefa]);
+                    println!(
+                        "TEST FAILED {:02x} {:02x} {:02x}",
+                        mem[0xdef8], mem[0xdef9], mem[0xdefa]
+                    );
                 }
                 let _ = self.sub_set_flags(l, false, &mut mem);
             }
@@ -889,8 +870,6 @@ impl CPU {
                 self.push(curr, &mut mem);
                 self.reg.pc = 0x0000 | proc as u16;
             }
-
-            _ => self.cpu_crash(format!("Instruction not supported {:?}", instruction)),
         }
 
         if self.ie_delay == 0 {
@@ -908,7 +887,7 @@ impl CPU {
             }
         }
 
-        self.update_timer(&mut mem, instruction.machine_cycles() as u32);
+        self.update_timer(&mut mem, instruction.machine_cycles() as u32 + (conditional_taken as u32) * 3);
 
         // Debug log
         #[cfg(debug_assertions)]
@@ -947,10 +926,10 @@ impl CPU {
             self.m_cycle_counter += value;
             // TODO I know there's a nice pattern with big magic here, but I can't figure it out.
             let inc_per_cycles = match tac_clock_select {
-                0 => 256,
-                1 => 4,
-                2 => 16,
-                3 => 64,
+                0b00 => 256,
+                0b01 => 4,
+                0b10 => 16,
+                0b11 => 64,
                 _ => unreachable!(),
             };
             if self.m_cycle_counter >= inc_per_cycles {
@@ -1077,10 +1056,6 @@ impl CPU {
                 entry.registers,
             );
         }
-    }
-
-    fn next_addr_msb_first(&mut self, mem: &mut Memory) -> u16 {
-        ((self.next_byte(mem) as u16) << 8) | (self.next_byte(mem) as u16)
     }
 
     fn next_addr_lsb_first(&mut self, mem: &mut Memory) -> u16 {

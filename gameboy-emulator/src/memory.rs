@@ -1,9 +1,27 @@
+use crate::cartridge_header::CartridgeHeader;
 use std::cmp::max;
 use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::ops::{Index, IndexMut};
-use crate::cartridge_header::CartridgeHeader;
+
+pub struct ROMOnly {
+    null: u8,
+}
+
+impl ROMOnly {
+    pub fn new() -> Self {
+        Self { null: 0 }
+    }
+
+    pub fn rom_bank(&self) -> usize {
+        1
+    }
+
+    pub fn rom_write(&mut self, _: u16) -> &mut u8 {
+        &mut self.null
+    }
+}
 
 pub struct MBC1 {
     ram_bank_enable: u8,
@@ -76,6 +94,7 @@ impl MBC3 {
 }
 
 pub enum MemoryBankController {
+    ROMOnly(ROMOnly),
     MBC1(MBC1),
     MBC3(MBC3),
 }
@@ -83,6 +102,7 @@ pub enum MemoryBankController {
 impl MemoryBankController {
     pub fn rom_bank(&self) -> usize {
         match self {
+            MemoryBankController::ROMOnly(c) => c.rom_bank(),
             MemoryBankController::MBC1(c) => c.rom_bank(),
             MemoryBankController::MBC3(c) => c.rom_bank(),
         }
@@ -90,6 +110,7 @@ impl MemoryBankController {
 
     pub fn rom_write(&mut self, addr: u16) -> &mut u8 {
         match self {
+            MemoryBankController::ROMOnly(c) => c.rom_write(addr),
             MemoryBankController::MBC1(c) => c.rom_write(addr),
             MemoryBankController::MBC3(c) => c.rom_write(addr),
         }
@@ -159,7 +180,7 @@ impl Index<u16> for Memory {
                     panic!("Selected bank {bank} not available.")
                 }
                 &self.rom[bank * 0x4000 + (addr as usize - 0x4000)]
-            },
+            }
             0x8000..=0x97FF => &self.tile_ram[(addr - 0x8000) as usize],
             0x9800..=0x9FFF => &self.background_map[(addr - 0x9800) as usize],
             0xA000..=0xBFFF => &self.cartridge_ram[(addr - 0xA000) as usize],
