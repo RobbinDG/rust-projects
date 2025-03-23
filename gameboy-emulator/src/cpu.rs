@@ -684,6 +684,9 @@ impl CPU {
                 }
             }
             Instruction::CP(l) => {
+                if matches!(l, DataLoc::Value(0xCB)) {
+                    println!("TEST FAILED {:02x} {:02x} {:02x}", mem[0xdef8], mem[0xdef9], mem[0xdefa]);
+                }
                 let _ = self.sub_set_flags(l, false, &mut mem);
             }
             Instruction::CALL(addr) => {
@@ -1113,18 +1116,12 @@ impl CPU {
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
             DataLoc::Value(v) => v,
             _ => self.cpu_crash("Not in instruction set.".to_string()),
-        };
-        let a = self.reg.a;
-        let r = a as u16
-            + n as u16
-            + if add_carry {
-                self.reg.get_flag(4) as u16
-            } else {
-                0
-            };
-        let h = (a & 0x0F) + (n & 0x0F) > 0x0F;
+        } as u16;
+        let a = self.reg.a as u16;
+        let c_extra = add_carry as u16 * self.reg.get_flag(4) as u16;
+        let r = a + n + c_extra;
+        let h = (a & 0x0F) + (n & 0x0F) + c_extra > 0x0F;
         let c = (r >> 8) != 0;
-        // println!("Performed addition ({} {}) {} + {} -> {} ({} {})", add_carry, self.reg.get_flag(4), a, n, r as u8, h, c);
         self.reg.set_flag(7, (r as u8) == 0);
         self.reg.set_flag(6, false);
         self.reg.set_flag(5, h);
@@ -1140,13 +1137,16 @@ impl CPU {
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let a = self.reg.a;
-        let rhs = n.wrapping_add(if add_carry {
-            self.reg.get_flag(4) as u8
-        } else {
-            0
-        });
-        let (r, c) = a.overflowing_sub(rhs);
-        let (_, h) = (a << 4).overflowing_sub(rhs << 4);
+        let c_extra = add_carry as u8 & self.reg.get_flag(4) as u8;
+
+        let (r1, c1) = a.overflowing_sub(n);
+        let (r, c2) = r1.overflowing_sub(c_extra);
+        let c = c1 || c2;
+
+        let (r1, h1) = (a << 4).overflowing_sub(n << 4);
+        let (_, h2) = r1.overflowing_sub(c_extra << 4);
+        let h = h1 || h2;
+
         self.reg.set_flag(7, r == 0);
         self.reg.set_flag(6, true);
         self.reg.set_flag(5, h);
