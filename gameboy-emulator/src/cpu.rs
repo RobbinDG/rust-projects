@@ -862,6 +862,21 @@ impl CPU {
                 self.cpu_crash("Breakpoint".to_string());
             }
         }
+        
+        // TIMA register
+            // TODO 4 is placeholder since any cpu instruction takes at least 4 cycles
+            let tima_old = mem[0xFF05];
+            // Check TAC enable TODO TAC clock select
+            if (mem[0xFF07] >> 2) & 1 != 0 {
+                mem[0xFF05] = mem[0xFF05].wrapping_add(instruction.machine_cycles());
+                if mem[0xFF05] < tima_old {
+                    mem[0xFF05] = mem[0xFF06];
+                    // Timer interrupt
+                    if (mem[0xFFFF] >> 2) & 1 != 0 {
+                        mem[0xFF0F] |= 1 << 2;
+                    }
+                }
+            }
 
         // Debug log
         #[cfg(debug_assertions)]

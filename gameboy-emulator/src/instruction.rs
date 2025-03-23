@@ -70,69 +70,76 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    // pub fn clock_cycles(&self) -> usize {
-    //     match self {
-    //         Instruction::LD(_, _) = {}
-    //         Instruction::LD5 => {}
-    //         Instruction::LD6 => {}
-    //         Instruction::LDH1(_) => {}
-    //         Instruction::LDH2(_) => {}
-    //         Instruction::LD16(_, _) => {}
-    //         Instruction::LDSPHL => {}
-    //         Instruction::LDHL(_) => {}
-    //         Instruction::LDnn(_) => {}
-    //         Instruction::PUSH(_) => {}
-    //         Instruction::POP(_) => {}
-    //         Instruction::ADD(_) => {}
-    //         Instruction::ADC(_) => {}
-    //         Instruction::SUB(_) => {}
-    //         Instruction::SBC(_) => {}
-    //         Instruction::AND(_) => {}
-    //         Instruction::OR(_) => {}
-    //         Instruction::XOR(_) => {}
-    //         Instruction::CP(_) => {}
-    //         Instruction::INC(_) => {}
-    //         Instruction::DEC(_) => {}
-    //         Instruction::ADD16(_) => {}
-    //         Instruction::ADD16n(_) => {}
-    //         Instruction::INC16(_) => {}
-    //         Instruction::DEC16(_) => {}
-    //         Instruction::SWAP(_) => {}
-    //         Instruction::DAA => {}
-    //         Instruction::CPL => {}
-    //         Instruction::CCF => {}
-    //         Instruction::SCF => {}
-    //         Instruction::NOP => {}
-    //         Instruction::HALT => {}
-    //         Instruction::STOP => {}
-    //         Instruction::DI => {}
-    //         Instruction::EI => {}
-    //         Instruction::RLCA => {}
-    //         Instruction::RLA => {}
-    //         Instruction::RRCA => {}
-    //         Instruction::RRA => {}
-    //         Instruction::RLC(_) => {}
-    //         Instruction::RL(_) => {}
-    //         Instruction::RRC(_) => {}
-    //         Instruction::RR(_) => {}
-    //         Instruction::SLA(_) => {}
-    //         Instruction::SRA(_) => {}
-    //         Instruction::SRL(_) => {}
-    //         Instruction::BIT(_, _) => {}
-    //         Instruction::SET(_, _) => {}
-    //         Instruction::RES(_, _) => {}
-    //         Instruction::JP1(_) => {}
-    //         Instruction::JP2(_, _) => {}
-    //         Instruction::JP3 => {}
-    //         Instruction::JR4(_) => {}
-    //         Instruction::JR5(_, _) => {}
-    //         Instruction::JPc(_, _) => {}
-    //         Instruction::CALL(_) => {}
-    //         Instruction::CALLc(_, _) => {}
-    //         Instruction::RST(_) => {}
-    //         Instruction::RET => {}
-    //         Instruction::RETc(_) => {}
-    //         Instruction::RETI => {}
-    //     }
-    // }
+    pub fn clock_cycles(&self) -> u8 {
+        match self {
+            // DONE UNTIL HERE
+            Instruction::LD(_, _) => 4,
+            Instruction::LD5 => 4,
+            Instruction::LD6 => 4,
+            Instruction::LDD(_, _) => 4,
+            Instruction::LDI(_, _) => 4,
+            Instruction::LDH1(_) => 4,
+            Instruction::LDH2(_) => 4,
+            Instruction::LD16(_, _) => 4,
+            Instruction::LDSPHL => 4,
+            Instruction::LDHL(_) => 4,
+            Instruction::LDnn(_) => 4,
+            Instruction::PUSH(_) => 4,
+            Instruction::POP(_) => 4,
+            Instruction::ADD(_) => 4,
+            Instruction::ADC(_) => 4,
+            Instruction::SUB(_) => 4,
+            Instruction::SBC(_) => 4,
+            Instruction::AND(_) => 4,
+            Instruction::OR(_) => 4,
+            Instruction::XOR(_) => 4,
+            Instruction::CP(_) => 4,
+            Instruction::INC(_) => 4,
+            Instruction::DEC(_) => 4,
+            Instruction::ADD16(_) => 4,
+            Instruction::ADD16n(_) => 4,
+            Instruction::INC16(_) => 4,
+            Instruction::DEC16(_) => 4,
+            Instruction::SWAP(_) => 4,
+            Instruction::DAA => 4,
+            Instruction::CPL => 4,
+            Instruction::CCF => 4,
+            Instruction::SCF => 4,
+            Instruction::NOP => 4,
+            Instruction::HALT => 4,
+            Instruction::STOP => 4,
+            Instruction::DI => 4,
+            Instruction::EI => 4,
+            Instruction::RLCA => 4,
+            Instruction::RLA => 4,
+            Instruction::RRCA => 4,
+            Instruction::RRA => 4,
+            Instruction::RLC(_) => 4,
+            Instruction::RL(_) => 4,
+            Instruction::RRC(_) => 4,
+            Instruction::RR(_) => 4,
+            Instruction::SLA(_) => 4,
+            Instruction::SRA(_) => 4,
+            Instruction::SRL(_) => 4,
+            Instruction::BIT(_, _) => 4,
+            Instruction::SET(_, _) => 4,
+            Instruction::RES(_, _) => 4,
+            Instruction::JP1(_) => 4,
+            Instruction::JP2(_, _) => 4,
+            Instruction::JP3 => 4,
+            Instruction::JR4(_) => 4,
+            Instruction::JR5(_, _) => 4,
+            Instruction::JPc(_, _) => 4,
+            Instruction::CALL(_) => 4,
+            Instruction::CALLc(_, _) => 4,
+            Instruction::RST(_) => 4,
+            Instruction::RET => 4,
+            Instruction::RETc(_) => 4,
+            Instruction::RETI => 4,
+        }
+    }
+
+    pub fn machine_cycles(&self) -> u8 {
+        self.clock_cycles() / 4
+    }
 }

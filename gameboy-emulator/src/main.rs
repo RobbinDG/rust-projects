@@ -74,21 +74,6 @@ impl GameBoy {
         for _ in 0usize..10_400_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
-            // TIMA register
-            // TODO 4 is placeholder since any cpu instruction takes at least 4 cycles
-            let tima_old = self.mem[0xFF05];
-            // Check TAC enable TODO TAC clock select
-            if (self.mem[0xFF07] >> 2) & 1 != 0 {
-                self.mem[0xFF05] = self.mem[0xFF05].wrapping_add(4);
-                if self.mem[0xFF05] < tima_old {
-                    self.mem[0xFF05] = self.mem[0xFF06];
-                    // Timer interrupt
-                    if (self.mem[0xFFFF] >> 2) & 1 != 0 {
-                        self.mem[0xFF0F] |= 1 << 2;
-                    }
-                }
-            }
-
             self.joy_pad.lock().unwrap().update(&mut self.mem);
             self.cpu.check_interrupts(&mut self.mem);
             self.mem = self.cpu.run_cycle(self.mem);
