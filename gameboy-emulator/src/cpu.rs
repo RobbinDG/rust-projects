@@ -589,11 +589,6 @@ impl CPU {
                     .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_sub(1));
             }
             Instruction::LD16(reg, v) => {
-                if matches!(reg, AddrReg::BC) && v == 0x1200 {
-                    // self.breakpoint_delay = 100;
-                    // 0x12 == 0b0001_0010
-                    // 0xE0 == 0b1110_0000
-                }
                 self.reg.set_pair(reg, v);
             }
             Instruction::LDSPHL => {
@@ -780,62 +775,31 @@ impl CPU {
             Instruction::DAA => {
                 // http://www.z80.info/z80syntx.htm#DAA
                 let c = self.reg.get_flag(4);
-                let hi = self.reg.a >> 4;
                 let h = self.reg.get_flag(5);
-                let lo = self.reg.a & 0xF;
-                let a_before = self.reg.a;
-                match self.last {
-                    Instruction::ADD(_) | Instruction::ADC(_) | Instruction::INC(_) => {
-                        // match (c, hi, h, lo) {
-                        //     (false, 0x0..=0x9, false, 0x0..=0x9) => (0x00, false),
-                        //     (false, 0x0..=0x8, false, 0xA..=0xF) => (0x06, false),
-                        //     (false, 0x0..=0x9, true, 0x0..=0x3) => (0x06, false),
-                        //     (false, 0xA..=0xF, false, 0x0..=0x9) => (0x60, true),
-                        //     (false, 0x9..=0xF, false, 0xA..=0xF) => (0x66, true),
-                        //     (false, 0xA..=0xF, true, 0x0..=0x3) => (0x66, true),
-                        //     (true, 0x0..=0x2, false, 0x0..=0x9) => (0x60, true),
-                        //     (true, 0x0..=0x2, false, 0xA..=0xF) => (0x66, true),
-                        //     (true, 0x0..=0x3, true, 0x0..=0x3) => (0x66, true),
-                        //     _ => self.cpu_crash("Couldn't DAA convert".to_string()),
-                        // }
-                        if self.reg.a > 0x99 || c {
-                            self.reg.a += 0x60;
-                            self.reg.set_flag(4, true);
-                        } else if lo > 0x09 || h {
-                            self.reg.a += 0x06;
-                            self.reg.set_flag(4, false);
-                        }
-                    }
-                    Instruction::SUB(_)
-                    | Instruction::SBC(_)
-                    | Instruction::DEC(_)
-                    | Instruction::NEG => {
-                        if c {
-                            self.reg.a -= 0x60;
-                        } else if h {
-                            self.reg.a -= 0x06;
-                        }
-                        //     match (c, hi, h, lo) {
-                        //     (false, 0x0..=0x9, false, 0x0..=0x9) => (0x00, false),
-                        //     (false, 0x0..=0x8, true, 0x6..=0xF) => (0xFA, false),
-                        //     (true, 0x7..=0xF, false, 0x0..=0x9) => (0xA0, true),
-                        //     (true, 0x6..=0xF, true, 0x6..=0xF) => (0x9A, true),
-                        //     _ => self.cpu_crash("Couldn't DAA convert".to_string()),
-                        // }
-                    }
-                    _ => {
-                        println!(
-                            "ERROR: DAA not supported for last instruction {:?}",
-                            self.last
-                        );
-                        // (0, false)
-                    }
+                let n = self.reg.get_flag(6);
+                let a = self.reg.a;
+                let lo = a & 0xF;
+
+                let mut offset = 0u8;
+                let mut c_after = false;
+                if (!n && lo > 0x09) || h {
+                    offset |= 0x06;
+                }
+
+                if (!n && a > 0x99) || c {
+                    offset |= 0x60;
+                    c_after = true;
+                }
+
+                self.reg.a = if !n {
+                    a.wrapping_add(offset)
+                } else {
+                    a.wrapping_sub(offset)
                 };
-                println!("Performed DAA {} -> {}", a_before, self.reg.a);
-                // self.reg.a = self.reg.a.wrapping_add(added);
-                self.reg.set_flag(7, self.reg.a == 0);
+
+                self.reg.set_flag(7, a == 0);
                 self.reg.set_flag(5, false);
-                // self.reg.set_flag(4, c_after);
+                self.reg.set_flag(4, c_after);
             }
             Instruction::CPL => {
                 self.reg.a = !self.reg.a;
