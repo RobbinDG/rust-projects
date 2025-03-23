@@ -405,16 +405,15 @@ impl CPU {
                         let r = prefixed & 0x07;
                         Instruction::SRL(Self::decode_register(r))
                     }
-
-                    // BIT: data is encoded as 0b01bbbrrr.
-                    0b01000000..=0b01111111 => {
-                        let b = (prefixed >> 3) & 0b0000_0111;
-                        let r = prefixed & 0b0000_0111;
-                        Instruction::BIT(b, Self::decode_register(r))
-                    }
                     0x30..=0x37 => {
                         let r = prefixed & 0x07;
                         Instruction::SWAP(Self::decode_register(r))
+                    }
+                    // BIT: data is encoded as 0b01bbbrrr.
+                    0x40..=0x7F => {
+                        let b = (prefixed >> 3) & 0b0000_0111;
+                        let r = prefixed & 0b0000_0111;
+                        Instruction::BIT(b, Self::decode_register(r))
                     }
                     // RES: data is encoded as 0b10bbbrrr.
                     0b10000000..=0b10111111 => {
@@ -711,8 +710,7 @@ impl CPU {
                 println!("IME enabled");
                 // self.cpu_crash("test".to_string());
             }
-            Instruction::BIT(data, n) => {
-                let b = (data >> 3) & 0x7;
+            Instruction::BIT(b, n) => {
                 if b > 7 {
                     self.cpu_crash(format!("Invalid RES bit: {b}"));
                 }
@@ -729,8 +727,7 @@ impl CPU {
                 self.reg.set_flag(6, false);
                 self.reg.set_flag(5, true);
             }
-            Instruction::RES(data, n) => {
-                let b = (data >> 3) & 0x7;
+            Instruction::RES(b, n) => {
                 if b > 7 {
                     self.cpu_crash(format!("Invalid RES bit: {b}"));
                 }
@@ -744,8 +741,7 @@ impl CPU {
                     _ => self.cpu_crash("Not in instruction set.".to_string()),
                 }
             }
-            Instruction::SET(data, n) => {
-                let b = (data >> 3) & 0x7;
+            Instruction::SET(b, n) => {
                 if b > 7 {
                     panic!("Invalid SET bit: {b}");
                 }
