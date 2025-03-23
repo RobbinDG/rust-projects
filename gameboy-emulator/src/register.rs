@@ -118,7 +118,7 @@ impl Registers {
             }
             AddrReg::AF => {
                 self.a = ms;
-                self.f = ls;
+                self.f = ls & 0xF0;
             }
         };
     }

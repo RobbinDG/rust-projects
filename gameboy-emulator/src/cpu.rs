@@ -464,6 +464,10 @@ impl CPU {
             }
             Instruction::JP2(c, addr) => {
                 if self.reg.eval_condition(c) {
+                    if addr == 0xc1b9 {
+                        println!("FAILED TEST");
+                        // self.breakpoint_delay = 50;
+                    }
                     self.reg.pc = addr;
                 }
             }
@@ -555,7 +559,7 @@ impl CPU {
             }
             Instruction::LDH2(o) => {
                 if matches!(o, 0x85) && mem[0xFF00 | o as u16] > 1 {
-                    self.breakpoint_delay = 200;
+                    // self.breakpoint_delay = 200;
                     // println!(
                     //     "Read from registers: {:02x} <- {:02x}",
                     //     o,
@@ -585,8 +589,10 @@ impl CPU {
                     .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_sub(1));
             }
             Instruction::LD16(reg, v) => {
-                if matches!(reg, AddrReg::BC) && v == 0x0123 {
-                    // self.breakpoint_delay = 50;
+                if matches!(reg, AddrReg::BC) && v == 0x1200 {
+                    // self.breakpoint_delay = 100;
+                    // 0x12 == 0b0001_0010
+                    // 0xE0 == 0b1110_0000
                 }
                 self.reg.set_pair(reg, v);
             }
@@ -595,21 +601,6 @@ impl CPU {
                     .set_pair(AddrReg::SP, self.reg.get_pair(AddrReg::HL));
             }
             Instruction::LDHL(offset) => {
-                // let orig = self.reg.sp;
-                // let (r, c, h) = if offset >= 0 {
-                //     let (r, _) = orig.overflowing_add(offset as u16);
-                //     let (_, c) = (orig << 8).overflowing_add((offset as u16) << 8);
-                //     let (_, h) = (orig << 12).overflowing_add((offset as u16) << 12);
-                //     (r, c, h)
-                // } else {
-                //     let offset = (-offset) as u16;
-                //     let (r, _) = orig.overflowing_sub(offset);
-                //     let (_, c) = (orig << 8).overflowing_sub(offset << 8);
-                //     let (_, h) = (orig << 12).overflowing_sub(offset << 12);
-                //     println!("LDHL sub {:04x} {:04x} {:04x} {} {}", orig, offset, r, h, c);
-                //     (r, c, h)
-                // };
-
                 let hi = (self.reg.sp >> 8) as u8;
                 let lo = (self.reg.sp & 0x00FF) as u8;
                 let s = ((offset as u8) & MSB_MASK) != 0;
