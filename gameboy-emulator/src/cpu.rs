@@ -741,7 +741,7 @@ impl CPU {
                     a.wrapping_sub(offset)
                 };
 
-                self.reg.set_flag(7, a == 0);
+                self.reg.set_flag(7, self.reg.a == 0);
                 self.reg.set_flag(5, false);
                 self.reg.set_flag(4, c_after);
             }
