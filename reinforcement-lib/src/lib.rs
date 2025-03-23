@@ -4,6 +4,7 @@ mod environment;
 mod interpreter;
 mod learning;
 mod reward;
+mod q_learning;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
