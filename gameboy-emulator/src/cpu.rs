@@ -666,22 +666,21 @@ impl CPU {
             Instruction::XOR(l) => {
                 self.reg.a = self.xor_set_flags(l, &mut mem);
             }
-            Instruction::SWAP(l) => {
-                let n = match l {
-                    DataLoc::Reg(r) => self.reg.get(r),
-                    DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
-                    _ => self.cpu_crash("Not in instruction set.".to_string()),
-                };
-                let msn = n >> 4;
-                let lsn = n & 0xF;
-                let n_new = (lsn << 4) | msn;
-                match l {
-                    DataLoc::Reg(r) => self.reg.set(r, n_new),
-                    DataLoc::AddrReg(AddrReg::HL) => {
-                        mem[self.reg.get_pair(AddrReg::HL)] = n_new;
-                    }
-                    _ => self.cpu_crash("Not in instruction set.".to_string()),
-                }
+            Instruction::SWAP(r) => {
+                self.apply_to_7_bit_reg(Self::swap, r, &mut mem);
+                // let n = match l {
+                //     DataLoc::Reg(r) => self.reg.get(r),
+                //     DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
+                //     _ => self.cpu_crash("Not in instruction set.".to_string()),
+                // };
+                // let n_new = Self::swap(n);
+                // match l {
+                //     DataLoc::Reg(r) => self.reg.set(r, n_new),
+                //     DataLoc::AddrReg(AddrReg::HL) => {
+                //         mem[self.reg.get_pair(AddrReg::HL)] = n_new;
+                //     }
+                //     _ => self.cpu_crash("Not in instruction set.".to_string()),
+                // }
             }
             Instruction::CP(l) => {
                 if matches!(l, DataLoc::Value(0xCB)) {
@@ -854,16 +853,16 @@ impl CPU {
             }
             Instruction::EI => self.ie_delay = 1,
             Instruction::RLCA => {
-                self.reg.a = Self::rotate_left_into_carry(self.reg.a, &mut self.reg);
+                self.reg.a = Self::rotate_left_into_carry(self.reg.a, false, &mut self.reg);
             }
             Instruction::RLA => {
-                self.reg.a = Self::rotate_left_through_carry(self.reg.a, &mut self.reg);
+                self.reg.a = Self::rotate_left_through_carry(self.reg.a, false, &mut self.reg);
             }
             Instruction::RRCA => {
-                self.reg.a = Self::rotate_right_into_carry(self.reg.a, &mut self.reg);
+                self.reg.a = Self::rotate_right_into_carry(self.reg.a, false, &mut self.reg);
             }
             Instruction::RRA => {
-                self.reg.a = Self::rotate_right_through_carry(self.reg.a, &mut self.reg);
+                self.reg.a = Self::rotate_right_through_carry(self.reg.a, false, &mut self.reg);
             }
             Instruction::RLC(r) => {
                 self.apply_to_7_bit_reg(Self::rotate_left_into_carry, r, &mut mem);
@@ -976,14 +975,14 @@ impl CPU {
 
     fn apply_to_7_bit_reg<F>(&mut self, f: F, r: DataLoc, mem: &mut Memory)
     where
-        F: Fn(u8, &mut Registers) -> u8,
+        F: Fn(u8, bool, &mut Registers) -> u8,
     {
         let n = match r {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
-        let n_new = f(n, &mut self.reg);
+        let n_new = f(n, true, &mut self.reg);
         match r {
             DataLoc::Reg(r) => self.reg.set(r, n_new),
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)] = n_new,
@@ -991,65 +990,76 @@ impl CPU {
         };
     }
 
-    fn rotate_left_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
+    fn swap(n: u8, set_z: bool, reg: &mut Registers) -> u8 {
+        let msn = n >> 4;
+        let lsn = n & 0xF;
+        let n_new = (lsn << 4) | msn;
+        reg.set_flag(7, n_new == 0 && set_z);
+        reg.set_flag(6, false);
+        reg.set_flag(5, false);
+        reg.set_flag(4, false);
+        n_new
+    }
+
+    fn rotate_left_into_carry(a_old: u8, set_z: bool, reg: &mut Registers) -> u8 {
         let a = a_old.rotate_left(1);
         // TODO gameboy manual says to set Z, z80 manual says not to. Not setting it gets
         //  test further with the same amount of instructions
-        // reg.set_flag(7, a == 0);
+        reg.set_flag(7, a == 0 && set_z);
         reg.set_flag(6, false);
         reg.set_flag(5, false);
         reg.set_flag(4, (a_old & MSB_MASK) != 0);
         a
     }
 
-    fn rotate_left_through_carry(a_old: u8, reg: &mut Registers) -> u8 {
+    fn rotate_left_through_carry(a_old: u8, set_z: bool, reg: &mut Registers) -> u8 {
         let a = (a_old << 1) | reg.get_flag(4) as u8;
-        reg.set_flag(7, a == 0);
+        reg.set_flag(7, a == 0 && set_z);
         reg.set_flag(6, false);
         reg.set_flag(5, false);
         reg.set_flag(4, (a_old & MSB_MASK) != 0);
         a
     }
 
-    fn rotate_right_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
+    fn rotate_right_into_carry(a_old: u8, set_z: bool, reg: &mut Registers) -> u8 {
         let a = a_old.rotate_right(1);
-        reg.set_flag(7, a == 0);
+        reg.set_flag(7, a == 0 && set_z);
         reg.set_flag(6, false);
         reg.set_flag(5, false);
         reg.set_flag(4, (a_old & LSB_MASK) != 0);
         a
     }
 
-    fn rotate_right_through_carry(a_old: u8, reg: &mut Registers) -> u8 {
+    fn rotate_right_through_carry(a_old: u8, set_z: bool, reg: &mut Registers) -> u8 {
         let a = (a_old >> 1) | ((reg.get_flag(4) as u8) << 7);
-        reg.set_flag(7, a == 0);
+        reg.set_flag(7, a == 0 && set_z);
         reg.set_flag(6, false);
         reg.set_flag(5, false);
         reg.set_flag(4, (a_old & LSB_MASK) != 0);
         a
     }
 
-    fn shift_left_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
+    fn shift_left_into_carry(a_old: u8, set_z: bool, reg: &mut Registers) -> u8 {
         let a = a_old << 1;
-        reg.set_flag(7, a == 0);
+        reg.set_flag(7, a == 0 && set_z);
         reg.set_flag(6, false);
         reg.set_flag(5, false);
         reg.set_flag(4, (a_old & MSB_MASK) != 0);
         a
     }
 
-    fn shift_right_into_carry(a_old: u8, reg: &mut Registers) -> u8 {
+    fn shift_right_into_carry(a_old: u8, set_z: bool, reg: &mut Registers) -> u8 {
         let a = a_old >> 1;
-        reg.set_flag(7, a == 0);
+        reg.set_flag(7, a == 0 && set_z);
         reg.set_flag(6, false);
         reg.set_flag(5, false);
         reg.set_flag(4, (a_old & LSB_MASK) != 0);
         a
     }
 
-    fn shift_right_into_carry_keep_msb(a_old: u8, reg: &mut Registers) -> u8 {
+    fn shift_right_into_carry_keep_msb(a_old: u8, set_z: bool, reg: &mut Registers) -> u8 {
         let a = (a_old >> 1) | (a_old & MSB_MASK);
-        reg.set_flag(7, a == 0);
+        reg.set_flag(7, a == 0 && set_z);
         reg.set_flag(6, false);
         reg.set_flag(5, false);
         reg.set_flag(4, (a_old & LSB_MASK) != 0);
