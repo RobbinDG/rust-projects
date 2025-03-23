@@ -129,31 +129,31 @@ impl CPU {
             0x3B => Instruction::DEC16(AddrReg::SP),
 
             // 1. LD
-            0x06 => Instruction::LD1(DataLoc::Reg(Reg::B), self.next_byte(&mut mem)),
-            0x0E => Instruction::LD1(DataLoc::Reg(Reg::C), self.next_byte(&mut mem)),
-            0x16 => Instruction::LD1(DataLoc::Reg(Reg::D), self.next_byte(&mut mem)),
-            0x1E => Instruction::LD1(DataLoc::Reg(Reg::E), self.next_byte(&mut mem)),
-            0x26 => Instruction::LD1(DataLoc::Reg(Reg::H), self.next_byte(&mut mem)),
-            0x2E => Instruction::LD1(DataLoc::Reg(Reg::L), self.next_byte(&mut mem)),
-            0x36 => Instruction::LD1(DataLoc::AddrReg(AddrReg::HL), self.next_byte(&mut mem)),
+            0x06 => Instruction::LD(DataLoc::Reg(Reg::B), DataLoc::Value(self.next_byte(&mut mem))),
+            0x0E => Instruction::LD(DataLoc::Reg(Reg::C), DataLoc::Value(self.next_byte(&mut mem))),
+            0x16 => Instruction::LD(DataLoc::Reg(Reg::D), DataLoc::Value(self.next_byte(&mut mem))),
+            0x1E => Instruction::LD(DataLoc::Reg(Reg::E), DataLoc::Value(self.next_byte(&mut mem))),
+            0x26 => Instruction::LD(DataLoc::Reg(Reg::H), DataLoc::Value(self.next_byte(&mut mem))),
+            0x2E => Instruction::LD(DataLoc::Reg(Reg::L), DataLoc::Value(self.next_byte(&mut mem))),
+            0x36 => Instruction::LD(DataLoc::AddrReg(AddrReg::HL), DataLoc::Value(self.next_byte(&mut mem))),
 
             // 2. LD
             0b01000000..0b01110110 | 0b01110111..=0b01111111 => {
                 let first = (byte >> 3) & 0x7;
                 let second = byte & 0x7;
-                Instruction::LD2(Self::decode_register(first), Self::decode_register(second))
+                Instruction::LD(Self::decode_register(first), Self::decode_register(second))
             }
 
             // 3. LD
-            0x0A => Instruction::LD3(DataLoc::AddrReg(AddrReg::BC)),
-            0x1A => Instruction::LD3(DataLoc::AddrReg(AddrReg::DE)),
-            0xFA => Instruction::LD3(DataLoc::Addr(self.next_addr_lsb_first(&mut mem))),
-            0x3E => Instruction::LD3(DataLoc::Value(self.next_byte(&mut mem))),
+            0x0A => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::AddrReg(AddrReg::BC)),
+            0x1A => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::AddrReg(AddrReg::DE)),
+            0xFA => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::Addr(self.next_addr_lsb_first(&mut mem))),
+            0x3E => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::Value(self.next_byte(&mut mem))),
 
             // 4. LD
-            0x02 => Instruction::LD4(DataLoc::AddrReg(AddrReg::BC)),
-            0x12 => Instruction::LD4(DataLoc::AddrReg(AddrReg::DE)),
-            0xEA => Instruction::LD4(DataLoc::Addr(self.next_addr_lsb_first(&mut mem))),
+            0x02 => Instruction::LD(DataLoc::AddrReg(AddrReg::BC), DataLoc::Reg(Reg::A)),
+            0x12 => Instruction::LD(DataLoc::AddrReg(AddrReg::DE), DataLoc::Reg(Reg::A)),
+            0xEA => Instruction::LD(DataLoc::Addr(self.next_addr_lsb_first(&mut mem)), DataLoc::Reg(Reg::A)),
 
             // 5. LD
             0xF2 => Instruction::LD5,
@@ -166,12 +166,12 @@ impl CPU {
             0xF0 => Instruction::LDH2(self.next_byte(&mut mem)),
 
             // LDI
-            0x2A => Instruction::LDI1,
-            0x22 => Instruction::LDI2,
+            0x2A => Instruction::LDI(DataLoc::Reg(Reg::A), DataLoc::AddrReg(AddrReg::HL)),
+            0x22 => Instruction::LDI(DataLoc::AddrReg(AddrReg::HL), DataLoc::Reg(Reg::A)),
 
             // LDD
-            0x3A => Instruction::LDD1,
-            0x32 => Instruction::LDD2,
+            0x3A => Instruction::LDD(DataLoc::Reg(Reg::A), DataLoc::AddrReg(AddrReg::HL)),
+            0x32 => Instruction::LDD(DataLoc::AddrReg(AddrReg::HL), DataLoc::Reg(Reg::A)),
 
             // LD 16-bit
             0x01 => Instruction::LD16(AddrReg::BC, self.next_addr_lsb_first(&mut mem)),
@@ -482,70 +482,24 @@ impl CPU {
                     self.reg.pc = self.reg.pc.wrapping_add_signed(addr as i16);
                 }
             }
-            Instruction::LD1(r, v) => match r {
-                DataLoc::Reg(r) => self.reg.set(r, v),
-                DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)] = v,
-                _ => self.cpu_crash("Not in instruction set.".to_string()),
-            },
-            Instruction::LD2(a, b) => {
-                let v = match b {
-                    DataLoc::Reg(r) => self.reg.get(r),
-                    DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
-                    _ => self.cpu_crash("Not in instruction set.".to_string()),
-                };
-                match a {
-                    DataLoc::Reg(r) => self.reg.set(r, v),
-                    DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)] = v,
-                    _ => self.cpu_crash("Not in instruction set.".to_string()),
-                }
+            Instruction::LD(a, b) => {
+                self.ld_8_bit(a, b, &mut mem);
             }
-            Instruction::LD3(r) => {
-                self.reg.a = match r {
-                    DataLoc::Reg(r) => self.reg.get(r),
-                    DataLoc::AddrReg(r) => mem[self.reg.get_pair(r)],
-                    DataLoc::Addr(addr) => {
-                        if addr == 0xdef8 {
-                            println!(
-                                "FAILED INSTRUCTION: {:02x} {:02x}",
-                                mem[addr],
-                                mem[addr + 1]
-                            );
-                        }
-                        mem[addr]
-                    }
-                    DataLoc::Value(v) => v,
-                }
-            }
-            Instruction::LD4(r) => match r {
-                DataLoc::Reg(r) => self.reg.set(r, self.reg.a),
-                DataLoc::AddrReg(r) => mem[self.reg.get_pair(r)] = self.reg.a,
-                DataLoc::Addr(addr) => {
-                    if addr == 0xdef8 {
-                        println!("TESTED INSTRUCTION: {:02x}", self.reg.a);
-                    }
-                    mem[addr] = self.reg.a
-                }
-                _ => self.cpu_crash("Not in instruction set.".to_string()),
-            },
             Instruction::LD5 => {
-                let addr = 0xFF00 | self.reg.c as u16;
-                if matches!(self.reg.c, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
-                    // println!(
-                    //     "Read from registers: {:02x} <- {:02x}",
-                    //     self.reg.c, mem[addr]
-                    // );
-                }
-                self.reg.a = mem[addr];
+                // let addr = 0xFF00 | self.reg.c as u16;
+                // self.reg.a = mem[addr];
+                self.ld_8_bit(DataLoc::Reg(Reg::A), DataLoc::Addr(0xFF00 | self.reg.c as u16), &mut mem);
             }
             Instruction::LD6 => {
-                if matches!(self.reg.c, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
-                    // println!(
-                    //     "Write to registers: {:02x} <- {:02x}",
-                    //     self.reg.c, self.reg.a
-                    // );
-                }
-                let addr = 0xFF00 | self.reg.c as u16;
-                mem[addr] = self.reg.a;
+                // if matches!(self.reg.c, (0..=0x43) | (0x45..=0x77) | 0xFF | 0xF8 | 0xD6) {
+                //     // println!(
+                //     //     "Write to registers: {:02x} <- {:02x}",
+                //     //     self.reg.c, self.reg.a
+                //     // );
+                // }
+                // let addr = 0xFF00 | self.reg.c as u16;
+                // mem[addr] = self.reg.a;
+                self.ld_8_bit(DataLoc::Addr(0xFF00 | self.reg.c as u16), DataLoc::Reg(Reg::A), &mut mem);
             }
             Instruction::LDH1(o) => {
                 if matches!(o, 0x85 | 0xE0..=0xEF) {
@@ -568,23 +522,13 @@ impl CPU {
                 }
                 self.reg.a = mem[0xFF00 | o as u16];
             }
-            Instruction::LDI1 => {
-                self.reg.a = mem[self.reg.get_pair(AddrReg::HL)];
+            Instruction::LDI(a, b) => {
+                self.ld_8_bit(a, b, &mut mem);
                 self.reg
                     .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_add(1));
             }
-            Instruction::LDI2 => {
-                mem[self.reg.get_pair(AddrReg::HL)] = self.reg.a;
-                self.reg
-                    .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_add(1));
-            }
-            Instruction::LDD1 => {
-                self.reg.a = mem[self.reg.get_pair(AddrReg::HL)];
-                self.reg
-                    .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_sub(1));
-            }
-            Instruction::LDD2 => {
-                mem[self.reg.get_pair(AddrReg::HL)] = self.reg.a;
+            Instruction::LDD(a, b) => {
+                self.ld_8_bit(a, b, &mut mem);
                 self.reg
                     .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_sub(1));
             }
@@ -1184,6 +1128,22 @@ impl CPU {
             0x5 => DataLoc::Reg(Reg::L),
             0x6 => DataLoc::AddrReg(AddrReg::HL),
             _ => panic!("Invalid register encoding."),
+        }
+    }
+
+    fn ld_8_bit(&mut self, to: DataLoc, from: DataLoc, mem: &mut Memory) {
+        // TODO this might be optimised by making the datalocs generic
+        let v = match from {
+            DataLoc::Reg(r) => self.reg.get(r),
+            DataLoc::AddrReg(r) => mem[self.reg.get_pair(r)],
+            DataLoc::Addr(addr) => mem[addr],
+            DataLoc::Value(v) => v,
+        };
+        match to {
+            DataLoc::Reg(r) => self.reg.set(r, v),
+            DataLoc::AddrReg(r) => mem[self.reg.get_pair(r)] = v,
+            DataLoc::Addr(addr) => mem[addr] = v,
+            _ => self.cpu_crash("Not in instruction set.".to_string()),
         }
     }
 }
