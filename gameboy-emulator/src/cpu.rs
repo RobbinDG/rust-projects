@@ -448,8 +448,7 @@ impl CPU {
         self.instructions_count[byte as usize] += 1;
 
         // Execute
-
-        let mut conditional_taken = false;
+        let mut conditional_extra_cycles = 0u32;
         match instruction.clone() {
             Instruction::INC(l) => {
                 let (old, res) = match l {
@@ -498,7 +497,7 @@ impl CPU {
             }
             Instruction::JP2(c, addr) => {
                 if self.reg.eval_condition(c) {
-                    conditional_taken = true;
+                    conditional_extra_cycles = 1;
                     if addr == 0xc1b9 {
                         println!("FAILED TEST");
                     }
@@ -513,7 +512,7 @@ impl CPU {
             }
             Instruction::JR5(c, addr) => {
                 if self.reg.eval_condition(c) {
-                    conditional_taken = true;
+                    conditional_extra_cycles = 1;
                     self.reg.pc = self.reg.pc.wrapping_add_signed(addr as i16);
                 }
             }
@@ -538,6 +537,9 @@ impl CPU {
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
+                if o == 0x0F {
+                    // self.breakpoint_delay = 10;
+                }
                 self.reg.a = mem[0xFF00 | o as u16];
             }
             Instruction::LDI(a, b) => {
@@ -673,6 +675,7 @@ impl CPU {
             }
             Instruction::CALLc(cond, addr) => {
                 if self.reg.eval_condition(cond) {
+                    conditional_extra_cycles = 3;
                     self.call(addr, &mut mem);
                 }
             }
@@ -681,6 +684,7 @@ impl CPU {
             }
             Instruction::RETc(cond) => {
                 if self.reg.eval_condition(cond) {
+                    conditional_extra_cycles = 3;
                     self.ret(&mut mem);
                 }
             }
@@ -881,13 +885,14 @@ impl CPU {
         }
 
         if self.breakpoint_delay > 0 {
+            // println!("TIMA: {:02x} {:04x}", mem[0xFF05], self.reg.pc);
             self.breakpoint_delay -= 1;
             if self.breakpoint_delay == 0 {
                 self.cpu_crash("Breakpoint".to_string());
             }
         }
 
-        self.update_timer(&mut mem, instruction.machine_cycles() as u32 + (conditional_taken as u32) * 3);
+        self.update_timer(&mut mem, instruction.machine_cycles() as u32 + conditional_extra_cycles);
 
         // Debug log
         #[cfg(debug_assertions)]
@@ -935,13 +940,10 @@ impl CPU {
             if self.m_cycle_counter >= inc_per_cycles {
                 self.m_cycle_counter -= inc_per_cycles;
                 let mut tima_new = tima_old.wrapping_add(1);
-                // println!("{} {} {:08b} {:08b} {}", tima_old, tima_new, mem[0xFFFF], mem[0xFF0F], self.ime);
                 if tima_new < tima_old {
                     tima_new = tma;
                     // Timer interrupt
-                    if (mem[0xFFFF] >> 2) & 1 != 0 {
-                        mem[0xFF0F] |= 1 << 2;
-                    }
+                    mem[0xFF0F] |= 1 << 2;
                 }
                 mem[0xFF05] = tima_new;
             }
@@ -1114,7 +1116,12 @@ impl CPU {
         let n = match l {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
-            DataLoc::Value(v) => v,
+            DataLoc::Value(v) => {
+                if v == 0x24 {
+                    println!("SUB {} {:04x}", v, self.reg.sp);
+                }
+                v
+            },
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let a = self.reg.a;
@@ -1141,7 +1148,12 @@ impl CPU {
         let n = match l {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
-            DataLoc::Value(v) => v,
+            DataLoc::Value(v) => {
+                if v == 0x04 {
+                    // self.breakpoint_delay = 50;
+                }
+                v
+            },
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let r = self.reg.a & n;
@@ -1198,6 +1210,9 @@ impl CPU {
 
     fn ld_8_bit(&mut self, to: DataLoc, from: DataLoc, mem: &mut Memory) {
         // TODO this might be optimised by making the datalocs generic
+        if matches!(to, DataLoc::Reg(Reg::D)) && matches!(from, DataLoc::Value(0)) {
+            // self.breakpoint_delay = 10;
+        }
         let v = match from {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(r) => mem[self.reg.get_pair(r)],

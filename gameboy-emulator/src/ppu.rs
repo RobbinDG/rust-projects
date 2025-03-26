@@ -149,9 +149,7 @@ impl PPU {
         } else {
             // Mode 1: Vertical blank
             if !self.in_vblank {
-                if mem[0xFFFF] & 1 != 0 {
-                    mem[0xFF0F] |= 0b0000_0001;
-                }
+                mem[0xFF0F] |= 0b0000_0001;
                 self.in_vblank = true;
                 self.render(&mem);
             }

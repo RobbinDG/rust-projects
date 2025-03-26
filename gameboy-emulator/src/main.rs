@@ -67,7 +67,7 @@ impl GameBoy {
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..100_400_000 {
+        for _ in 0usize..10_200_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
             self.joy_pad.lock().unwrap().update(&mut self.mem);
