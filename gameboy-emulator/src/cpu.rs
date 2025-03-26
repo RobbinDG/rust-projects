@@ -97,6 +97,10 @@ impl CPU {
         let byte = self.next_byte(&mut mem);
         let dbg_current_pc = self.reg.pc - 1;
 
+        if dbg_current_pc == 0xc2e7 {
+            // self.breakpoint_delay = 10;
+        }
+
         // Decode
         let instruction = match byte {
             // INC
@@ -537,9 +541,6 @@ impl CPU {
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
-                if o == 0x0F {
-                    // self.breakpoint_delay = 10;
-                }
                 self.reg.a = mem[0xFF00 | o as u16];
             }
             Instruction::LDI(a, b) => {
@@ -885,14 +886,17 @@ impl CPU {
         }
 
         if self.breakpoint_delay > 0 {
-            // println!("TIMA: {:02x} {:04x}", mem[0xFF05], self.reg.pc);
+            println!("TIMA: {:02x} {:04x}", mem[0xFF05], self.reg.pc);
             self.breakpoint_delay -= 1;
             if self.breakpoint_delay == 0 {
                 self.cpu_crash("Breakpoint".to_string());
             }
         }
 
-        self.update_timer(&mut mem, instruction.machine_cycles() as u32 + conditional_extra_cycles);
+        self.update_timer(
+            &mut mem,
+            instruction.machine_cycles() as u32 + conditional_extra_cycles,
+        );
 
         // Debug log
         #[cfg(debug_assertions)]
@@ -921,7 +925,7 @@ impl CPU {
     fn update_timer(&mut self, mem: &mut Memory, value: u32) {
         // TIMA register
         // TODO 4 is placeholder since any cpu instruction takes at least 4 cycles
-        let tima_old = mem[0xFF05];
+        let mut tima_old = mem[0xFF05];
         let tma = mem[0xFF06];
         let tac = mem[0xFF07];
         let tac_clock_select = tac & 0b11;
@@ -937,16 +941,18 @@ impl CPU {
                 0b11 => 64,
                 _ => unreachable!(),
             };
-            if self.m_cycle_counter >= inc_per_cycles {
+            let mut tima_new = tima_old;
+            while self.m_cycle_counter >= inc_per_cycles {
                 self.m_cycle_counter -= inc_per_cycles;
-                let mut tima_new = tima_old.wrapping_add(1);
+                tima_new = tima_old.wrapping_add(1);
                 if tima_new < tima_old {
                     tima_new = tma;
                     // Timer interrupt
                     mem[0xFF0F] |= 1 << 2;
                 }
-                mem[0xFF05] = tima_new;
+                tima_old = tima_new;
             }
+            mem[0xFF05] = tima_new;
         }
     }
 
@@ -1116,12 +1122,7 @@ impl CPU {
         let n = match l {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
-            DataLoc::Value(v) => {
-                if v == 0x24 {
-                    println!("SUB {} {:04x}", v, self.reg.sp);
-                }
-                v
-            },
+            DataLoc::Value(v) => v,
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let a = self.reg.a;
@@ -1148,12 +1149,7 @@ impl CPU {
         let n = match l {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
-            DataLoc::Value(v) => {
-                if v == 0x04 {
-                    // self.breakpoint_delay = 50;
-                }
-                v
-            },
+            DataLoc::Value(v) => v,
             _ => self.cpu_crash("Not in instruction set.".to_string()),
         };
         let r = self.reg.a & n;
@@ -1210,9 +1206,6 @@ impl CPU {
 
     fn ld_8_bit(&mut self, to: DataLoc, from: DataLoc, mem: &mut Memory) {
         // TODO this might be optimised by making the datalocs generic
-        if matches!(to, DataLoc::Reg(Reg::D)) && matches!(from, DataLoc::Value(0)) {
-            // self.breakpoint_delay = 10;
-        }
         let v = match from {
             DataLoc::Reg(r) => self.reg.get(r),
             DataLoc::AddrReg(r) => mem[self.reg.get_pair(r)],

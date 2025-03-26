@@ -79,7 +79,7 @@ impl Instruction {
                 (DataLoc::AddrReg(_), DataLoc::Reg(_)) => 8,
                 (DataLoc::AddrReg(_), DataLoc::Value(_)) => 12,
                 (DataLoc::Addr(_), DataLoc::Reg(_)) => 16,
-                _ => 4,
+                (a, b) => panic!("{:?} {:?}", a, b),
             },
             Instruction::LD5 => 8,
             Instruction::LD6 => 8,
@@ -140,20 +140,20 @@ impl Instruction {
             Instruction::SLA(v) => Self::clock_cycles_rotate_shift(v),
             Instruction::SRA(v) => Self::clock_cycles_rotate_shift(v),
             Instruction::SRL(v) => Self::clock_cycles_rotate_shift(v),
-            Instruction::BIT(_, v) => Self::clock_cycles_rotate_shift(v),
+            Instruction::BIT(_, v) => Self::clock_cycles_bit(v),
             Instruction::SET(_, v) => Self::clock_cycles_rotate_shift(v),
             Instruction::RES(_, v) => Self::clock_cycles_rotate_shift(v),
-            Instruction::JP1(_) => 12,
+            Instruction::JP1(_) => 16,
             Instruction::JP2(_, _) => 12,
             Instruction::JP3 => 4,
-            Instruction::JR4(_) => 8,
+            Instruction::JR4(_) => 12,
             Instruction::JR5(_, _) => 8,
-            Instruction::CALL(_) => 12,
+            Instruction::CALL(_) => 24,
             Instruction::CALLc(_, _) => 12,
-            Instruction::RST(_) => 32,
-            Instruction::RET => 8,
+            Instruction::RST(_) => 16,
+            Instruction::RET => 16,
             Instruction::RETc(_) => 8,
-            Instruction::RETI => 8,
+            Instruction::RETI => 16,
         }
     }
 
@@ -161,6 +161,14 @@ impl Instruction {
         match v {
             DataLoc::Reg(_) => 8,
             DataLoc::AddrReg(_) => 16,
+            _ => 8,
+        }
+    }
+
+    fn clock_cycles_bit(v: &DataLoc) -> u8 {
+        match v {
+            DataLoc::Reg(_) => 8,
+            DataLoc::AddrReg(_) => 12,
             _ => 8,
         }
     }
