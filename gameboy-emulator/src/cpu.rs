@@ -97,8 +97,8 @@ impl CPU {
         let byte = self.next_byte(&mut mem);
         let dbg_current_pc = self.reg.pc - 1;
 
-        if dbg_current_pc == 0xc2e7 {
-            // self.breakpoint_delay = 10;
+        if dbg_current_pc == 0x02f5 {
+            // self.breakpoint_delay = 100;
         }
 
         // Decode
@@ -538,10 +538,19 @@ impl CPU {
                 );
             }
             Instruction::LDH1(o) => {
+                println!("Write to hram {:04x}, ({:02x}) <- {:02x}", self.reg.pc, o, self.reg.a);
+                if o == 0x85 {
+                    // println!("Write to 85 {:04x} {:02x}", self.reg.pc, self.reg.a)
+                    // self.breakpoint_delay = 10;
+                }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
                 self.reg.a = mem[0xFF00 | o as u16];
+                if !(o == 0x85 && self.reg.a == 0x00) {
+                    println!("Read from hram {:04x}, ({:02x}): {:02x}", self.reg.pc, o, self.reg.a);
+                    // self.breakpoint_delay = 190;
+                }
             }
             Instruction::LDI(a, b) => {
                 self.ld_8_bit(a, b, &mut mem);

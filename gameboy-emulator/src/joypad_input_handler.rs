@@ -17,6 +17,7 @@ impl InputCallback for JoypadInputHandler {
         let c = std::char::from_u32(uni_char).unwrap();
         let mut jp = self.joy_pad.lock().unwrap();
         jp.reset();
+        println!("Pressing {}", c);
         match c {
             'w' => jp.up = true,
             'a' => jp.left = true,

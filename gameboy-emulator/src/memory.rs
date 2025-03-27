@@ -53,7 +53,8 @@ impl MBC1 {
                 if self.memory_model & 1 == 1 {
                     &mut self.ram_bank_enable
                 } else {
-                    panic!("Memory model not set to 32/4");
+                    println!("Memory model not set to 32/4");
+                    &mut self.ram_bank_enable
                 }
             }
             0x2000..=0x3FFF => &mut self.rom_bank,

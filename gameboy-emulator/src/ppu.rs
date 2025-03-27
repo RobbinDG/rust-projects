@@ -127,7 +127,7 @@ impl PPU {
                     // Load BG
                     let mut pixel = 0u8;
                     if lcdc.bg_window_enable {
-                        pixel = self.get_bg_pixel_for(&mem, self.line_idx, self.sl, &mut lcdc);
+                        pixel = self.render_background_layer(&mem, self.line_idx, self.sl, &mut lcdc);
                         if lcdc.window_enable {
                             pixel =
                                 self.render_window_layer(self.line_idx, self.sl, &mem, &mut lcdc)
@@ -191,22 +191,22 @@ impl PPU {
         mem
     }
 
-    fn get_bg_pixel_for(&self, mem: &Memory, x: u8, y: u8, lcdc: &mut LCDC) -> u8 {
+    fn render_background_layer(&self, mem: &Memory, x: u8, y: u8, lcdc: &mut LCDC) -> u8 {
         let scroll_x = mem[0xFF43];
         let scroll_y = mem[0xFF42];
         let x = x.wrapping_add(scroll_x);
         let y = y.wrapping_add(scroll_y);
 
-        Self::get_pixel_from_tile_map(mem, lcdc, x, y)
+        Self::get_pixel_from_tile_map(mem, lcdc, x, y, lcdc.bg_tile_map)
     }
 
-    fn get_pixel_from_tile_map(mem: &Memory, lcdc: &LCDC, x: u8, y: u8) -> u8 {
+    fn get_pixel_from_tile_map(mem: &Memory, lcdc: &LCDC, x: u8, y: u8, tile_map: bool) -> u8 {
         let tile_x = x / TILE_X;
         let tile_y = y / TILE_Y;
         let tile_coord_x = x % TILE_X;
         let tile_coord_y = y % TILE_Y;
 
-        let tile_idx = if lcdc.bg_tile_map {
+        let tile_idx = if tile_map {
             // 9C00–9FFF
             mem[0x9C00 + tile_x as u16 + tile_y as u16 * TILE_TABLE_SIZE]
         } else {
@@ -234,7 +234,7 @@ impl PPU {
         let win_y = mem[0xFF4A];
         let x = x.wrapping_add(win_x).wrapping_sub(7);
         let y = y.wrapping_add(win_y);
-        Self::get_pixel_from_tile_map(mem, lcdc, x, y)
+        Self::get_pixel_from_tile_map(mem, lcdc, x, y, lcdc.window_tile_map)
     }
 
     fn render_sprite_layer(&mut self, mem: &mut Memory, pixel: &mut u8) {
