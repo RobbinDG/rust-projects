@@ -6,10 +6,10 @@ use cartridge_header::CartridgeHeader;
 use cpu::CPU;
 use std::fs;
 use std::fs::File;
-use std::io::{Read};
+use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 mod addrreg;
 mod cartridge_header;
@@ -24,11 +24,15 @@ mod ppu;
 mod reg;
 mod register;
 
+const CLOCK_FREQ_UPDATE_INTERVAL: u32 = 20480;
+
 struct GameBoy {
     mem: Memory,
     cpu: CPU,
     ppu: PPU,
     joy_pad: Arc<Mutex<JoyPad>>,
+    cpu_last_cycle_cnt_reset: SystemTime,
+    cpu_cycle_counter: u32,
 }
 
 impl GameBoy {
@@ -50,6 +54,8 @@ impl GameBoy {
             cpu,
             ppu,
             joy_pad: jp,
+            cpu_last_cycle_cnt_reset: SystemTime::now(),
+            cpu_cycle_counter: 0,
         }
     }
 
@@ -70,11 +76,26 @@ impl GameBoy {
         for _ in 0usize..10_000_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
-            self.joy_pad.lock().unwrap().update(&mut self.mem);
+            {
+                self.joy_pad.lock().unwrap().update(&mut self.mem);
+            }
             self.cpu.check_interrupts(&mut self.mem);
             let m_cycles = self.cpu.run_cycle(&mut self.mem);
             for _ in 0..(m_cycles * 4) {
-                self.mem = self.ppu.run_dot(self.mem);
+                self.ppu.run_dot(&mut self.mem);
+            }
+            self.cpu_cycle_counter += m_cycles;
+            if self.cpu_cycle_counter >= CLOCK_FREQ_UPDATE_INTERVAL {
+                self.cpu_cycle_counter -= CLOCK_FREQ_UPDATE_INTERVAL;
+                let cycle_time = SystemTime::now();
+                let dt = cycle_time
+                    .duration_since(self.cpu_last_cycle_cnt_reset)
+                    .unwrap();
+                self.cpu_last_cycle_cnt_reset = cycle_time;
+                println!(
+                    "Clock Freq: {} MHz",
+                    CLOCK_FREQ_UPDATE_INTERVAL as f32 / dt.as_secs_f32() / 1_000_000.0
+                );
             }
         }
         self.cpu.print_exec_log();

@@ -517,10 +517,10 @@ impl CPU {
                 );
             }
             Instruction::LDH1(o) => {
-                println!(
-                    "Write to hram {:04x}, ({:02x}) <- {:02x}",
-                    self.reg.pc, o, self.reg.a
-                );
+                // println!(
+                //     "Write to hram {:04x}, ({:02x}) <- {:02x}",
+                //     self.reg.pc, o, self.reg.a
+                // );
                 if o == 0x85 {
                     // println!("Write to 85 {:04x} {:02x}", self.reg.pc, self.reg.a)
                     // self.breakpoint_delay = 10;
@@ -530,10 +530,10 @@ impl CPU {
             Instruction::LDH2(o) => {
                 self.reg.a = mem[0xFF00 | o as u16];
                 if !(o == 0x85 && self.reg.a == 0x00) {
-                    println!(
-                        "Read from hram {:04x}, ({:02x}): {:02x}",
-                        self.reg.pc, o, self.reg.a
-                    );
+                    // println!(
+                    //     "Read from hram {:04x}, ({:02x}): {:02x}",
+                    //     self.reg.pc, o, self.reg.a
+                    // );
                     // self.breakpoint_delay = 190;
                 }
             }

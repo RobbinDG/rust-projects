@@ -91,16 +91,15 @@ impl PPU {
         }
     }
 
-    pub fn run_dot(&mut self, mut mem: Memory) -> Memory {
+    pub fn run_dot(&mut self, mem: &mut Memory) {
         let mut lcdc = LCDC::load(&mem);
         if !lcdc.lcd_ppu_enable {
             mem[0xFF41] &= 0b1111_1100;
-            return mem;
         }
 
         let sprite_height = if lcdc.obj_size { 16 } else { 8 };
 
-        self.oam_dma_transfer(&mut mem);
+        self.oam_dma_transfer(mem);
 
         mem[0xFF44] = self.sl;
         let ppu_mode = if self.sl < MODE_1_SL {
@@ -139,7 +138,7 @@ impl PPU {
                     }
 
                     if lcdc.obj_enable {
-                        self.render_sprite_layer(&mut mem, &mut pixel);
+                        self.render_sprite_layer(mem, &mut pixel);
                     }
                     self.set_pixel(self.line_idx, self.sl, pixel);
                 }
@@ -191,7 +190,6 @@ impl PPU {
                 self.frame_start_time = now;
             }
         }
-        mem
     }
 
     fn render_background_layer(&self, mem: &Memory, x: u8, y: u8, lcdc: &mut LCDC) -> u8 {
