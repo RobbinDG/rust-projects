@@ -1,7 +1,8 @@
+use std::thread::sleep;
 use crate::joypad_input_handler::JoypadInputHandler;
 use crate::memory::Memory;
 use minifb::{Key, Scale, Window, WindowOptions};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -97,6 +98,8 @@ impl PPU {
             return mem;
         }
 
+        let sprite_height = if lcdc.obj_size { 16 } else { 8 };
+
         self.oam_dma_transfer(&mut mem);
 
         mem[0xFF44] = self.sl;
@@ -106,11 +109,11 @@ impl PPU {
                 // Mode 0: OAM scan
                 self.line_idx = 0;
                 // 40 sprites to check, 80 dots.
-                if self.dot % 2 == 0 && self.sl_objects_nxt < SL_SPRITE_CAPACITY {
+                if self.dot % 2 == 0 && self.sl_objects_nxt < SL_SPRITE_CAPACITY * SPRITE_BYTES {
                     let sprite_idx = 0xFE00 + self.dot * (SPRITE_BYTES as u16) / 2;
                     let sprite_y = mem[sprite_idx + 0];
                     // TODO thet sl + 16 here depends on the mode, the one with sprite_y doesn't
-                    if sprite_y <= self.sl + 16 && self.sl + 16 < sprite_y + 16 {
+                    if sprite_y <= self.sl + 16 && self.sl + 16 < sprite_y + sprite_height {
                         // Copy sprite data if it is in the scanline.
                         self.sl_objects[self.sl_objects_nxt + 0] = mem[sprite_idx + 0];
                         self.sl_objects[self.sl_objects_nxt + 1] = mem[sprite_idx + 1];
@@ -127,7 +130,8 @@ impl PPU {
                     // Load BG
                     let mut pixel = 0u8;
                     if lcdc.bg_window_enable {
-                        pixel = self.render_background_layer(&mem, self.line_idx, self.sl, &mut lcdc);
+                        pixel =
+                            self.render_background_layer(&mem, self.line_idx, self.sl, &mut lcdc);
                         if lcdc.window_enable {
                             pixel =
                                 self.render_window_layer(self.line_idx, self.sl, &mem, &mut lcdc)
@@ -137,7 +141,6 @@ impl PPU {
                     if lcdc.obj_enable {
                         self.render_sprite_layer(&mut mem, &mut pixel);
                     }
-                    // println!("({}, {}) = {}  (sprites: {})", self.line_idx, self.sl, pixel, self.sl_objects_nxt);
                     self.set_pixel(self.line_idx, self.sl, pixel);
                 }
                 2
@@ -220,12 +223,6 @@ impl PPU {
             // 8800–97FF signed
             0x9000u16.wrapping_add_signed((tile_idx as i8) as i16 * 16)
         };
-        if tile_idx != 127 || true {
-            // println!(
-            //     "({}, {}) ({}, {}) ({}, {}) ({}, {}) {:04x} {} {}",
-            //     win_x, win_y, x, y, tile_x, tile_y, tile_coord_x, tile_coord_y, 0x9800 + tile_x as u16 + tile_y as u16 * TILE_TABLE_SIZE, tile_idx, s
-            // );
-        }
         Self::get_pixel_in_tile(mem, tile_coord_x, tile_coord_y, s)
     }
 
@@ -266,8 +263,7 @@ impl PPU {
     fn get_pixel_in_tile(mem: &Memory, in_tile_x: u8, in_tile_y: u8, tile_start: u16) -> u8 {
         let lo_channel = (mem[tile_start + (2 * in_tile_y as u16)] >> (7 - in_tile_x)) & 1;
         let hi_channel = (mem[tile_start + (2 * in_tile_y as u16 + 1)] >> (7 - in_tile_x)) & 1;
-        let pixel_value = hi_channel << 1 | lo_channel;
-        pixel_value
+        hi_channel << 1 | lo_channel
     }
 
     fn oam_dma_transfer(&mut self, mem: &mut Memory) {
@@ -275,6 +271,7 @@ impl PPU {
         if reg <= 0xDF {
             self.oam_dma_start = (reg as u16) << 8;
             self.oam_dma_ctr = 0;
+            println!("STARTED OAM DMA {:02x}", self.oam_dma_start);
             mem[0xFF46] = 0xFF;
         }
         if self.oam_dma_ctr < OAM_DMA_LENGTH {
@@ -283,7 +280,7 @@ impl PPU {
             mem[dst] = mem[src];
             self.oam_dma_ctr += 1;
             if self.oam_dma_ctr == OAM_DMA_LENGTH {
-                // println!("COMPLETED OAM DMA")
+                println!("COMPLETED OAM DMA")
             }
         }
     }
@@ -299,5 +296,48 @@ impl PPU {
     fn set_pixel(&mut self, x: u8, y: u8, pixel: u8) {
         let grayscale = (pixel << 6) as u32;
         self.buffer[x as usize + y as usize * WIDTH] = grayscale << 16 | grayscale << 8 | grayscale;
+    }
+
+    pub fn render_all_tiles(mem: &Memory) {
+        let mut buffer = [0u32; 256 * 512];
+        let lcdc = LCDC::load(mem);
+        for tx in 0..32u16 {
+            for ty in 0..64u16 {
+                let ti = ty * 32 + tx;
+                let t = mem[0x9800 + ti];
+
+                let s = if lcdc.bg_window_tile_data_area {
+                    // 8000–8FFF unsigned
+                    0x8000 + t as u16 * TILE_SIZE_BYTES
+                } else {
+                    // 8800–97FF signed
+                    0x9000u16.wrapping_add_signed((t as i8) as i16 * 16)
+                };
+                println!("{:02x} {:02x}", t, s);
+
+                for x in 0..8 {
+                    for y in 0..8 {
+                        let grayscale = Self::get_pixel_in_tile(mem, x, y, s) as u32 * 64;
+                        buffer[(tx * 8 + x as u16) as usize + (ty * 8 + y as u16) as usize * 256] = grayscale << 16 | grayscale << 8 | grayscale;
+                    }
+                }
+            }
+        }
+
+
+        let mut window = Window::new(
+            "Tile grid",
+            256,
+            512,
+            WindowOptions {
+                scale: Scale::X2,
+                ..WindowOptions::default()
+            },
+        )
+        .unwrap();
+        window.update_with_buffer(buffer.as_slice(), 256, 512).unwrap();
+        loop {
+            sleep(Duration::from_millis(1000));
+        }
     }
 }

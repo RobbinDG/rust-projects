@@ -67,16 +67,15 @@ impl GameBoy {
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..20_000 {
+        for _ in 0usize..10_000_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
             self.joy_pad.lock().unwrap().update(&mut self.mem);
             self.cpu.check_interrupts(&mut self.mem);
-            self.mem = self.cpu.run_cycle(self.mem);
-            self.mem = self.ppu.run_dot(self.mem);
-            // self.mem = self.ppu.run_dot(self.mem);
-            // self.mem = self.ppu.run_dot(self.mem);
-            // self.mem = self.ppu.run_dot(self.mem);
+            let m_cycles = self.cpu.run_cycle(&mut self.mem);
+            for _ in 0..(m_cycles * 4) {
+                self.mem = self.ppu.run_dot(self.mem);
+            }
         }
         self.cpu.print_exec_log();
 
@@ -96,6 +95,7 @@ impl GameBoy {
         }
 
         self.mem.write_contents().unwrap();
+        PPU::render_all_tiles(&self.mem);
         loop {
             sleep(Duration::from_millis(1000));
         }
@@ -103,8 +103,8 @@ impl GameBoy {
 }
 
 fn main() {
-    // let filename = "./Pokemon Red (UE) [S][!].gb";
-    let filename = "./Tetris (JUE) (V1.1) [!].gb";
+    let filename = "./Pokemon Red (UE) [S][!].gb";
+    // let filename = "./Tetris (JUE) (V1.1) [!].gb";
     // let filename = "./cpu_instrs.gb";
     // let filename = "./instr_timing.gb";
     // let filename = "./dmg_sound.gb";

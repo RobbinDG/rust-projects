@@ -87,14 +87,14 @@ impl CPU {
         self.next_byte(mem) as i8
     }
 
-    pub fn run_cycle(&mut self, mut mem: Memory) -> Memory {
+    pub fn run_cycle(&mut self, mem: &mut Memory) -> u32 {
         if self.halted {
-            self.update_timer(&mut mem, 1);
-            return mem;
+            self.update_timer(mem, 1);
+            return 1;
         }
 
         // Fetch
-        let byte = self.next_byte(&mut mem);
+        let byte = self.next_byte(mem);
         let dbg_current_pc = self.reg.pc - 1;
 
         if dbg_current_pc == 0x02f5 {
@@ -136,33 +136,15 @@ impl CPU {
             0x3B => Instruction::DEC16(AddrReg::SP),
 
             // 1. LD
-            0x06 => Instruction::LD(
-                DataLoc::Reg(Reg::B),
-                DataLoc::Value(self.next_byte(&mut mem)),
-            ),
-            0x0E => Instruction::LD(
-                DataLoc::Reg(Reg::C),
-                DataLoc::Value(self.next_byte(&mut mem)),
-            ),
-            0x16 => Instruction::LD(
-                DataLoc::Reg(Reg::D),
-                DataLoc::Value(self.next_byte(&mut mem)),
-            ),
-            0x1E => Instruction::LD(
-                DataLoc::Reg(Reg::E),
-                DataLoc::Value(self.next_byte(&mut mem)),
-            ),
-            0x26 => Instruction::LD(
-                DataLoc::Reg(Reg::H),
-                DataLoc::Value(self.next_byte(&mut mem)),
-            ),
-            0x2E => Instruction::LD(
-                DataLoc::Reg(Reg::L),
-                DataLoc::Value(self.next_byte(&mut mem)),
-            ),
+            0x06 => Instruction::LD(DataLoc::Reg(Reg::B), DataLoc::Value(self.next_byte(mem))),
+            0x0E => Instruction::LD(DataLoc::Reg(Reg::C), DataLoc::Value(self.next_byte(mem))),
+            0x16 => Instruction::LD(DataLoc::Reg(Reg::D), DataLoc::Value(self.next_byte(mem))),
+            0x1E => Instruction::LD(DataLoc::Reg(Reg::E), DataLoc::Value(self.next_byte(mem))),
+            0x26 => Instruction::LD(DataLoc::Reg(Reg::H), DataLoc::Value(self.next_byte(mem))),
+            0x2E => Instruction::LD(DataLoc::Reg(Reg::L), DataLoc::Value(self.next_byte(mem))),
             0x36 => Instruction::LD(
                 DataLoc::AddrReg(AddrReg::HL),
-                DataLoc::Value(self.next_byte(&mut mem)),
+                DataLoc::Value(self.next_byte(mem)),
             ),
 
             // 2. LD
@@ -177,18 +159,15 @@ impl CPU {
             0x1A => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::AddrReg(AddrReg::DE)),
             0xFA => Instruction::LD(
                 DataLoc::Reg(Reg::A),
-                DataLoc::Addr(self.next_addr_lsb_first(&mut mem)),
+                DataLoc::Addr(self.next_addr_lsb_first(mem)),
             ),
-            0x3E => Instruction::LD(
-                DataLoc::Reg(Reg::A),
-                DataLoc::Value(self.next_byte(&mut mem)),
-            ),
+            0x3E => Instruction::LD(DataLoc::Reg(Reg::A), DataLoc::Value(self.next_byte(mem))),
 
             // 4. LD
             0x02 => Instruction::LD(DataLoc::AddrReg(AddrReg::BC), DataLoc::Reg(Reg::A)),
             0x12 => Instruction::LD(DataLoc::AddrReg(AddrReg::DE), DataLoc::Reg(Reg::A)),
             0xEA => Instruction::LD(
-                DataLoc::Addr(self.next_addr_lsb_first(&mut mem)),
+                DataLoc::Addr(self.next_addr_lsb_first(mem)),
                 DataLoc::Reg(Reg::A),
             ),
 
@@ -199,8 +178,8 @@ impl CPU {
             0xE2 => Instruction::LD6,
 
             // LDH
-            0xE0 => Instruction::LDH1(self.next_byte(&mut mem)),
-            0xF0 => Instruction::LDH2(self.next_byte(&mut mem)),
+            0xE0 => Instruction::LDH1(self.next_byte(mem)),
+            0xF0 => Instruction::LDH2(self.next_byte(mem)),
 
             // LDI
             0x2A => Instruction::LDI(DataLoc::Reg(Reg::A), DataLoc::AddrReg(AddrReg::HL)),
@@ -211,13 +190,13 @@ impl CPU {
             0x32 => Instruction::LDD(DataLoc::AddrReg(AddrReg::HL), DataLoc::Reg(Reg::A)),
 
             // LD 16-bit
-            0x01 => Instruction::LD16(AddrReg::BC, self.next_addr_lsb_first(&mut mem)),
-            0x11 => Instruction::LD16(AddrReg::DE, self.next_addr_lsb_first(&mut mem)),
-            0x21 => Instruction::LD16(AddrReg::HL, self.next_addr_lsb_first(&mut mem)),
-            0x31 => Instruction::LD16(AddrReg::SP, self.next_addr_lsb_first(&mut mem)),
+            0x01 => Instruction::LD16(AddrReg::BC, self.next_addr_lsb_first(mem)),
+            0x11 => Instruction::LD16(AddrReg::DE, self.next_addr_lsb_first(mem)),
+            0x21 => Instruction::LD16(AddrReg::HL, self.next_addr_lsb_first(mem)),
+            0x31 => Instruction::LD16(AddrReg::SP, self.next_addr_lsb_first(mem)),
             0xF9 => Instruction::LDSPHL,
-            0xF8 => Instruction::LDHL(self.next_byte_signed(&mut mem)),
-            0x08 => Instruction::LDnn(self.next_addr_lsb_first(&mut mem)),
+            0xF8 => Instruction::LDHL(self.next_byte_signed(mem)),
+            0x08 => Instruction::LDnn(self.next_addr_lsb_first(mem)),
 
             // PUSH
             0xF5 => Instruction::PUSH(AddrReg::AF),
@@ -240,7 +219,7 @@ impl CPU {
             0x84 => Instruction::ADD(DataLoc::Reg(Reg::H)),
             0x85 => Instruction::ADD(DataLoc::Reg(Reg::L)),
             0x86 => Instruction::ADD(DataLoc::AddrReg(AddrReg::HL)),
-            0xC6 => Instruction::ADD(DataLoc::Value(self.next_byte(&mut mem))),
+            0xC6 => Instruction::ADD(DataLoc::Value(self.next_byte(mem))),
 
             // ADC
             0x8F => Instruction::ADC(DataLoc::Reg(Reg::A)),
@@ -251,14 +230,14 @@ impl CPU {
             0x8C => Instruction::ADC(DataLoc::Reg(Reg::H)),
             0x8D => Instruction::ADC(DataLoc::Reg(Reg::L)),
             0x8E => Instruction::ADC(DataLoc::AddrReg(AddrReg::HL)),
-            0xCE => Instruction::ADC(DataLoc::Value(self.next_byte(&mut mem))),
+            0xCE => Instruction::ADC(DataLoc::Value(self.next_byte(mem))),
 
             // ADD 16-bit
             0x09 => Instruction::ADD16(AddrReg::BC),
             0x19 => Instruction::ADD16(AddrReg::DE),
             0x29 => Instruction::ADD16(AddrReg::HL),
             0x39 => Instruction::ADD16(AddrReg::SP),
-            0xE8 => Instruction::ADD16n(self.next_byte_signed(&mut mem)),
+            0xE8 => Instruction::ADD16n(self.next_byte_signed(mem)),
 
             // SUB
             0x9F => Instruction::SBC(DataLoc::Reg(Reg::A)),
@@ -269,7 +248,7 @@ impl CPU {
             0x9C => Instruction::SBC(DataLoc::Reg(Reg::H)),
             0x9D => Instruction::SBC(DataLoc::Reg(Reg::L)),
             0x9E => Instruction::SBC(DataLoc::AddrReg(AddrReg::HL)),
-            0xDE => Instruction::SBC(DataLoc::Value(self.next_byte(&mut mem))),
+            0xDE => Instruction::SBC(DataLoc::Value(self.next_byte(mem))),
 
             // SBC
             0x97 => Instruction::SUB(DataLoc::Reg(Reg::A)),
@@ -280,7 +259,7 @@ impl CPU {
             0x94 => Instruction::SUB(DataLoc::Reg(Reg::H)),
             0x95 => Instruction::SUB(DataLoc::Reg(Reg::L)),
             0x96 => Instruction::SUB(DataLoc::AddrReg(AddrReg::HL)),
-            0xD6 => Instruction::SUB(DataLoc::Value(self.next_byte(&mut mem))),
+            0xD6 => Instruction::SUB(DataLoc::Value(self.next_byte(mem))),
 
             // AND
             0xA7 => Instruction::AND(DataLoc::Reg(Reg::A)),
@@ -291,7 +270,7 @@ impl CPU {
             0xA4 => Instruction::AND(DataLoc::Reg(Reg::H)),
             0xA5 => Instruction::AND(DataLoc::Reg(Reg::L)),
             0xA6 => Instruction::AND(DataLoc::AddrReg(AddrReg::HL)),
-            0xE6 => Instruction::AND(DataLoc::Value(self.next_byte(&mut mem))),
+            0xE6 => Instruction::AND(DataLoc::Value(self.next_byte(mem))),
 
             // OR
             0xB7 => Instruction::OR(DataLoc::Reg(Reg::A)),
@@ -302,7 +281,7 @@ impl CPU {
             0xB4 => Instruction::OR(DataLoc::Reg(Reg::H)),
             0xB5 => Instruction::OR(DataLoc::Reg(Reg::L)),
             0xB6 => Instruction::OR(DataLoc::AddrReg(AddrReg::HL)),
-            0xF6 => Instruction::OR(DataLoc::Value(self.next_byte(&mut mem))),
+            0xF6 => Instruction::OR(DataLoc::Value(self.next_byte(mem))),
 
             // XOR
             0xAF => Instruction::XOR(DataLoc::Reg(Reg::A)),
@@ -313,7 +292,7 @@ impl CPU {
             0xAC => Instruction::XOR(DataLoc::Reg(Reg::H)),
             0xAD => Instruction::XOR(DataLoc::Reg(Reg::L)),
             0xAE => Instruction::XOR(DataLoc::AddrReg(AddrReg::HL)),
-            0xEE => Instruction::XOR(DataLoc::Value(self.next_byte(&mut mem))),
+            0xEE => Instruction::XOR(DataLoc::Value(self.next_byte(mem))),
 
             // CP
             0xBF => Instruction::CP(DataLoc::Reg(Reg::A)),
@@ -324,29 +303,29 @@ impl CPU {
             0xBC => Instruction::CP(DataLoc::Reg(Reg::H)),
             0xBD => Instruction::CP(DataLoc::Reg(Reg::L)),
             0xBE => Instruction::CP(DataLoc::AddrReg(AddrReg::HL)),
-            0xFE => Instruction::CP(DataLoc::Value(self.next_byte(&mut mem))),
+            0xFE => Instruction::CP(DataLoc::Value(self.next_byte(mem))),
 
             // JP
-            0xC3 => Instruction::JP1(self.next_addr_lsb_first(&mut mem)),
-            0xC2 => Instruction::JP2(Condition::NZ, self.next_addr_lsb_first(&mut mem)),
-            0xCA => Instruction::JP2(Condition::Z, self.next_addr_lsb_first(&mut mem)),
-            0xD2 => Instruction::JP2(Condition::NC, self.next_addr_lsb_first(&mut mem)),
-            0xDA => Instruction::JP2(Condition::C, self.next_addr_lsb_first(&mut mem)),
+            0xC3 => Instruction::JP1(self.next_addr_lsb_first(mem)),
+            0xC2 => Instruction::JP2(Condition::NZ, self.next_addr_lsb_first(mem)),
+            0xCA => Instruction::JP2(Condition::Z, self.next_addr_lsb_first(mem)),
+            0xD2 => Instruction::JP2(Condition::NC, self.next_addr_lsb_first(mem)),
+            0xDA => Instruction::JP2(Condition::C, self.next_addr_lsb_first(mem)),
             0xE9 => Instruction::JP3,
 
             // JR
-            0x18 => Instruction::JR4(self.next_byte_signed(&mut mem)),
-            0x20 => Instruction::JR5(Condition::NZ, self.next_byte_signed(&mut mem)),
-            0x28 => Instruction::JR5(Condition::Z, self.next_byte_signed(&mut mem)),
-            0x30 => Instruction::JR5(Condition::NC, self.next_byte_signed(&mut mem)),
-            0x38 => Instruction::JR5(Condition::C, self.next_byte_signed(&mut mem)),
+            0x18 => Instruction::JR4(self.next_byte_signed(mem)),
+            0x20 => Instruction::JR5(Condition::NZ, self.next_byte_signed(mem)),
+            0x28 => Instruction::JR5(Condition::Z, self.next_byte_signed(mem)),
+            0x30 => Instruction::JR5(Condition::NC, self.next_byte_signed(mem)),
+            0x38 => Instruction::JR5(Condition::C, self.next_byte_signed(mem)),
 
             // CALL
-            0xCD => Instruction::CALL(self.next_addr_lsb_first(&mut mem)),
-            0xC4 => Instruction::CALLc(Condition::NZ, self.next_addr_lsb_first(&mut mem)),
-            0xCC => Instruction::CALLc(Condition::Z, self.next_addr_lsb_first(&mut mem)),
-            0xD4 => Instruction::CALLc(Condition::NC, self.next_addr_lsb_first(&mut mem)),
-            0xDC => Instruction::CALLc(Condition::C, self.next_addr_lsb_first(&mut mem)),
+            0xCD => Instruction::CALL(self.next_addr_lsb_first(mem)),
+            0xC4 => Instruction::CALLc(Condition::NZ, self.next_addr_lsb_first(mem)),
+            0xCC => Instruction::CALLc(Condition::Z, self.next_addr_lsb_first(mem)),
+            0xD4 => Instruction::CALLc(Condition::NC, self.next_addr_lsb_first(mem)),
+            0xDC => Instruction::CALLc(Condition::C, self.next_addr_lsb_first(mem)),
 
             // RET
             0xC9 => Instruction::RET,
@@ -364,7 +343,7 @@ impl CPU {
             0x00 => Instruction::NOP,
             0x76 => Instruction::HALT,
             0x10 => {
-                assert_eq!(self.next_byte(&mut mem), 0);
+                assert_eq!(self.next_byte(mem), 0);
                 Instruction::STOP
             }
             0xF3 => Instruction::DI,
@@ -377,7 +356,7 @@ impl CPU {
             0x1F => Instruction::RRA,
 
             0xCB => {
-                let prefixed = self.next_byte(&mut mem);
+                let prefixed = self.next_byte(mem);
                 self.instructions_count[256 + prefixed as usize] += 1;
                 match prefixed {
                     // Rotates & Shifts
@@ -521,24 +500,27 @@ impl CPU {
                 }
             }
             Instruction::LD(a, b) => {
-                self.ld_8_bit(a, b, &mut mem);
+                self.ld_8_bit(a, b, mem);
             }
             Instruction::LD5 => {
                 self.ld_8_bit(
                     DataLoc::Reg(Reg::A),
                     DataLoc::Addr(0xFF00 | self.reg.c as u16),
-                    &mut mem,
+                    mem,
                 );
             }
             Instruction::LD6 => {
                 self.ld_8_bit(
                     DataLoc::Addr(0xFF00 | self.reg.c as u16),
                     DataLoc::Reg(Reg::A),
-                    &mut mem,
+                    mem,
                 );
             }
             Instruction::LDH1(o) => {
-                println!("Write to hram {:04x}, ({:02x}) <- {:02x}", self.reg.pc, o, self.reg.a);
+                println!(
+                    "Write to hram {:04x}, ({:02x}) <- {:02x}",
+                    self.reg.pc, o, self.reg.a
+                );
                 if o == 0x85 {
                     // println!("Write to 85 {:04x} {:02x}", self.reg.pc, self.reg.a)
                     // self.breakpoint_delay = 10;
@@ -548,17 +530,20 @@ impl CPU {
             Instruction::LDH2(o) => {
                 self.reg.a = mem[0xFF00 | o as u16];
                 if !(o == 0x85 && self.reg.a == 0x00) {
-                    println!("Read from hram {:04x}, ({:02x}): {:02x}", self.reg.pc, o, self.reg.a);
+                    println!(
+                        "Read from hram {:04x}, ({:02x}): {:02x}",
+                        self.reg.pc, o, self.reg.a
+                    );
                     // self.breakpoint_delay = 190;
                 }
             }
             Instruction::LDI(a, b) => {
-                self.ld_8_bit(a, b, &mut mem);
+                self.ld_8_bit(a, b, mem);
                 self.reg
                     .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_add(1));
             }
             Instruction::LDD(a, b) => {
-                self.ld_8_bit(a, b, &mut mem);
+                self.ld_8_bit(a, b, mem);
                 self.reg
                     .set_pair(AddrReg::HL, self.reg.get_pair(AddrReg::HL).wrapping_sub(1));
             }
@@ -596,17 +581,17 @@ impl CPU {
                 mem[r + 1] = (self.reg.sp >> 8) as u8;
             }
             Instruction::PUSH(r) => {
-                self.push(self.reg.get_pair(r), &mut mem);
+                self.push(self.reg.get_pair(r), mem);
             }
             Instruction::POP(r) => {
-                let val = self.pop(&mut mem);
+                let val = self.pop(mem);
                 self.reg.set_pair(r, val);
             }
             Instruction::ADD(l) => {
-                self.reg.a = self.add_set_flags(l, false, &mut mem);
+                self.reg.a = self.add_set_flags(l, false, mem);
             }
             Instruction::ADC(l) => {
-                self.reg.a = self.add_set_flags(l, true, &mut mem);
+                self.reg.a = self.add_set_flags(l, true, mem);
             }
             Instruction::ADD16(r) => {
                 let hl = self.reg.get_pair(AddrReg::HL);
@@ -641,22 +626,22 @@ impl CPU {
                 self.reg.set_pair(AddrReg::SP, r);
             }
             Instruction::SUB(l) => {
-                self.reg.a = self.sub_set_flags(l, false, &mut mem);
+                self.reg.a = self.sub_set_flags(l, false, mem);
             }
             Instruction::SBC(l) => {
-                self.reg.a = self.sub_set_flags(l, true, &mut mem);
+                self.reg.a = self.sub_set_flags(l, true, mem);
             }
             Instruction::AND(l) => {
-                self.reg.a = self.and_set_flags(l, &mut mem);
+                self.reg.a = self.and_set_flags(l, mem);
             }
             Instruction::OR(l) => {
-                self.reg.a = self.or_set_flags(l, &mut mem);
+                self.reg.a = self.or_set_flags(l, mem);
             }
             Instruction::XOR(l) => {
-                self.reg.a = self.xor_set_flags(l, &mut mem);
+                self.reg.a = self.xor_set_flags(l, mem);
             }
             Instruction::SWAP(r) => {
-                self.apply_to_7_bit_reg(Self::swap, r, &mut mem);
+                self.apply_to_7_bit_reg(Self::swap, r, mem);
                 // let n = match l {
                 //     DataLoc::Reg(r) => self.reg.get(r),
                 //     DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
@@ -678,28 +663,28 @@ impl CPU {
                         mem[0xdef8], mem[0xdef9], mem[0xdefa]
                     );
                 }
-                let _ = self.sub_set_flags(l, false, &mut mem);
+                let _ = self.sub_set_flags(l, false, mem);
             }
             Instruction::CALL(addr) => {
-                self.call(addr, &mut mem);
+                self.call(addr, mem);
             }
             Instruction::CALLc(cond, addr) => {
                 if self.reg.eval_condition(cond) {
                     conditional_extra_cycles = 3;
-                    self.call(addr, &mut mem);
+                    self.call(addr, mem);
                 }
             }
             Instruction::RET => {
-                self.ret(&mut mem);
+                self.ret(mem);
             }
             Instruction::RETc(cond) => {
                 if self.reg.eval_condition(cond) {
                     conditional_extra_cycles = 3;
-                    self.ret(&mut mem);
+                    self.ret(mem);
                 }
             }
             Instruction::RETI => {
-                self.ret(&mut mem);
+                self.ret(mem);
                 self.ime = true;
                 self.instructions_out_of_interrupt = 0;
                 println!("IME enabled");
@@ -809,7 +794,7 @@ impl CPU {
                     if interrupt_pending {
                         // 1 byte OP code
                     } else {
-                        // self.next_byte(&mut mem);
+                        // self.next_byte(mem);
                         self.halted = true;
                     }
                 } else {
@@ -821,7 +806,7 @@ impl CPU {
                                 self.cpu_crash("CPU glitch".to_string());
                             }
                         } else {
-                            // self.next_byte(&mut mem);
+                            // self.next_byte(mem);
                             mem[0xFF04] = 0x00;
                             self.halted = true;
                             println!("Speed change");
@@ -832,7 +817,7 @@ impl CPU {
                             println!("STOP MODE");
                         } else {
                             mem[0xFF04] = 0x00;
-                            // self.next_byte(&mut mem);
+                            // self.next_byte(mem);
                             println!("STOP MODE");
                         }
                     }
@@ -856,32 +841,32 @@ impl CPU {
                 self.reg.a = Self::rotate_right_through_carry(self.reg.a, false, &mut self.reg);
             }
             Instruction::RLC(r) => {
-                self.apply_to_7_bit_reg(Self::rotate_left_into_carry, r, &mut mem);
+                self.apply_to_7_bit_reg(Self::rotate_left_into_carry, r, mem);
             }
             Instruction::RL(r) => {
-                self.apply_to_7_bit_reg(Self::rotate_left_through_carry, r, &mut mem);
+                self.apply_to_7_bit_reg(Self::rotate_left_through_carry, r, mem);
             }
             Instruction::RRC(r) => {
-                self.apply_to_7_bit_reg(Self::rotate_right_into_carry, r, &mut mem);
+                self.apply_to_7_bit_reg(Self::rotate_right_into_carry, r, mem);
             }
             Instruction::RR(r) => {
-                self.apply_to_7_bit_reg(Self::rotate_right_through_carry, r, &mut mem);
+                self.apply_to_7_bit_reg(Self::rotate_right_through_carry, r, mem);
             }
             Instruction::SLA(r) => {
-                self.apply_to_7_bit_reg(Self::shift_left_into_carry, r, &mut mem);
+                self.apply_to_7_bit_reg(Self::shift_left_into_carry, r, mem);
             }
             Instruction::SRA(r) => {
-                self.apply_to_7_bit_reg(Self::shift_right_into_carry_keep_msb, r, &mut mem);
+                self.apply_to_7_bit_reg(Self::shift_right_into_carry_keep_msb, r, mem);
             }
             Instruction::SRL(r) => {
-                self.apply_to_7_bit_reg(Self::shift_right_into_carry, r, &mut mem);
+                self.apply_to_7_bit_reg(Self::shift_right_into_carry, r, mem);
             }
             Instruction::RST(proc) => {
                 if proc == 0x38 {
                     // self.cpu_crash("HIT RST 0x38".to_string());
                 }
                 let curr = self.reg.pc; // PC was incremented, decrement to get current
-                self.push(curr, &mut mem);
+                self.push(curr, mem);
                 self.reg.pc = 0x0000 | proc as u16;
             }
         }
@@ -902,10 +887,8 @@ impl CPU {
             }
         }
 
-        self.update_timer(
-            &mut mem,
-            instruction.machine_cycles() as u32 + conditional_extra_cycles,
-        );
+        let m_cycles = instruction.machine_cycles() as u32 + conditional_extra_cycles;
+        self.update_timer(mem, m_cycles);
 
         // Debug log
         #[cfg(debug_assertions)]
@@ -928,7 +911,7 @@ impl CPU {
         }
 
         self.last = instruction;
-        mem
+        m_cycles
     }
 
     fn update_timer(&mut self, mem: &mut Memory, value: u32) {
