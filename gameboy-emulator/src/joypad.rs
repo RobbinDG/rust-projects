@@ -40,32 +40,33 @@ impl JoyPad {
 
     pub fn update(&mut self, mem: &mut Memory) {
         mem[0xFF00] |= 0x0F;
-        if mem[0xFF00] >> 4 == 0b10 {
+        let input_select = mem[0xFF00] >> 4;
+        if input_select == 0b01 {
             if self.start {
-                self.set_button_bit(mem, 0);
+                self.set_button_bit(mem, 3);
             }
             if self.select {
-                self.set_button_bit(mem, 1);
-            }
-            if self.a {
                 self.set_button_bit(mem, 2);
             }
             if self.b {
-                self.set_button_bit(mem, 3);
-            }
-        }
-        if mem[0xFF00] >> 4 == 0b01 {
-            if self.down {
-                self.set_button_bit(mem, 0);
-            }
-            if self.up {
                 self.set_button_bit(mem, 1);
             }
-            if self.left {
+            if self.a {
+                self.set_button_bit(mem, 0);
+            }
+        }
+        if input_select == 0b10 {
+            if self.down {
+                self.set_button_bit(mem, 3);
+            }
+            if self.up {
                 self.set_button_bit(mem, 2);
             }
+            if self.left {
+                self.set_button_bit(mem, 1);
+            }
             if self.right {
-                self.set_button_bit(mem, 3);
+                self.set_button_bit(mem, 0);
             }
         }
         self.previous = mem[0xFF00];
