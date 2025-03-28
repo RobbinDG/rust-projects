@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::ops::{Index, IndexMut};
+use log::error;
 
 pub struct ROMOnly {
     null: u8,
@@ -88,7 +89,7 @@ impl MBC3 {
 
     pub fn rom_write(&mut self, addr: u16) -> &mut u8 {
         if !matches!(addr, 0x2000..=0x3FFF) {
-            panic!("Invalid write to memory bank: {:04x}", addr);
+            error!("Invalid write to memory bank: {:04x}", addr);
         }
         &mut self.rom_bank_reg
     }

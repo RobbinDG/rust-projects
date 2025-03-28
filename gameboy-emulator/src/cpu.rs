@@ -6,6 +6,7 @@ use crate::memory::Memory;
 use crate::reg::Reg;
 use crate::register::Registers;
 use std::collections::VecDeque;
+use log::{debug, info};
 
 const MSB_MASK: u8 = 0b1000_0000;
 const LSB_MASK: u8 = 0b0000_0001;
@@ -481,9 +482,6 @@ impl CPU {
             Instruction::JP2(c, addr) => {
                 if self.reg.eval_condition(c) {
                     conditional_extra_cycles = 1;
-                    if addr == 0xc1b9 {
-                        println!("FAILED TEST");
-                    }
                     self.reg.pc = addr;
                 }
             }
@@ -687,7 +685,7 @@ impl CPU {
                 self.ret(mem);
                 self.ime = true;
                 self.instructions_out_of_interrupt = 0;
-                println!("IME enabled");
+                debug!("IME enabled");
                 // self.cpu_crash("test".to_string());
             }
             Instruction::BIT(b, n) => {
@@ -801,7 +799,7 @@ impl CPU {
                     if speed_key_requested {
                         if interrupt_pending {
                             if self.ime {
-                                println!("Speed change");
+                                info!("Speed change");
                             } else {
                                 self.cpu_crash("CPU glitch".to_string());
                             }
@@ -809,22 +807,22 @@ impl CPU {
                             // self.next_byte(mem);
                             mem[0xFF04] = 0x00;
                             self.halted = true;
-                            println!("Speed change");
+                            info!("Speed change");
                         }
                     } else {
                         if interrupt_pending {
                             mem[0xFF04] = 0x00;
-                            println!("STOP MODE");
+                            info!("STOP MODE");
                         } else {
                             mem[0xFF04] = 0x00;
                             // self.next_byte(mem);
-                            println!("STOP MODE");
+                            info!("STOP MODE");
                         }
                     }
                 }
             }
             Instruction::DI => {
-                println!("IME disabled");
+                debug!("IME disabled");
                 self.ime = false
             }
             Instruction::EI => self.ie_delay = 1,
@@ -873,14 +871,13 @@ impl CPU {
 
         if self.ie_delay == 0 {
             self.ime = true;
-            println!("IME enabled");
+            debug!("IME enabled");
         }
         if self.ie_delay >= 0 {
             self.ie_delay -= 1;
         }
 
         if self.breakpoint_delay > 0 {
-            println!("TIMA: {:02x} {:04x}", mem[0xFF05], self.reg.pc);
             self.breakpoint_delay -= 1;
             if self.breakpoint_delay == 0 {
                 self.cpu_crash("Breakpoint".to_string());

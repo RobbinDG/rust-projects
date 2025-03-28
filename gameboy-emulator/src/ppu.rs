@@ -3,6 +3,7 @@ use crate::joypad_input_handler::JoypadInputHandler;
 use crate::memory::Memory;
 use minifb::{Key, Scale, Window, WindowOptions};
 use std::time::{Duration, SystemTime};
+use log::debug;
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -180,7 +181,7 @@ impl PPU {
             if self.sl >= TOTAL_SL {
                 self.sl = 0;
                 let now = SystemTime::now();
-                println!(
+                debug!(
                     "FPS {:?}",
                     1.0 / now
                         .duration_since(self.frame_start_time)
@@ -269,7 +270,7 @@ impl PPU {
         if reg <= 0xDF {
             self.oam_dma_start = (reg as u16) << 8;
             self.oam_dma_ctr = 0;
-            println!("STARTED OAM DMA {:02x}", self.oam_dma_start);
+            debug!("STARTED OAM DMA {:02x}", self.oam_dma_start);
             mem[0xFF46] = 0xFF;
         }
         if self.oam_dma_ctr < OAM_DMA_LENGTH {
@@ -278,7 +279,7 @@ impl PPU {
             mem[dst] = mem[src];
             self.oam_dma_ctr += 1;
             if self.oam_dma_ctr == OAM_DMA_LENGTH {
-                println!("COMPLETED OAM DMA")
+                debug!("COMPLETED OAM DMA")
             }
         }
     }

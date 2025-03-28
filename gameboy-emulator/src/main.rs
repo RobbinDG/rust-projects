@@ -10,6 +10,7 @@ use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
+use log::debug;
 
 mod addrreg;
 mod cartridge_header;
@@ -24,7 +25,7 @@ mod ppu;
 mod reg;
 mod register;
 
-const CLOCK_FREQ_UPDATE_INTERVAL: u32 = 20480;
+const CLOCK_FREQ_UPDATE_INTERVAL: u32 = 1_000_000;
 
 struct GameBoy {
     mem: Memory,
@@ -73,7 +74,7 @@ impl GameBoy {
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..10_000_000 {
+        for _ in 0usize..100_000_000 {
             // DIV register
             self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
             {
@@ -92,7 +93,7 @@ impl GameBoy {
                     .duration_since(self.cpu_last_cycle_cnt_reset)
                     .unwrap();
                 self.cpu_last_cycle_cnt_reset = cycle_time;
-                println!(
+                debug!(
                     "Clock Freq: {} MHz",
                     CLOCK_FREQ_UPDATE_INTERVAL as f32 / dt.as_secs_f32() / 1_000_000.0
                 );

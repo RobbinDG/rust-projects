@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 minifb = "0.28.0"
+log = "0.4.27"
 
 [profile.release]
 debug = true
