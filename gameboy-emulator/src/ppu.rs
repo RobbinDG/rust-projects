@@ -1,9 +1,9 @@
-use std::thread::sleep;
 use crate::joypad_input_handler::JoypadInputHandler;
 use crate::memory::Memory;
-use minifb::{Key, Scale, Window, WindowOptions};
-use std::time::{Duration, SystemTime};
 use log::debug;
+use minifb::{Key, Scale, Window, WindowOptions};
+use std::thread::sleep;
+use std::time::{Duration, SystemTime};
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -240,6 +240,10 @@ impl PPU {
             let sprite_x = self.sl_objects[i + 1];
             let tile_idx = self.sl_objects[i + 2];
             let sprite_attrs = self.sl_objects[i + 3];
+            let dmg_palette = (sprite_attrs >> 4) & 1;
+            let x_flip = (sprite_attrs >> 5) & 1;
+            let y_flip = (sprite_attrs >> 6) & 1;
+            let priority = (sprite_attrs >> 7) & 1;
 
             if !(sprite_x <= self.line_idx + 8 && self.line_idx + 8 < sprite_x + 8) {
                 continue;
@@ -250,12 +254,14 @@ impl PPU {
             }
 
             let in_sprite_x = self.line_idx + 8 - sprite_x;
-            // println!("Drawing sprite: x {} {} {} y {} {}", self.line_idx, sprite_x, in_sprite_x, self.sl, sprite_y);
             let in_sprite_y = self.sl + 16 - sprite_y;
-            let tile_start = 0x8000 + tile_idx as u16;
+            let tile_start = 0x8000 + tile_idx as u16 * TILE_SIZE_BYTES;
 
             sprite_min_x = sprite_x;
-            *pixel = Self::get_pixel_in_tile(mem, in_sprite_x, in_sprite_y, tile_start);
+            let sprite_pixel = Self::get_pixel_in_tile(mem, in_sprite_x, in_sprite_y, tile_start);
+            if priority == 0 || *pixel == 0 {
+                *pixel = sprite_pixel
+            };
         }
     }
 
@@ -312,17 +318,16 @@ impl PPU {
                     // 8800–97FF signed
                     0x9000u16.wrapping_add_signed((t as i8) as i16 * 16)
                 };
-                println!("{:02x} {:02x}", t, s);
 
                 for x in 0..8 {
                     for y in 0..8 {
                         let grayscale = Self::get_pixel_in_tile(mem, x, y, s) as u32 * 64;
-                        buffer[(tx * 8 + x as u16) as usize + (ty * 8 + y as u16) as usize * 256] = grayscale << 16 | grayscale << 8 | grayscale;
+                        buffer[(tx * 8 + x as u16) as usize + (ty * 8 + y as u16) as usize * 256] =
+                            grayscale << 16 | grayscale << 8 | grayscale;
                     }
                 }
             }
         }
-
 
         let mut window = Window::new(
             "Tile grid",
@@ -334,7 +339,9 @@ impl PPU {
             },
         )
         .unwrap();
-        window.update_with_buffer(buffer.as_slice(), 256, 512).unwrap();
+        window
+            .update_with_buffer(buffer.as_slice(), 256, 512)
+            .unwrap();
         loop {
             sleep(Duration::from_millis(1000));
         }
