@@ -11,13 +11,13 @@ const BIT_7_MASK: u8 = 1 << 7;
 pub struct APU {
     pulse_period_divider: u16,
     wave_period_divider: u16,
+    ch1_enabled: bool,
     ch1_freq: Arc<Mutex<Option<f32>>>,
     handle: thread::JoinHandle<()>,
 }
 
 impl APU {
     pub fn new() -> Self {
-
         let freq: Arc<Mutex<Option<f32>>> = Arc::new(Mutex::new(None));
         let freq_clone = freq.clone();
         let handle = thread::spawn(move || {
@@ -71,6 +71,7 @@ impl APU {
         Self {
             pulse_period_divider: 0,
             wave_period_divider: 0,
+            ch1_enabled: false,
             ch1_freq: freq_clone,
             handle,
         }
@@ -79,21 +80,30 @@ impl APU {
     pub fn clock_pulse(&mut self, mem: &mut Memory) {
         self.pulse_period_divider += 1;
 
-        let ch1_period_lo = mem[0xFF13];
         let ch1_period_hi = mem[0xFF14];
-        let ch1_period = (((ch1_period_hi & 0b111) as u16) << 8) | (ch1_period_lo as u16);
         if ch1_period_hi & BIT_7_MASK != 0 {
-            // TODO do trigger things here
+            self.ch1_enabled = true;
+            // TODO reset length timer
+            // TODO reset envelope timer
+            // TODO set to initial volume (NR12)
+            // TODO do sweep things
             mem[0xFF14] &= !BIT_7_MASK;
         }
 
         if self.pulse_period_divider >= 0x7FF {
-            self.pulse_period_divider = ch1_period;
-            self.ch1_freq
-                .lock()
-                .unwrap()
-                .replace(131072.0 / (2048 - ch1_period) as f32);
+            self.set_pulse_divider(mem);
         }
+    }
+
+    fn set_pulse_divider(&mut self, mem: &Memory) {
+        let ch1_period_lo = mem[0xFF13];
+        let ch1_period_hi = mem[0xFF14];
+        let ch1_period = (((ch1_period_hi & 0b111) as u16) << 8) | (ch1_period_lo as u16);
+        self.pulse_period_divider = ch1_period;
+        self.ch1_freq
+            .lock()
+            .unwrap()
+            .replace(131072.0 / (2048 - ch1_period) as f32);
     }
 
     pub fn clock_wave(&mut self, mem: &mut Memory) {

@@ -36,9 +36,11 @@ struct GameBoy {
     cpu: CPU,
     ppu: PPU,
     apu: APU,
+    apu_div: u8,
     joy_pad: Arc<Mutex<JoyPad>>,
     cpu_last_cycle_cnt_reset: SystemTime,
     cpu_cycle_counter: u32,
+    div_counter: u8,
     dot_counter: u32,
 }
 
@@ -62,9 +64,11 @@ impl GameBoy {
             cpu,
             ppu,
             apu,
+            apu_div: 0,
             joy_pad: jp,
             cpu_last_cycle_cnt_reset: SystemTime::now(),
             cpu_cycle_counter: 0,
+            div_counter: 0,
             dot_counter: 0,
         }
     }
@@ -84,13 +88,22 @@ impl GameBoy {
 
     pub fn start(mut self) {
         for _ in 0usize..100_000_000 {
-            // DIV register
-            self.mem[0xFF04] = self.mem[0xFF04].wrapping_add(1);
             {
                 self.joy_pad.lock().unwrap().update(&mut self.mem);
             }
             self.cpu.check_interrupts(&mut self.mem);
+            let last_div_ctr = self.div_counter;
             let m_cycles = self.cpu.run_cycle(&mut self.mem);
+            self.div_counter = self.div_counter.wrapping_add(4 * m_cycles as u8);
+            if self.div_counter < last_div_ctr {
+                // DIV register
+                let last_div = self.mem[0xFF04];
+                let new_div = last_div.wrapping_add(1);
+                if new_div & 0b0000_1000 == 0 && last_div & 0b0000_1000 != 0 {
+                    self.apu_div = self.apu_div.wrapping_add(1);
+                }
+                self.mem[0xFF04] = new_div;
+            }
             for _ in 0..(m_cycles * 4) {
                 self.ppu.run_dot(&mut self.mem);
                 self.dot_counter = self.dot_counter.wrapping_add(1);
