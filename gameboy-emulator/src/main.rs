@@ -3,14 +3,17 @@ use crate::joypad_input_handler::JoypadInputHandler;
 use crate::memory::Memory;
 use crate::ppu::PPU;
 use cartridge_header::CartridgeHeader;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::{Sample, SampleFormat, StreamInstant};
 use cpu::CPU;
+use log::debug;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
-use log::debug;
+use crate::apu::APU;
 
 mod addrreg;
 mod cartridge_header;
@@ -24,6 +27,7 @@ mod memory;
 mod ppu;
 mod reg;
 mod register;
+mod apu;
 
 const CLOCK_FREQ_UPDATE_INTERVAL: u32 = 1_000_000;
 
@@ -31,9 +35,11 @@ struct GameBoy {
     mem: Memory,
     cpu: CPU,
     ppu: PPU,
+    apu: APU,
     joy_pad: Arc<Mutex<JoyPad>>,
     cpu_last_cycle_cnt_reset: SystemTime,
     cpu_cycle_counter: u32,
+    dot_counter: u32,
 }
 
 impl GameBoy {
@@ -50,13 +56,16 @@ impl GameBoy {
         let mem = Memory::new(boot_rom, rom, header).unwrap();
         let cpu = CPU::new();
         let ppu = PPU::new(JoypadInputHandler::new(jp.clone()));
+        let apu = APU::new();
         GameBoy {
             mem,
             cpu,
             ppu,
+            apu,
             joy_pad: jp,
             cpu_last_cycle_cnt_reset: SystemTime::now(),
             cpu_cycle_counter: 0,
+            dot_counter: 0,
         }
     }
 
@@ -84,6 +93,10 @@ impl GameBoy {
             let m_cycles = self.cpu.run_cycle(&mut self.mem);
             for _ in 0..(m_cycles * 4) {
                 self.ppu.run_dot(&mut self.mem);
+                self.dot_counter = self.dot_counter.wrapping_add(1);
+                if self.dot_counter % 4 == 0 {
+                    self.apu.clock_pulse(&mut self.mem);
+                }
             }
             self.cpu_cycle_counter += m_cycles;
             if self.cpu_cycle_counter >= CLOCK_FREQ_UPDATE_INTERVAL {
@@ -125,8 +138,8 @@ impl GameBoy {
 }
 
 fn main() {
-    let filename = "./Pokemon Red (UE) [S][!].gb";
-    // let filename = "./Tetris (JUE) (V1.1) [!].gb";
+    // let filename = "./Pokemon Red (UE) [S][!].gb";
+    let filename = "./Tetris (JUE) (V1.1) [!].gb";
     // let filename = "./cpu_instrs.gb";
     // let filename = "./instr_timing.gb";
     // let filename = "./dmg_sound.gb";

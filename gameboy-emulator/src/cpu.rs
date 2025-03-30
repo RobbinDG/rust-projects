@@ -640,27 +640,8 @@ impl CPU {
             }
             Instruction::SWAP(r) => {
                 self.apply_to_7_bit_reg(Self::swap, r, mem);
-                // let n = match l {
-                //     DataLoc::Reg(r) => self.reg.get(r),
-                //     DataLoc::AddrReg(AddrReg::HL) => mem[self.reg.get_pair(AddrReg::HL)],
-                //     _ => self.cpu_crash("Not in instruction set.".to_string()),
-                // };
-                // let n_new = Self::swap(n);
-                // match l {
-                //     DataLoc::Reg(r) => self.reg.set(r, n_new),
-                //     DataLoc::AddrReg(AddrReg::HL) => {
-                //         mem[self.reg.get_pair(AddrReg::HL)] = n_new;
-                //     }
-                //     _ => self.cpu_crash("Not in instruction set.".to_string()),
-                // }
             }
             Instruction::CP(l) => {
-                if matches!(l, DataLoc::Value(0xCB)) {
-                    println!(
-                        "TEST FAILED {:02x} {:02x} {:02x}",
-                        mem[0xdef8], mem[0xdef9], mem[0xdefa]
-                    );
-                }
                 let _ = self.sub_set_flags(l, false, mem);
             }
             Instruction::CALL(addr) => {
