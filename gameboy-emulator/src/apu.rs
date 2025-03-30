@@ -8,18 +8,43 @@ use std::time::Duration;
 
 const BIT_7_MASK: u8 = 1 << 7;
 
+struct PulseChannel {
+    enabled: bool,
+    freq: f32,
+    duty: u8,
+    initial_length: u8,
+    length_timer: u8,
+    period_divider: u16,
+}
+
+impl PulseChannel {
+    fn set_pulse_divider(&mut self, mem: &Memory) {
+        let ch1_period_lo = mem[0xFF13];
+        let ch1_period_hi = mem[0xFF14];
+        let ch1_period = (((ch1_period_hi & 0b111) as u16) << 8) | (ch1_period_lo as u16);
+        self.period_divider = ch1_period;
+        self.freq = 131072.0 / (2048 - ch1_period) as f32;
+    }
+}
+
 pub struct APU {
-    pulse_period_divider: u16,
     wave_period_divider: u16,
-    ch1_enabled: bool,
-    ch1_freq: Arc<Mutex<Option<f32>>>,
+    ch1: Arc<Mutex<PulseChannel>>,
     handle: thread::JoinHandle<()>,
 }
 
 impl APU {
     pub fn new() -> Self {
-        let freq: Arc<Mutex<Option<f32>>> = Arc::new(Mutex::new(None));
-        let freq_clone = freq.clone();
+        let ch1 = Arc::new(Mutex::new(PulseChannel {
+            enabled: false,
+            freq: 0.0,
+            duty: 0,
+            initial_length: 0,
+            length_timer: 0,
+            period_divider: 0,
+        }));
+
+        let ch1_clone = ch1.clone();
         let handle = thread::spawn(move || {
             let host = cpal::default_host();
             let device = host
@@ -42,21 +67,18 @@ impl APU {
                     .build_output_stream(
                         &config,
                         move |data: &mut [f32], c: &cpal::OutputCallbackInfo| {
-                            let mut f = freq.lock().unwrap();
-                            match &mut *f {
-                                None => {
-                                    for sample in data.iter_mut() {
-                                        *sample = Sample::EQUILIBRIUM;
-                                    }
+                            let mut c = ch1.lock().unwrap();
+                            if !c.enabled {
+                                for sample in data.iter_mut() {
+                                    *sample = Sample::EQUILIBRIUM;
                                 }
-                                Some(f) => {
-                                    for sample in data.iter_mut() {
-                                        sample_clock = (sample_clock + 1.0) % sample_rate;
-                                        let amp =
-                                            sample_clock * f.clone() * 2.0 * std::f32::consts::PI
-                                                / sample_rate;
-                                        *sample = if amp.sin() > 0.0 { 0.5 } else { -0.5 };
-                                    }
+                            } else {
+                                let bound = 1.0 / (2 * c.duty as i8 - 2) as f32;
+                                for sample in data.iter_mut() {
+                                    sample_clock = (sample_clock + 1.0) % sample_rate;
+                                    let amp = sample_clock * c.freq * 2.0 * std::f32::consts::PI
+                                        / sample_rate;
+                                    *sample = if amp.sin() > bound { 0.5 } else { -0.5 };
                                 }
                             }
                         },
@@ -69,41 +91,45 @@ impl APU {
             sleep(Duration::from_secs(5000))
         });
         Self {
-            pulse_period_divider: 0,
             wave_period_divider: 0,
-            ch1_enabled: false,
-            ch1_freq: freq_clone,
+            ch1: ch1_clone,
             handle,
         }
     }
 
+    pub fn div_apu_tick(&mut self, mem: &mut Memory, div_apu: u8) {
+        let mut ch1 = self.ch1.lock().unwrap();
+        if (div_apu & 1) != 0 {
+            if ch1.length_timer == 64 {
+                ch1.enabled = false;
+            } else {
+                ch1.length_timer += 1;
+            }
+        }
+    }
+
     pub fn clock_pulse(&mut self, mem: &mut Memory) {
-        self.pulse_period_divider += 1;
+        let mut ch1 = self.ch1.lock().unwrap();
+        ch1.period_divider += 1;
 
         let ch1_period_hi = mem[0xFF14];
+        let duty_length = mem[0xFF11];
+        ch1.duty = duty_length >> 6;
+        ch1.initial_length = duty_length & 0b0011_1111;
+
         if ch1_period_hi & BIT_7_MASK != 0 {
-            self.ch1_enabled = true;
-            // TODO reset length timer
+            ch1.enabled = true;
+            ch1.length_timer = ch1.initial_length;
+            ch1.set_pulse_divider(mem);
             // TODO reset envelope timer
             // TODO set to initial volume (NR12)
             // TODO do sweep things
             mem[0xFF14] &= !BIT_7_MASK;
         }
 
-        if self.pulse_period_divider >= 0x7FF {
-            self.set_pulse_divider(mem);
+        if ch1.period_divider >= 0x7FF {
+            ch1.set_pulse_divider(mem);
         }
-    }
-
-    fn set_pulse_divider(&mut self, mem: &Memory) {
-        let ch1_period_lo = mem[0xFF13];
-        let ch1_period_hi = mem[0xFF14];
-        let ch1_period = (((ch1_period_hi & 0b111) as u16) << 8) | (ch1_period_lo as u16);
-        self.pulse_period_divider = ch1_period;
-        self.ch1_freq
-            .lock()
-            .unwrap()
-            .replace(131072.0 / (2048 - ch1_period) as f32);
     }
 
     pub fn clock_wave(&mut self, mem: &mut Memory) {
