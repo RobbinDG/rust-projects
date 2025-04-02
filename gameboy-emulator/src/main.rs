@@ -152,10 +152,10 @@ impl GameBoy {
 
 fn main() {
     // let filename = "./Pokemon Red (UE) [S][!].gb";
-    let filename = "./Tetris (JUE) (V1.1) [!].gb";
+    // let filename = "./Tetris (JUE) (V1.1) [!].gb";
     // let filename = "./cpu_instrs.gb";
     // let filename = "./instr_timing.gb";
-    // let filename = "./dmg_sound.gb";
+    let filename = "./dmg_sound.gb";
     let mut gb = GameBoy::from_cartridge(filename);
     gb.skip_boot_rom();
     gb.start();
