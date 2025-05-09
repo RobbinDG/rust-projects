@@ -17,4 +17,6 @@ CREATE TABLE transactions (
     value_orig FLOAT,
     currency_orig VARCHAR,
     exchange_rate FLOAT
-)
+);
+
+CREATE INDEX idx_transaction_date ON transactions (date);

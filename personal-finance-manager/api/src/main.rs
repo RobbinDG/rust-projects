@@ -6,7 +6,7 @@ use rocket::tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use rocket::State;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{Pool, Sqlite};
+use sqlx::{Pool, Sqlite, SqlitePool};
 use std::io::Cursor;
 
 static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
@@ -16,8 +16,11 @@ fn hello(name: &str, age: u8) -> String {
     format!("Hello, {} year old named {}!", age, name)
 }
 
-#[post("/upload_transactions", format = "text/csv", data = "<file>")]
-async fn test(mut file: TempFile<'_>, pool: &State<Pool<Sqlite>>) -> std::io::Result<String> {
+#[get("/transactions")]
+async fn get_transactions(pool: &State<SqlitePool>) {}
+
+#[post("/transactions", format = "text/csv", data = "<file>")]
+async fn post_transactions(mut file: TempFile<'_>, pool: &State<Pool<Sqlite>>) -> std::io::Result<String> {
     let mut contents = String::new();
     let mut open_file = match file.open().await {
         Err(e) => {
@@ -88,6 +91,12 @@ async fn test(mut file: TempFile<'_>, pool: &State<Pool<Sqlite>>) -> std::io::Re
     })
 }
 
+#[post("/parties")]
+async fn parties(name: &str, category: &str, pool: &State<SqlitePool>) -> std::io::Result<()> {
+    sqlx::query!("INSERT INTO parties VALUES (?, ?)", name, category).execute(&**pool).await.unwrap();
+    Ok(())
+}
+
 #[launch]
 async fn rocket() -> _ {
     let options = SqliteConnectOptions::new()
@@ -107,5 +116,5 @@ async fn rocket() -> _ {
 
     rocket::build()
         .manage(pool)
-        .mount("/", routes![hello, test])
+        .mount("/", routes![hello, post_transactions])
 }
