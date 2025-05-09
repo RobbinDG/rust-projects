@@ -1,0 +1,9 @@
+[package]
+name = "personal-finance-manager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rocket = "0.5.1"
+sqlx = { version = "0.8.3", features = ["runtime-tokio", "sqlite", "macros", "sqlx-macros", "migrate"] }
+csv = "1.3.1"
