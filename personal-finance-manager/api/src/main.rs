@@ -1,3 +1,5 @@
+mod cors;
+
 #[macro_use]
 extern crate rocket;
 
@@ -8,6 +10,7 @@ use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Sqlite, SqlitePool};
 use std::io::Cursor;
+use crate::cors::CORS;
 
 static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
 
@@ -91,16 +94,16 @@ async fn post_transactions(mut file: TempFile<'_>, pool: &State<Pool<Sqlite>>) -
     })
 }
 
-#[post("/parties")]
-async fn parties(name: &str, category: &str, pool: &State<SqlitePool>) -> std::io::Result<()> {
-    sqlx::query!("INSERT INTO parties VALUES (?, ?)", name, category).execute(&**pool).await.unwrap();
-    Ok(())
-}
+// #[post("/parties")]
+// async fn parties(name: &str, category: &str, pool: &State<SqlitePool>) -> std::io::Result<()> {
+//     sqlx::query!("INSERT INTO parties VALUES (?, ?)", name, category).execute(&**pool).await.unwrap();
+//     Ok(())
+// }
 
 #[launch]
 async fn rocket() -> _ {
     let options = SqliteConnectOptions::new()
-        .filename("transactions.db")
+        .filename("../transactions.db")
         .create_if_missing(true);
 
     let pool = SqlitePoolOptions::new()
@@ -116,5 +119,6 @@ async fn rocket() -> _ {
 
     rocket::build()
         .manage(pool)
+        .attach(CORS)
         .mount("/", routes![hello, post_transactions])
 }
