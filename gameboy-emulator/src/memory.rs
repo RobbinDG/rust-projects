@@ -1,10 +1,10 @@
 use crate::cartridge_header::CartridgeHeader;
-use std::cmp::max;
+use log::error;
+use std::cmp::{max, min};
 use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::ops::{Index, IndexMut};
-use log::error;
 
 pub struct ROMOnly {
     null: u8,
@@ -22,55 +22,79 @@ impl ROMOnly {
     pub fn rom_write(&mut self, _: u16) -> &mut u8 {
         &mut self.null
     }
+
+    pub fn ram_bank(&self) -> usize {
+        0
+    }
+}
+
+enum MBC1MemoryModel {
+    ROMExtend,
+    RAMBank,
+    Neither,
 }
 
 pub struct MBC1 {
+    memory_model: MBC1MemoryModel,
     ram_bank_enable: u8,
-    memory_model: u8, // last bit is: false == 16/8, true == 32/4
+    advanced_mode: u8, // last bit is: false == 16/8, true == 32/4
     rom_bank: u8,
+    rom_bank_mask: u8,
     upper_rom_bank_bits: u8,
     ram_bank: u8,
+    void: u8,
 }
 
 impl MBC1 {
-    pub fn new() -> Self {
+    pub fn new(num_rom_banks: u8, num_ram_banks: u8) -> Self {
+        let mut rom_bank_mask = num_rom_banks;
+        for i in 0..8 {
+            rom_bank_mask |= num_rom_banks >> i;
+        }
+        let memory_model = if num_rom_banks > 0b11111 {
+            MBC1MemoryModel::ROMExtend
+        } else if num_rom_banks > 1 {
+            MBC1MemoryModel::RAMBank
+        } else {
+            MBC1MemoryModel::Neither
+        };
         Self {
+            memory_model,
             ram_bank_enable: 0,
-            memory_model: 0,
+            advanced_mode: 0,
             rom_bank: 1,
+            rom_bank_mask: min(0b0001_1111, rom_bank_mask),
             upper_rom_bank_bits: 0,
             ram_bank: 0,
+            void: 0,
         }
     }
 
     pub fn rom_bank(&self) -> usize {
-        let bank_number = (self.rom_bank & 0b0001_1111) | ((self.upper_rom_bank_bits & 0b11) << 5);
+        let lower_bank = max(self.rom_bank & self.rom_bank_mask, 1);
+        let upper_bank = self.upper_rom_bank_bits & 0b11;
+        let bank_number = lower_bank | (upper_bank << 5);
         max(bank_number, 1) as usize
     }
 
     pub fn rom_write(&mut self, addr: u16) -> &mut u8 {
         match addr {
-            0x0000..=0x1FFF => {
-                if self.memory_model & 1 == 1 {
-                    &mut self.ram_bank_enable
-                } else {
-                    println!("Memory model not set to 32/4");
-                    &mut self.ram_bank_enable
-                }
-            }
+            0x0000..=0x1FFF => &mut self.ram_bank_enable,
             0x2000..=0x3FFF => &mut self.rom_bank,
             0x4000..=0x5FFF => {
-                if self.memory_model & 1 == 1 {
-                    // 32/4
-                    &mut self.ram_bank
-                } else {
-                    // 16/8
-                    &mut self.upper_rom_bank_bits
+                match self.memory_model {
+                    MBC1MemoryModel::ROMExtend => &mut self.upper_rom_bank_bits,
+                    MBC1MemoryModel::RAMBank => &mut self.ram_bank,
+                    MBC1MemoryModel::Neither => &mut self.void,
                 }
             }
-            0x6000..=0x7FFF => &mut self.memory_model,
+            0x6000..=0x7FFF => &mut self.advanced_mode,
             _ => panic!("Invalid write to memory bank: {:04x}", addr),
         }
+    }
+
+    pub fn ram_bank(&self) -> usize {
+        self.ram_bank as usize
     }
 }
 
@@ -92,6 +116,10 @@ impl MBC3 {
             error!("Invalid write to memory bank: {:04x}", addr);
         }
         &mut self.rom_bank_reg
+    }
+
+    pub fn ram_bank(&self) -> usize {
+        0
     }
 }
 
@@ -117,6 +145,14 @@ impl MemoryBankController {
             MemoryBankController::MBC3(c) => c.rom_write(addr),
         }
     }
+
+    pub fn ram_bank(&self) -> usize {
+        match self {
+            MemoryBankController::ROMOnly(c) => c.ram_bank(),
+            MemoryBankController::MBC1(c) => c.ram_bank(),
+            MemoryBankController::MBC3(c) => c.ram_bank(),
+        }
+    }
 }
 
 pub struct Memory {
@@ -126,13 +162,17 @@ pub struct Memory {
     rom: Vec<u8>,
     pub tile_ram: [u8; 0x1800],
     pub background_map: [u8; 0x0800],
-    cartridge_ram: [u8; 0x2000],
+    cartridge_ram: [u8; 0x8000],
     wram: [u8; 0x2000],
     pub sprite: [u8; 0xA0],
-    io: [u8; 0x80],
-    pub high_ram: [u8; 0x80],
+    io1: [u8; 0x10],          // 00 - 0F
+    audio: [u8; 0x17],        // 10 - 26
+    wave_ram: [u8; 0x10],     // 30 - 3F
+    io2: [u8; 0x37],          // 40 - 77
+    pub high_ram: [u8; 0x89], // 78 - FF
     unused_response: u8,
     unused_write_dummy: u8,
+    audio_disabled: u8,
 }
 
 impl Memory {
@@ -144,13 +184,17 @@ impl Memory {
             rom,
             tile_ram: [0; 0x1800],
             background_map: [0; 0x0800],
-            cartridge_ram: [0; 0x2000],
+            cartridge_ram: [0; 0x8000],
             wram: [0; 0x2000],
             sprite: [0; 0xA0],
-            io: [0; 0x80],
-            high_ram: [0; 0x80],
+            io1: [0; 0x10],
+            audio: [0; 0x17],
+            wave_ram: [0; 0x10],
+            io2: [0; 0x37],
+            high_ram: [0; 0x89],
             unused_response: 0xFF,
             unused_write_dummy: 0,
+            audio_disabled: 0,
         })
     }
 
@@ -185,14 +229,28 @@ impl Index<u16> for Memory {
             }
             0x8000..=0x97FF => &self.tile_ram[(addr - 0x8000) as usize],
             0x9800..=0x9FFF => &self.background_map[(addr - 0x9800) as usize],
-            0xA000..=0xBFFF => &self.cartridge_ram[(addr - 0xA000) as usize],
+            0xA000..=0xBFFF => {
+                let bank = self.bank_ctrl.ram_bank();
+                &self.cartridge_ram[(addr - 0xA000) as usize + 0x2000 * bank]
+            },
             0xC000..=0xDFFF => &self.wram[(addr - 0xC000) as usize],
             0xE000..=0xFDFF => &self.wram[(addr - 0xE000) as usize], // Echo RAM
             0xFE00..=0xFE9F => &self.sprite[(addr - 0xFE00) as usize],
-            0xFF00..=0xFF7F => &self.io[(addr - 0xFF00) as usize],
-            0xFF80..=0xFFFF => &self.high_ram[(addr - 0xFF80) as usize],
+            0xFF00..=0xFF0F => &self.io1[(addr - 0xFF00) as usize],
+            0xFF10..=0xFF26 => {
+                let nr52 = self.audio[0xFF26 - 0xFF10];
+                let audio_disabled = nr52 & (1 << 7) == 0;
+                if audio_disabled && addr != 0xFF26 {
+                    &self.audio_disabled
+                } else {
+                    &self.audio[(addr - 0xFF10) as usize]
+                }
+            }
+            0xFF30..=0xFF3F => &self.wave_ram[(addr - 0xFF30) as usize],
+            0xFF40..=0xFF77 => &self.io2[(addr - 0xFF40) as usize],
+            0xFF77..=0xFFFF => &self.high_ram[(addr - 0xFF77) as usize],
             _ => {
-                println!("Unused memory {:04x}", addr);
+                println!("Unused memory read {:04x}", addr);
                 &self.unused_response
             }
         }
@@ -217,10 +275,13 @@ impl IndexMut<u16> for Memory {
             0xA000..=0xBFFF => &mut self.cartridge_ram[(addr - 0xA000) as usize],
             0xC000..=0xDFFF => &mut self.wram[(addr - 0xC000) as usize],
             0xFE00..=0xFE9F => &mut self.sprite[(addr - 0xFE00) as usize],
-            0xFF00..=0xFF7F => &mut self.io[(addr - 0xFF00) as usize],
-            0xFF80..=0xFFFF => &mut self.high_ram[(addr - 0xFF80) as usize],
+            0xFF00..=0xFF0F => &mut self.io1[(addr - 0xFF00) as usize],
+            0xFF10..=0xFF26 => &mut self.audio[(addr - 0xFF10) as usize],
+            0xFF30..=0xFF3F => &mut self.wave_ram[(addr - 0xFF30) as usize],
+            0xFF40..=0xFF77 => &mut self.io2[(addr - 0xFF40) as usize],
+            0xFF77..=0xFFFF => &mut self.high_ram[(addr - 0xFF77) as usize],
             _ => {
-                println!("Unused/unmapped memory");
+                println!("Unused memory write {:04x}", addr);
                 &mut self.unused_write_dummy
             }
         }

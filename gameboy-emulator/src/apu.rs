@@ -149,6 +149,10 @@ impl<S: Sweep> PulseChannel<S> {
             self.set_pulse_divider(mem);
         }
     }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
 }
 
 pub struct APU {
@@ -251,8 +255,19 @@ impl APU {
     pub fn div_apu_tick(&mut self, mem: &mut Memory, div_apu: u8) {
         let mut ch1 = self.ch1.lock().unwrap();
         ch1.div_apu_tick(mem, div_apu);
+        if ch1.enabled() { // Set enabled bit
+            mem[0xFF26] |= 1 << 0;
+        } else {
+            mem[0xFF26] &= !(1 << 0);
+        }
+
         let mut ch2 = self.ch2.lock().unwrap();
         ch2.div_apu_tick(mem, div_apu);
+        if ch2.enabled() { // Set enabled bit
+            mem[0xFF26] |= 1 << 1;
+        } else {
+            mem[0xFF26] &= !(1 << 1);
+        }
     }
 
     pub fn clock_pulse(&mut self, mem: &mut Memory) {

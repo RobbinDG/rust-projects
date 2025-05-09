@@ -41,7 +41,7 @@ impl CartridgeHeader {
     pub fn memory_bank_controller(&self) -> Result<MemoryBankController, String> {
         match self.cartridge_type {
             0x00 => Ok(MemoryBankController::ROMOnly(ROMOnly::new())),
-            0x01..=0x03 => Ok(MemoryBankController::MBC1(MBC1::new())),
+            0x01..=0x03 => Ok(MemoryBankController::MBC1(MBC1::new(self.rom_size, self.ram_size))),
             0x0F..=0x13 => Ok(MemoryBankController::MBC3(MBC3::new())),
             _ => Err("Cartridge type's MemoryBankController not implemented".to_string()),
         }
