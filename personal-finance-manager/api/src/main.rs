@@ -3,14 +3,17 @@ mod cors;
 #[macro_use]
 extern crate rocket;
 
+use crate::cors::CORS;
 use rocket::fs::TempFile;
+use rocket::serde::{Serialize, json::Json};
 use rocket::tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use rocket::State;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Sqlite, SqlitePool};
 use std::io::Cursor;
-use crate::cors::CORS;
+use std::time::SystemTime;
+use chrono::NaiveDate;
 
 static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
 
@@ -19,11 +22,44 @@ fn hello(name: &str, age: u8) -> String {
     format!("Hello, {} year old named {}!", age, name)
 }
 
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct Transaction {
+    IBAN: String,
+    currency: String,
+    BIC: String,
+    MTCN: i64,
+    date: NaiveDate,
+    interest_date: NaiveDate,
+    value: f64,
+    balance_after: f64,
+    IBAN_other: Option<String>,
+    name_other: String,
+    BIC_other: Option<String>,
+    code: Option<String>,
+    reference: Option<String>,
+    description: Option<String>,
+    value_orig: Option<f64>,
+    currency_orig: Option<String>,
+    exchange_rate: Option<f64>,
+}
+
 #[get("/transactions")]
-async fn get_transactions(pool: &State<SqlitePool>) {}
+async fn get_transactions(pool: &State<SqlitePool>) -> Result<Json<Vec<Transaction>>, String> {
+    let transactions = match sqlx::query_as!(Transaction, "SELECT * FROM transactions")
+        .fetch_all(&**pool)
+        .await {
+        Ok(transactions) => transactions,
+        Err(_) => return Err(String::from("Failed to get transactions")),
+    };
+    Ok(Json(transactions))
+}
 
 #[post("/transactions", format = "text/csv", data = "<file>")]
-async fn post_transactions(mut file: TempFile<'_>, pool: &State<Pool<Sqlite>>) -> std::io::Result<String> {
+async fn post_transactions(
+    mut file: TempFile<'_>,
+    pool: &State<Pool<Sqlite>>,
+) -> std::io::Result<String> {
     let mut contents = String::new();
     let mut open_file = match file.open().await {
         Err(e) => {
@@ -120,5 +156,5 @@ async fn rocket() -> _ {
     rocket::build()
         .manage(pool)
         .attach(CORS)
-        .mount("/", routes![hello, post_transactions])
+        .mount("/", routes![hello, get_transactions, post_transactions])
 }
