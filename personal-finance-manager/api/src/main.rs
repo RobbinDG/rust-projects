@@ -22,7 +22,7 @@ fn hello(name: &str, age: u8) -> String {
     format!("Hello, {} year old named {}!", age, name)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(crate = "rocket::serde")]
 struct Transaction {
     IBAN: String,
@@ -83,8 +83,8 @@ async fn post_transactions(
                 let r3 = row.get(3);
                 let r4 = row.get(4);
                 let r5 = row.get(5);
-                let r6 = row.get(6);
-                let r7 = row.get(7);
+                let r6 = row.get(6).and_then(|s| s.replace('.', "").replace(',', ".").parse::<f64>().ok());
+                let r7 = row.get(7).and_then(|s| s.replace('.', "").replace(',', ".").replace('+', "").parse::<f64>().ok());
                 let r8 = row.get(8);
                 let r9 = row.get(9);
                 let r12 = row.get(12);
