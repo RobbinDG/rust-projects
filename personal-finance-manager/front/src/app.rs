@@ -83,27 +83,31 @@ pub fn app() -> Html {
             <button {onclick} disabled={*loading}>{ if *loading { "Loading..." } else { "Fetch Data" } }</button>
             <p>{ (*response).clone() }</p>
         </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>{ "ID" }</th>
-                    <th>{ "Name" }</th>
-                    <th>{ "Email" }</th>
-                </tr>
-            </thead>
-            <tbody>
-                {
-                    for users.iter().map(|transaction| html! {
-                        <tr key={ transaction.MTCN}>
-                            <td>{ transaction.value }</td>
-                            <td>{ transaction.balance_after }</td>
-                            <td>{ &transaction.name_other }</td>
-                            <td>{ &transaction.description }</td>
+        <div class="p-4 max-h-screen overflow-auto">
+            <div class="min-w-full overflow-x-auto border rounded shadow-md">
+                <table class="min-w-full table-auto bg-white">
+                    <thead class="bg-gray-200 sticky top-0 z-10">
+                        <tr>
+                            <th class="px-4 py-2 text-left">{ "ID" }</th>
+                            <th class="px-4 py-2 text-left">{ "Name" }</th>
+                            <th class="px-4 py-2 text-left">{ "Email" }</th>
                         </tr>
-                    })
-                }
-            </tbody>
-        </table>
+                    </thead>
+                    <tbody>
+                        {
+                            for users.iter().map(|transaction| html! {
+                                <tr key={ transaction.MTCN}  class="border-b hover:bg-gray-100">
+                                    <td class="px-4 py-2">{ transaction.value }</td>
+                                    <td class="px-4 py-2">{ transaction.balance_after }</td>
+                                    <td class="px-4 py-2">{ &transaction.name_other }</td>
+                                    <td class="px-4 py-2">{ &transaction.description }</td>
+                                </tr>
+                            })
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
         </>
     }
 }
