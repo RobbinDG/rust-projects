@@ -97,8 +97,12 @@ pub fn app() -> Html {
                         {
                             for users.iter().map(|transaction| html! {
                                 <tr key={ transaction.MTCN}  class="border-b hover:bg-gray-100">
-                                    <td class="px-4 py-2">{ transaction.value }</td>
-                                    <td class="px-4 py-2">{ transaction.balance_after }</td>
+                                    <td class={classes!(
+                                        "px-4",
+                                        "py-2",
+                                        if transaction.value < 0.0 { "text-red-700" } else { "text-green-700" }
+                                    )}>{ '€' }{ transaction.value.abs() }</td>
+                                    <td class="px-4 py-2">{ '€' }{ transaction.balance_after.abs() }</td>
                                     <td class="px-4 py-2">{ &transaction.name_other }</td>
                                     <td class="px-4 py-2">{ &transaction.description }</td>
                                 </tr>
