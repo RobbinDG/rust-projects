@@ -1,34 +1,18 @@
-mod cors;
-mod transaction;
-
 #[macro_use]
 extern crate rocket;
+mod cors;
+mod transaction;
+mod aggregates;
 
 use crate::cors::CORS;
-use rocket::fs::TempFile;
-use rocket::serde::{json::Json, Serialize};
+use crate::transaction::{get_transactions, post_transactions};
+use rocket::serde::Serialize;
 use rocket::tokio::io::{AsyncBufReadExt, AsyncReadExt};
-use rocket::State;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{Pool, Sqlite, SqlitePool};
-use std::io::Cursor;
-use std::time::SystemTime;
-use chrono::NaiveDate;
-use crate::transaction::{get_transactions, post_transactions};
+use crate::aggregates::get_aggregates;
 
 static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
-
-#[get("/hello/<name>/<age>")]
-fn hello(name: &str, age: u8) -> String {
-    format!("Hello, {} year old named {}!", age, name)
-}
-
-// #[post("/parties")]
-// async fn parties(name: &str, category: &str, pool: &State<SqlitePool>) -> std::io::Result<()> {
-//     sqlx::query!("INSERT INTO parties VALUES (?, ?)", name, category).execute(&**pool).await.unwrap();
-//     Ok(())
-// }
 
 #[launch]
 async fn rocket() -> _ {
@@ -50,5 +34,5 @@ async fn rocket() -> _ {
     rocket::build()
         .manage(pool)
         .attach(CORS)
-        .mount("/", routes![hello, get_transactions, post_transactions])
+        .mount("/", routes![get_transactions, post_transactions, get_aggregates])
 }
