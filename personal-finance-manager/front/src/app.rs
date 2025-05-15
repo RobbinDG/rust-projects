@@ -6,7 +6,7 @@ use yew::prelude::*;
 const API_URL: &str = "http://127.0.0.1:8000";
 
 #[derive(Deserialize)]
-struct Transaction {
+struct TransactionWithCategory {
     IBAN: String,
     currency: String,
     BIC: String,
@@ -24,17 +24,18 @@ struct Transaction {
     value_orig: Option<f64>,
     currency_orig: Option<String>,
     exchange_rate: Option<f64>,
+    category: Option<String>,
 }
 
 #[function_component(TransactionsTable)]
 pub fn app() -> Html {
-    let users = use_state(|| Vec::<Transaction>::new());
+    let users = use_state(|| Vec::<TransactionWithCategory>::new());
     let users_clone = users.clone();
     let hovered_row = use_state(|| None);
 
     use_effect_with((), move |_| {
         wasm_bindgen_futures::spawn_local(async move {
-            let fetched: Vec<Transaction> =
+            let fetched: Vec<TransactionWithCategory> =
                 Request::get((API_URL.to_owned() + "/transactions").as_str())
                     .send()
                     .await
@@ -113,6 +114,7 @@ pub fn app() -> Html {
                     if transaction.value < 0.0 { "text-red-700" } else { "text-green-700" },
                 )} style="text-align: right">{ '€' }{ format!("{:.02}", transaction.value.abs()) }</td>
                 <td class="px-4 py-2">{ &transaction.name_other.clone() }</td>
+                <td class="px-4 py-2">{ &transaction.category.clone() }</td>
             </tr>
         }
     });
@@ -127,6 +129,7 @@ pub fn app() -> Html {
                         <tr>
                             <th class="px-4 py-2 text-left">{ "Value" }</th>
                             <th class="px-4 py-2 text-left">{ "Name" }</th>
+                            <th class="px-4 py-2 text-left">{ "Category" }</th>
                         </tr>
                     </thead>
                     <tbody>

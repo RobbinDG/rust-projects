@@ -30,9 +30,32 @@ struct Transaction {
     exchange_rate: Option<f64>,
 }
 
+#[derive(Serialize, Debug)]
+#[serde(crate = "rocket::serde")]
+struct TransactionWithCategory {
+    IBAN: String,
+    currency: String,
+    BIC: String,
+    MTCN: i64,
+    date: NaiveDate,
+    interest_date: NaiveDate,
+    value: f64,
+    balance_after: f64,
+    IBAN_other: Option<String>,
+    name_other: String,
+    BIC_other: Option<String>,
+    code: Option<String>,
+    reference: Option<String>,
+    description: Option<String>,
+    value_orig: Option<f64>,
+    currency_orig: Option<String>,
+    exchange_rate: Option<f64>,
+    category: Option<String>,
+}
+
 #[get("/transactions")]
-pub async fn get_transactions(pool: &State<SqlitePool>) -> Result<Json<Vec<Transaction>>, String> {
-    let transactions = match sqlx::query_as!(Transaction, "SELECT * FROM transactions")
+pub async fn get_transactions(pool: &State<SqlitePool>) -> Result<Json<Vec<TransactionWithCategory>>, String> {
+    let transactions = match sqlx::query_as!(TransactionWithCategory, "SELECT t.*, pc.category FROM transactions t LEFT JOIN party_categories pc ON LOWER(t.name_other) = LOWER(pc.party_name)")
         .fetch_all(&**pool)
         .await {
         Ok(transactions) => transactions,

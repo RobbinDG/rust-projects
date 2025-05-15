@@ -21,6 +21,7 @@ Cargo.lock
 
 *.gb
 *.bin
+*.sqlx
 
 # Node JS and CSS
 package-lock.json
