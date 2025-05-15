@@ -1,9 +1,10 @@
 use rocket::fs::TempFile;
 use rocket::State;
 use sqlx::{Pool, Sqlite, SqlitePool};
-use std::io::Cursor;
+use std::io::{Cursor, Error};
 use rocket::serde::Serialize;
 use chrono::NaiveDate;
+use rocket::form::Form;
 use rocket::serde::json::Json;
 use rocket::tokio::io::AsyncReadExt;
 
@@ -40,11 +41,28 @@ pub async fn get_transactions(pool: &State<SqlitePool>) -> Result<Json<Vec<Trans
     Ok(Json(transactions))
 }
 
-#[post("/transactions", format = "text/csv", data = "<file>")]
+#[derive(FromForm)]
+struct TransactionsUploadForm<'r> {
+    filename: TempFile<'r>,
+}
+
+#[post("/transactions", rank = 1, data = "<form>")]
+pub async fn post_transactions_form(
+    mut form: Form<TransactionsUploadForm<'_>>,
+    pool: &State<Pool<Sqlite>>,
+) -> std::io::Result<String> {
+    process_uploaded_tsv(&mut form.filename, pool).await
+}
+
+#[post("/transactions", rank = 2, format = "text/csv", data = "<file>")]
 pub async fn post_transactions(
     mut file: TempFile<'_>,
     pool: &State<Pool<Sqlite>>,
 ) -> std::io::Result<String> {
+    process_uploaded_tsv(&mut file, pool).await
+}
+
+async fn process_uploaded_tsv(file: &mut TempFile<'_>, pool: &State<Pool<Sqlite>>) -> std::io::Result<String> {
     let mut contents = String::new();
     let mut open_file = match file.open().await {
         Err(e) => {
