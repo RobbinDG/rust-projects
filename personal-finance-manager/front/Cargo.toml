@@ -13,5 +13,7 @@ categories = ["gui", "wasm", "web-programming"]
 [dependencies]
 yew = { version="0.21", features=["csr"] }
 wasm-bindgen-futures = "0.4.50"
+gloo = "0.11.0"
 gloo-net = "0.6.0"
 serde = { version = "1.0.219", features = ["derive"] }
+log = "0.4.27"

@@ -1,4 +1,5 @@
 use gloo_net::http::Request;
+use log::info;
 use serde::Deserialize;
 use yew::prelude::*;
 
@@ -27,40 +28,9 @@ struct Transaction {
 
 #[function_component(App)]
 pub fn app() -> Html {
-    let response = use_state(|| String::new());
-    let loading = use_state(|| false);
-
-    let onclick = {
-        let response = response.clone();
-        let loading = loading.clone();
-
-        Callback::from(move |_| {
-            let response = response.clone();
-            let loading = loading.clone();
-            wasm_bindgen_futures::spawn_local(async move {
-                loading.set(true);
-                match Request::get((API_URL.to_owned() + "/hello/robbin/25").as_str())
-                    .send()
-                    .await
-                {
-                    Ok(resp) => {
-                        if let Ok(text) = resp.text().await {
-                            response.set(text);
-                        } else {
-                            response.set("Failed to read response body".into());
-                        }
-                    }
-                    Err(e) => {
-                        response.set(format!("Request failed {}", e));
-                    }
-                }
-                loading.set(false);
-            });
-        })
-    };
-
     let users = use_state(|| Vec::<Transaction>::new());
     let users_clone = users.clone();
+    let hovered_row = use_state(|| None);
 
     use_effect_with((), move |_| {
         wasm_bindgen_futures::spawn_local(async move {
@@ -77,37 +47,90 @@ pub fn app() -> Html {
         || ()
     });
 
+    let tooltip = {
+        if let Some((id, x, y)) = *hovered_row {
+            if let Some(row) = users.iter().find(|r| r.MTCN == id) {
+                let iban_other = match &row.IBAN_other {
+                    Some(d) => {
+                        if d.is_empty() {
+                            { "Unknown" }
+                        } else {
+                            d
+                        }
+                    },
+                    None => { "Unknown" }
+                };
+                let desc = match &row.description {
+                    Some(d) => {
+                        if d.is_empty() {
+                            { "No Description" }
+                        } else {
+                            d
+                        }
+                    },
+                    None => "No Description",
+                };
+                html! {
+                    <div
+                        class="fixed z-50 bg-white text-sm text-gray-800 border rounded shadow-lg p-2"
+                        style={format!("left: {}px; top: {}px;", x + 10, y + 10)}
+                    >
+                        <div class="font-semibold">{"Details"}</div>
+                        <div>{"From: "}{ iban_other }</div>
+                        <div>{"Description: "}{ desc }</div>
+                        <div>{"Balance after: €"}{ &row.balance_after }</div>
+                    </div>
+                }
+            } else {
+                html! {}
+            }
+        } else {
+            html! {}
+        }
+    };
+
+    let rows = users.iter().map(|transaction| {
+        let hovered_row_clone = hovered_row.clone();
+        let id = transaction.MTCN;
+        let on_mouse_enter = Callback::from(move |e: MouseEvent| {
+            hovered_row_clone.set(Some((id, e.client_x(), e.client_y())));
+        });
+
+        let hovered_row = hovered_row.clone();
+        let on_mouse_leave = Callback::from(move |_| {
+            hovered_row.set(None);
+        });
+
+        html! {
+            <tr
+                class="border-b hover:bg-gray-100 relative"
+                onmouseenter={on_mouse_enter}
+                onmouseleave={on_mouse_leave}
+            >
+                <td class={classes!(
+                    "px-4",
+                    "py-2",
+                    if transaction.value < 0.0 { "text-red-700" } else { "text-green-700" },
+                )} style="text-align: right">{ '€' }{ format!("{:.02}", transaction.value.abs()) }</td>
+                <td class="px-4 py-2">{ &transaction.name_other.clone() }</td>
+            </tr>
+        }
+    });
+
     html! {
         <>
-        <div>
-            <button {onclick} disabled={*loading}>{ if *loading { "Loading..." } else { "Fetch Data" } }</button>
-            <p>{ (*response).clone() }</p>
-        </div>
+        { tooltip }
         <div class="p-4 max-h-screen overflow-auto">
             <div class="min-w-full overflow-x-auto border rounded shadow-md">
                 <table class="min-w-full table-auto bg-white">
                     <thead class="bg-gray-200 sticky top-0 z-10">
                         <tr>
-                            <th class="px-4 py-2 text-left">{ "ID" }</th>
+                            <th class="px-4 py-2 text-left">{ "Value" }</th>
                             <th class="px-4 py-2 text-left">{ "Name" }</th>
-                            <th class="px-4 py-2 text-left">{ "Email" }</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {
-                            for users.iter().map(|transaction| html! {
-                                <tr key={ transaction.MTCN}  class="border-b hover:bg-gray-100">
-                                    <td class={classes!(
-                                        "px-4",
-                                        "py-2",
-                                        if transaction.value < 0.0 { "text-red-700" } else { "text-green-700" }
-                                    )}>{ '€' }{ transaction.value.abs() }</td>
-                                    <td class="px-4 py-2">{ '€' }{ transaction.balance_after.abs() }</td>
-                                    <td class="px-4 py-2">{ &transaction.name_other }</td>
-                                    <td class="px-4 py-2">{ &transaction.description }</td>
-                                </tr>
-                            })
-                        }
+                        { for rows }
                     </tbody>
                 </table>
             </div>
