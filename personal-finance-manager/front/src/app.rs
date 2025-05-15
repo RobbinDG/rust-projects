@@ -26,7 +26,7 @@ struct Transaction {
     exchange_rate: Option<f64>,
 }
 
-#[function_component(App)]
+#[function_component(TransactionsTable)]
 pub fn app() -> Html {
     let users = use_state(|| Vec::<Transaction>::new());
     let users_clone = users.clone();
