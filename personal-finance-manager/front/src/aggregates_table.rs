@@ -6,7 +6,7 @@ const API_URL: &str = "http://127.0.0.1:8000";
 
 #[derive(Deserialize)]
 struct MonthAggregate {
-    month_year: String,
+    year_month: String,
     sum: f64,
 }
 
@@ -35,7 +35,7 @@ pub fn app() -> Html {
             <tr
                 class="border-b hover:bg-gray-100 relative"
             >
-                <td class="px-4 py-2">{ &agg.month_year }</td>
+                <td class="px-4 py-2">{ &agg.year_month }</td>
                 <td class={classes!(
                     "px-4",
                     "py-2",

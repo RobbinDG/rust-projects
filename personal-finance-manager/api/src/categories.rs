@@ -6,7 +6,7 @@ use sqlx::SqlitePool;
 #[derive(Serialize, Debug)]
 #[serde(crate = "rocket::serde")]
 struct MonthAggregate {
-    month_year: String,
+    year_month: String,
     sum: f64,
 }
 
