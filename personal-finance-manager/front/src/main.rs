@@ -1,14 +1,27 @@
-mod app;
+mod transactions_table;
 mod aggregates_table;
 mod upload_transactions;
+mod routes;
 
-use gloo::utils::document;
-use app::TransactionsTable;
-use aggregates_table::AggregatesTable;
-use crate::upload_transactions::UploadTransactions;
+use crate::routes::{switch, AppRoute};
+use yew::prelude::*;
+use yew_router::prelude::*;
+
+#[function_component(App)]
+pub fn app() -> Html {
+    html! {
+        <BrowserRouter>
+            <nav>
+                <ul>
+                    <li><Link<AppRoute> to={AppRoute::Transactions}>{ "Transactions" }</Link<AppRoute>></li>
+                    <li><Link<AppRoute> to={AppRoute::Overview}>{ "Overview" }</Link<AppRoute>></li>
+                </ul>
+            </nav>
+            <Switch<AppRoute> render={switch} />
+        </BrowserRouter>
+    }
+}
 
 fn main() {
-    yew::Renderer::<UploadTransactions>::with_root(document().get_element_by_id("upload-transaction-form").unwrap()).render();
-    yew::Renderer::<TransactionsTable>::with_root(document().get_element_by_id("transactions").unwrap()).render();
-    yew::Renderer::<AggregatesTable>::with_root(document().get_element_by_id("aggregates").unwrap()).render();
+    yew::Renderer::<App>::new().render();
 }
