@@ -1,12 +1,12 @@
+use chrono::NaiveDate;
+use rocket::form::Form;
 use rocket::fs::TempFile;
+use rocket::serde::json::Json;
+use rocket::serde::Serialize;
+use rocket::tokio::io::AsyncReadExt;
 use rocket::State;
 use sqlx::{Pool, Sqlite, SqlitePool};
 use std::io::{Cursor, Error};
-use rocket::serde::Serialize;
-use chrono::NaiveDate;
-use rocket::form::Form;
-use rocket::serde::json::Json;
-use rocket::tokio::io::AsyncReadExt;
 
 #[derive(Serialize, Debug)]
 #[serde(crate = "rocket::serde")]
@@ -54,10 +54,44 @@ struct TransactionWithCategory {
 }
 
 #[get("/transactions")]
-pub async fn get_transactions(pool: &State<SqlitePool>) -> Result<Json<Vec<TransactionWithCategory>>, String> {
-    let transactions = match sqlx::query_as!(TransactionWithCategory, "SELECT t.*, pc.category FROM transactions t LEFT JOIN party_categories pc ON LOWER(t.name_other) = LOWER(pc.party_name)")
-        .fetch_all(&**pool)
-        .await {
+pub async fn get_transactions(
+    pool: &State<SqlitePool>,
+) -> Result<Json<Vec<TransactionWithCategory>>, String> {
+    let transactions = match sqlx::query_as!(
+        TransactionWithCategory,
+        "\
+        SELECT t.*, pc.category \
+        FROM transactions t \
+        LEFT JOIN party_categories pc \
+        ON LOWER(t.name_other) = LOWER(pc.party_name)"
+    )
+    .fetch_all(&**pool)
+    .await
+    {
+        Ok(transactions) => transactions,
+        Err(_) => return Err(String::from("Failed to get transactions")),
+    };
+    Ok(Json(transactions))
+}
+
+#[get("/transactions/<year_month>")]
+pub async fn get_transactions_month(
+    year_month: &str,
+    pool: &State<SqlitePool>,
+) -> Result<Json<Vec<TransactionWithCategory>>, String> {
+    let transactions = match sqlx::query_as!(
+        TransactionWithCategory,
+        "\
+        SELECT t.*, pc.category \
+        FROM transactions t \
+        LEFT JOIN party_categories pc \
+        ON LOWER(t.name_other) = LOWER(pc.party_name)\
+        WHERE strftime('%Y %m', date) = ?",
+        year_month,
+    )
+    .fetch_all(&**pool)
+    .await
+    {
         Ok(transactions) => transactions,
         Err(_) => return Err(String::from("Failed to get transactions")),
     };
@@ -85,7 +119,10 @@ pub async fn post_transactions(
     process_uploaded_tsv(&mut file, pool).await
 }
 
-async fn process_uploaded_tsv(file: &mut TempFile<'_>, pool: &State<Pool<Sqlite>>) -> std::io::Result<String> {
+async fn process_uploaded_tsv(
+    file: &mut TempFile<'_>,
+    pool: &State<Pool<Sqlite>>,
+) -> std::io::Result<String> {
     let mut contents = String::new();
     let mut open_file = match file.open().await {
         Err(e) => {
@@ -109,8 +146,16 @@ async fn process_uploaded_tsv(file: &mut TempFile<'_>, pool: &State<Pool<Sqlite>
                 let r3 = row.get(3);
                 let r4 = row.get(4);
                 let r5 = row.get(5);
-                let r6 = row.get(6).and_then(|s| s.replace('.', "").replace(',', ".").parse::<f64>().ok());
-                let r7 = row.get(7).and_then(|s| s.replace('.', "").replace(',', ".").replace('+', "").parse::<f64>().ok());
+                let r6 = row
+                    .get(6)
+                    .and_then(|s| s.replace('.', "").replace(',', ".").parse::<f64>().ok());
+                let r7 = row.get(7).and_then(|s| {
+                    s.replace('.', "")
+                        .replace(',', ".")
+                        .replace('+', "")
+                        .parse::<f64>()
+                        .ok()
+                });
                 let r8 = row.get(8);
                 let r9 = row.get(9);
                 let r12 = row.get(12);

@@ -9,7 +9,7 @@ mod transaction;
 use crate::aggregates::get_aggregates;
 use crate::categories::post_category;
 use crate::cors::CORS;
-use crate::transaction::{get_transactions, post_transactions, post_transactions_form};
+use crate::transaction::{get_transactions, get_transactions_month, post_transactions, post_transactions_form};
 use rocket::serde::Serialize;
 use rocket::tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use sqlx::migrate::Migrator;
@@ -44,6 +44,7 @@ async fn rocket() -> _ {
         "/",
         routes![
             get_transactions,
+            get_transactions_month,
             post_transactions,
             post_transactions_form,
             get_aggregates,
