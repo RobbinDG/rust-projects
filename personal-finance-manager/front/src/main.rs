@@ -2,6 +2,10 @@ mod transactions_table;
 mod aggregates_table;
 mod upload_transactions;
 mod routes;
+mod editable_table;
+mod editable_row;
+mod info_panel;
+mod row_editor;
 
 use crate::routes::{switch, AppRoute};
 use yew::prelude::*;
