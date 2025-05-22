@@ -8,9 +8,9 @@ pub struct RowEditorProps {
 
 #[function_component(RowEditor)]
 pub fn row_editor(props: &RowEditorProps) -> Html {
-    let input = use_state(|| props.item.label.clone());
+    let input = use_state(|| props.item.category.clone());
 
-    let oninput = {
+    let on_input = {
         let input = input.clone();
         Callback::from(move |e: InputEvent| {
             if let Some(input_el) = e.target_dyn_into::<web_sys::HtmlInputElement>() {
@@ -28,7 +28,7 @@ pub fn row_editor(props: &RowEditorProps) -> Html {
 
     html! {
         <div>
-            <input type="text" value={(*input).clone()} oninput={oninput} />
+            <input type="text" value={(*input).clone()} oninput={on_input} />
             <button onclick={on_submit}>{ "Submit" }</button>
         </div>
     }

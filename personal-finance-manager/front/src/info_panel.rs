@@ -4,16 +4,23 @@ use crate::editable_table::EditableTable;
 
 #[derive(Properties, PartialEq)]
 pub struct InfoPanelProps {
-    pub selected_data: RowData,
+    pub selected_data: Option<RowData>,
 }
 
 #[function_component(InfoPanel)]
 pub fn info_panel(props: &InfoPanelProps) -> Html {
+    let (title, rows) = match &props.selected_data {
+        None =>
+            ("No selection".to_owned(), Vec::new()),
+        Some(data) => (
+            format!("Details for {}", data.year_month), data.items.clone()
+        )
+    };
     html! {
         <div style="width: 300px; padding: 1rem; background: #f5f5f5;">
-            <h3>{ format!("Details for {}", props.selected_data.name) }</h3>
+            <h3>{ title }</h3>
             <input type="text" placeholder="Free text..." />
-            <EditableTable sub_items={props.selected_data.sub_items.clone()} />
+            <EditableTable sub_items={rows} />
         </div>
     }
 }

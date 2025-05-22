@@ -19,7 +19,8 @@ pub fn editable_row(props: &EditableRowProps) -> Html {
     html! {
         <>
             <tr onclick={toggle_editor} style="cursor: pointer;">
-                <td>{ &props.item.label }</td>
+                <td>{ &props.item.category }</td>
+                <td>{ format!("{:.02}", &props.item.breakdown_value) }</td>
             </tr>
             {
                 if *show_editor {

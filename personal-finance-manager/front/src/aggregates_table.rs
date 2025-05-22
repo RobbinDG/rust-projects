@@ -1,4 +1,3 @@
-use std::process::id;
 use gloo_net::http::Request;
 use serde::Deserialize;
 use yew::prelude::*;
@@ -32,26 +31,38 @@ pub fn app() -> Html {
         || ()
     });
 
-    let selected_id = use_state(|| Some("1".to_string())); // Always visible
-    let selected_data = use_state(|| get_data_for_id("1".to_string())); // Dummy data fetch
+    let selected_id = use_state(|| None::<String>);
+    let selected_data = use_state(|| None::<RowData>);
 
-    let on_row_click = {
+    {
         let selected_id = selected_id.clone();
         let selected_data = selected_data.clone();
-        Callback::from(move |id: String| {
-            selected_id.set(Some(id.to_string()));
-            selected_data.set(get_data_for_id(id));
-        })
-    };
+
+        use_effect_with((*selected_id).clone(), move |id| {
+            let id = id.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                if let Some(id) = id {
+                    let items: RowData =
+                        Request::get((API_URL.to_owned() + "/breakdowns/" + id.as_str()).as_str())
+                            .send()
+                            .await
+                            .unwrap()
+                            .json()
+                            .await
+                            .unwrap();
+                    selected_data.set(Some(items));
+                }
+            });
+            || ()
+        });
+    }
 
     let rows = users.iter().map(|agg| {
         let year_month = agg.year_month.clone();
         let on_row_click = {
             let selected_id = selected_id.clone();
-            let selected_data = selected_data.clone();
             Callback::from(move |_| {
                 selected_id.set(Some(year_month.clone()));
-                selected_data.set(get_data_for_id(year_month.clone()));
             })
         };
         html! {
@@ -86,39 +97,20 @@ pub fn app() -> Html {
                 </table>
             </div>
         </div>
-        <div style="display: flex;">
-            <div style="flex: 1;">
-                <button onclick={Callback::from(move |_| on_row_click.emit("2".to_string()))}>
-                    { "Click Main Row 2" }
-                </button>
-            </div>
-            <InfoPanel selected_data={(*selected_data).clone()} />
-        </div>
+        <InfoPanel selected_data={(*selected_data).clone()} />
         </>
     }
 }
 
 // Mock main row data structure
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Deserialize)]
 pub struct RowData {
-    pub id: String,
-    pub name: String,
-    pub sub_items: Vec<SubItem>,
+    pub year_month: String,
+    pub items: Vec<SubItem>,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Deserialize)]
 pub struct SubItem {
-    pub id: String,
-    pub label: String,
-}
-
-fn get_data_for_id(id: String) -> RowData {
-    RowData {
-        id: id.clone(),
-        name: format!("Main Row {}", id.clone()),
-        sub_items: vec![
-            SubItem { id: "1".to_string(), label: format!("Item {}.A", id) },
-            SubItem { id: "2".to_string(), label: format!("Item {}.B", id) },
-        ],
-    }
+    pub category: String,
+    pub breakdown_value: f64,
 }

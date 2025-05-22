@@ -16,7 +16,7 @@ pub fn editable_table(props: &EditableTableProps) -> Html {
                 {
                     props.sub_items.iter().map(|item| {
                         html! {
-                            <EditableRow key={item.id.clone()} item={item.clone()} />
+                            <EditableRow key={item.category.clone()} item={item.clone()} />
                         }
                     }).collect::<Html>()
                 }
