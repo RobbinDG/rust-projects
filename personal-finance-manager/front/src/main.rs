@@ -6,6 +6,7 @@ mod editable_table;
 mod editable_row;
 mod info_panel;
 mod row_editor;
+mod transactions_page;
 
 use crate::routes::{switch, AppRoute};
 use yew::prelude::*;

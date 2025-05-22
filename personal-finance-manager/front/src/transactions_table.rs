@@ -1,56 +1,20 @@
-use gloo_net::http::Request;
-use log::info;
+use crate::transactions_page::TransactionWithCategory;
 use serde::Deserialize;
 use yew::prelude::*;
 
-const API_URL: &str = "http://127.0.0.1:8000";
-
-#[derive(Deserialize)]
-struct TransactionWithCategory {
-    IBAN: String,
-    currency: String,
-    BIC: String,
-    MTCN: i64,
-    date: String,
-    interest_date: String,
-    value: f64,
-    balance_after: f64,
-    IBAN_other: Option<String>,
-    name_other: String,
-    BIC_other: Option<String>,
-    code: Option<String>,
-    reference: Option<String>,
-    description: Option<String>,
-    value_orig: Option<f64>,
-    currency_orig: Option<String>,
-    exchange_rate: Option<f64>,
-    category: Option<String>,
+#[derive(Properties, PartialEq)]
+pub struct TransactionTableProps {
+    pub transactions: Vec<TransactionWithCategory>
 }
 
 #[function_component(TransactionsTable)]
-pub fn app() -> Html {
-    let users = use_state(|| Vec::<TransactionWithCategory>::new());
-    let users_clone = users.clone();
-    let hovered_row = use_state(|| None);
+pub fn transactions_table(props: &TransactionTableProps) -> Html {
 
-    use_effect_with((), move |_| {
-        wasm_bindgen_futures::spawn_local(async move {
-            let fetched: Vec<TransactionWithCategory> =
-                Request::get((API_URL.to_owned() + "/transactions").as_str())
-                    .send()
-                    .await
-                    .unwrap()
-                    .json()
-                    .await
-                    .unwrap();
-            users_clone.set(fetched);
-        });
-        || ()
-    });
+    let hovered_row = use_state(|| None);
 
     let tooltip = {
         if let Some((id, x, y)) = *hovered_row {
-            if let Some(row) = users.iter().find(|r| r.MTCN == id) {
+            if let Some(row) = props.transactions.iter().find(|r| r.MTCN == id) {
                 let iban_other = match &row.IBAN_other {
                     Some(d) => {
                         if d.is_empty() {
@@ -90,7 +54,7 @@ pub fn app() -> Html {
         }
     };
 
-    let rows = users.iter().map(|transaction| {
+    let rows = props.transactions.iter().map(|transaction| {
         let hovered_row_clone = hovered_row.clone();
         let id = transaction.MTCN;
         let on_mouse_enter = Callback::from(move |e: MouseEvent| {
