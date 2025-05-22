@@ -5,6 +5,7 @@ mod categories;
 mod cors;
 mod month_breakdown;
 mod transaction;
+mod accounts;
 
 use crate::aggregates::get_aggregates;
 use crate::categories::post_category;
@@ -15,6 +16,7 @@ use rocket::tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::env;
+use crate::accounts::get_accounts;
 use crate::month_breakdown::get_breakdown;
 
 static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
@@ -50,6 +52,7 @@ async fn rocket() -> _ {
             get_aggregates,
             post_category,
             get_breakdown,
+            get_accounts,
         ],
     )
 }
