@@ -4,7 +4,9 @@ use yew::prelude::*;
 
 #[derive(Properties, PartialEq)]
 pub struct TransactionTableProps {
-    pub transactions: Vec<TransactionWithCategory>
+    pub transactions: Vec<TransactionWithCategory>,
+    #[prop_or_default]
+    pub on_row_click: Option<Callback<TransactionWithCategory>>,
 }
 
 #[function_component(TransactionsTable)]
@@ -54,6 +56,7 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
         }
     };
 
+
     let rows = props.transactions.iter().map(|transaction| {
         let hovered_row_clone = hovered_row.clone();
         let id = transaction.MTCN;
@@ -65,12 +68,19 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
         let on_mouse_leave = Callback::from(move |_| {
             hovered_row.set(None);
         });
+        let on_click = props.on_row_click.clone();
+        let transaction_clone = transaction.clone();
 
         html! {
             <tr
                 class="border-b hover:bg-gray-100 relative"
                 onmouseenter={on_mouse_enter}
                 onmouseleave={on_mouse_leave}
+                onclick={Callback::from(move |_| {
+                    if let Some(cb) = &on_click {
+                        cb.emit(transaction_clone.clone());
+                    }
+                })}
             >
                 <td class={classes!(
                     "px-4",
@@ -82,25 +92,22 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
             </tr>
         }
     });
-
     html! {
         <>
         { tooltip }
-        <div class="p-4 max-h-screen overflow-auto">
-            <div class="min-w-full overflow-x-auto border rounded shadow-md">
-                <table class="min-w-full table-auto bg-white">
-                    <thead class="bg-gray-200 sticky top-0 z-10">
-                        <tr>
-                            <th class="px-4 py-2 text-left">{ "Value" }</th>
-                            <th class="px-4 py-2 text-left">{ "Name" }</th>
-                            <th class="px-4 py-2 text-left">{ "Category" }</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        { for rows }
-                    </tbody>
-                </table>
-            </div>
+        <div class="flex-1 overflow-y-auto">
+            <table class="table-auto bg-white">
+                <thead class="bg-gray-200 sticky top-0 z-10">
+                    <tr>
+                        <th class="px-4 py-2 text-left">{ "Value" }</th>
+                        <th class="px-4 py-2 text-left">{ "Name" }</th>
+                        <th class="px-4 py-2 text-left">{ "Category" }</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    { for rows }
+                </tbody>
+            </table>
         </div>
         </>
     }

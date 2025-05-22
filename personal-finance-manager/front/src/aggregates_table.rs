@@ -2,8 +2,9 @@ use gloo_net::http::Request;
 use serde::Deserialize;
 use yew::prelude::*;
 use crate::info_panel::InfoPanel;
+use crate::transactions_page::TransactionWithCategory;
 
-const API_URL: &str = "http://127.0.0.1:8000";
+pub const API_URL: &str = "http://127.0.0.1:8000";
 
 #[derive(Deserialize)]
 struct MonthAggregate {
@@ -33,10 +34,12 @@ pub fn app() -> Html {
 
     let selected_id = use_state(|| None::<String>);
     let selected_data = use_state(|| None::<RowData>);
+    let selected_transactions = use_state(|| Vec::new());
 
     {
         let selected_id = selected_id.clone();
         let selected_data = selected_data.clone();
+        let selected_transactions = selected_transactions.clone();
 
         use_effect_with((*selected_id).clone(), move |id| {
             let id = id.clone();
@@ -51,6 +54,16 @@ pub fn app() -> Html {
                             .await
                             .unwrap();
                     selected_data.set(Some(items));
+
+                    let items: Vec<TransactionWithCategory> =
+                        Request::get((API_URL.to_owned() + "/transactions/" + id.as_str()).as_str())
+                            .send()
+                            .await
+                            .unwrap()
+                            .json()
+                            .await
+                            .unwrap();
+                    selected_transactions.set(items);
                 }
             });
             || ()
@@ -97,7 +110,7 @@ pub fn app() -> Html {
                 </table>
             </div>
         </div>
-        <InfoPanel selected_data={(*selected_data).clone()} />
+        <InfoPanel selected_data={(*selected_data).clone()} transactions={(*selected_transactions).clone()} />
         </>
     }
 }
