@@ -1,5 +1,4 @@
 use crate::transactions_page::TransactionWithCategory;
-use serde::Deserialize;
 use yew::prelude::*;
 
 #[derive(Properties, PartialEq)]
@@ -11,7 +10,6 @@ pub struct TransactionTableProps {
 
 #[function_component(TransactionsTable)]
 pub fn transactions_table(props: &TransactionTableProps) -> Html {
-
     let hovered_row = use_state(|| None);
 
     let tooltip = {
@@ -20,21 +18,21 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
                 let iban_other = match &row.IBAN_other {
                     Some(d) => {
                         if d.is_empty() {
-                            { "Unknown" }
+                            "Unknown"
                         } else {
                             d
                         }
-                    },
-                    None => { "Unknown" }
+                    }
+                    None => "Unknown",
                 };
                 let desc = match &row.description {
                     Some(d) => {
                         if d.is_empty() {
-                            { "No Description" }
+                            "No Description"
                         } else {
                             d
                         }
-                    },
+                    }
                     None => "No Description",
                 };
                 html! {
@@ -55,7 +53,6 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
             html! {}
         }
     };
-
 
     let rows = props.transactions.iter().map(|transaction| {
         let hovered_row_clone = hovered_row.clone();
