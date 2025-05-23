@@ -5,8 +5,10 @@ use yew::prelude::*;
 #[function_component(OverviewPage)]
 pub fn overview_page() -> Html {
     html! {
-        <div class="h-[calc(100vh-2rem)] m-4 flex flex-row gap-5 max-h-screen max-w-full">
-            <UploadTransactions />
+        <div class="h-[calc(100vh-2rem)] m-4 flex flex-row gap-5 w-full">
+            <div class="container w-xs h-fit">
+                <UploadTransactions />
+            </div>
             <AggregatesTable />
         </div>
     }

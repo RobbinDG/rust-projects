@@ -10,16 +10,24 @@ pub struct EditableTableProps {
 #[function_component(EditableTable)]
 pub fn editable_table(props: &EditableTableProps) -> Html {
     html! {
-        <table>
-            <tbody>
-                {
-                    props.sub_items.iter().map(|item| {
-                        html! {
-                            <EditableRow key={item.category.clone()} item={item.clone()} />
-                        }
-                    }).collect::<Html>()
-                }
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th class="text-left">{ "Category" }</th>
+                        <th class="text-right">{ "Value" }</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {
+                        props.sub_items.iter().map(|item| {
+                            html! {
+                                <EditableRow key={item.category.clone()} item={item.clone()} />
+                            }
+                        }).collect::<Html>()
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 }

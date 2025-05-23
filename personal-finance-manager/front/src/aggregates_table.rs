@@ -3,6 +3,7 @@ use crate::transactions_page::TransactionWithCategory;
 use gloo_net::http::Request;
 use serde::Deserialize;
 use yew::prelude::*;
+use crate::editable_table::EditableTable;
 
 pub const API_URL: &str = "http://127.0.0.1:8000";
 
@@ -70,7 +71,7 @@ pub fn app() -> Html {
         });
     }
 
-    let rows = users.iter().map(|agg| {
+    let agg_rows = users.iter().map(|agg| {
         let year_month = agg.year_month.clone();
         let on_row_click = {
             let selected_id = selected_id.clone();
@@ -91,25 +92,35 @@ pub fn app() -> Html {
         }
     });
 
+    let cat_rows = match &*selected_data {
+        None => vec![],
+        Some(d) => d.items.clone(),
+    };
+
     html! {
         <div class="flex flex-row gap-5">
-            <div class="container basis-xs">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th class="text-left">{ "Value" }</th>
-                                <th class="text-left">{ "Name" }</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            { for rows }
-                        </tbody>
-                    </table>
+            <div class="basis-xs shrink-0 flex flex-col space-y-5 w-full">
+                <div class="container max-h-1/2 h-1/2">
+                    <div class="table-container">
+                        <table class="w-full">
+                            <thead>
+                                <tr>
+                                    <th class="text-left">{ "Month" }</th>
+                                    <th class="text-right">{ "Value" }</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                { for agg_rows }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="max-h-1/2 h-1/2 container overflow-auto">
+                    <EditableTable sub_items={cat_rows} />
                 </div>
             </div>
-            <div class="basis-md">
-            <InfoPanel selected_data={(*selected_data).clone()} transactions={(*selected_transactions).clone()} />
+            <div class="basis-lg shrink-0">
+                <InfoPanel selected_data={(*selected_data).clone()} transactions={(*selected_transactions).clone()} />
             </div>
         </div>
     }

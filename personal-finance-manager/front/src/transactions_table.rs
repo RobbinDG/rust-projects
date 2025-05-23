@@ -80,8 +80,9 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
                 })}
             >
                 <td class={classes!(
+                    "text-right",
                     if transaction.value < 0.0 { "text-red-700" } else { "text-green-700" },
-                )} style="text-align: right">{ '€' }{ format!("{:.02}", transaction.value.abs()) }</td>
+                )}>{ '€' }{ format!("{:.02}", transaction.value.abs()) }</td>
                 <td class="px-4 py-2">{ &transaction.name_other.clone() }</td>
                 <td class="px-4 py-2">{ &transaction.category.clone() }</td>
             </tr>
@@ -89,7 +90,7 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
     });
     html! {
         <>
-        <div class="table-container h-full">
+        <div class="table-container h-full w-full">
             { tooltip }
             <table>
                 <thead>

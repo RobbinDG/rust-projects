@@ -33,7 +33,7 @@ h3, p {
 }
 
 .container {
-    @apply border rounded shadow-md p-4 bg-gray-700 max-h-full
+    @apply border rounded shadow-md p-4 bg-gray-700
 }
 
 button, input[type=submit] {

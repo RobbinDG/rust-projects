@@ -12,7 +12,10 @@ pub fn editable_row(props: &EditableRowProps) -> Html {
         <>
             <tr style="cursor: pointer;">
                 <td>{ &props.item.category }</td>
-                <td>{ format!("{:.02}", &props.item.breakdown_value) }</td>
+                <td class={classes!(
+                    "text-right",
+                    if &props.item.breakdown_value < &0.0 { "text-red-700" } else { "text-green-700" },
+                )}>{ format!("{:.02}", &props.item.breakdown_value) }</td>
             </tr>
         </>
     }
