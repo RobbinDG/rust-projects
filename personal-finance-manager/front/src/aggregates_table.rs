@@ -98,8 +98,8 @@ pub fn app() -> Html {
     };
 
     html! {
-        <div class="flex flex-row gap-5">
-            <div class="basis-xs shrink-0 flex flex-col space-y-5 w-full">
+        <div class="flex flex-row gap-5 w-max">
+            <div class="basis-xs shrink-0 flex flex-col space-y-5">
                 <div class="container max-h-1/2 h-1/2">
                     <div class="table-container">
                         <table class="w-full">
