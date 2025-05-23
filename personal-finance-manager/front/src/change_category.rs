@@ -67,7 +67,6 @@ pub fn change_category(props: &ChangeCategoryProps) -> Html {
             <p>{ name }</p>
             <input
                 type="text"
-                class="w-full p-2 border rounded"
                 value={(*input_value).clone()}
                 oninput={on_input}
             />

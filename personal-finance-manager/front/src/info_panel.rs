@@ -30,11 +30,15 @@ pub fn info_panel(props: &InfoPanelProps) -> Html {
     };
 
     html! {
-        <div class="h-screen flex flex-col" style="padding: 1rem; background: #f5f5f5;">
-            <h3>{ title }</h3>
-            <ChangeCategory name={(*selected_row).clone()} />
-            <EditableTable sub_items={rows} />
-            <TransactionsTable transactions={props.transactions.clone()} on_row_click={Some(on_row_click)} />
+        <div class="flex flex-col space-y-5 h-full max-h-full">
+            <div class="container">
+                <h3>{ title }</h3>
+                <ChangeCategory name={(*selected_row).clone()} />
+                <EditableTable sub_items={rows} />
+            </div>
+            <div class="flex-1 container overflow-y-auto">
+                <TransactionsTable transactions={props.transactions.clone()} on_row_click={Some(on_row_click)}/>
+            </div>
         </div>
     }
 }

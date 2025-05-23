@@ -11,7 +11,6 @@ pub struct EditableTableProps {
 pub fn editable_table(props: &EditableTableProps) -> Html {
     html! {
         <table>
-            <thead><tr><th>{ "Sub Items" }</th></tr></thead>
             <tbody>
                 {
                     props.sub_items.iter().map(|item| {

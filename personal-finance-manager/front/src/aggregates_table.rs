@@ -80,13 +80,11 @@ pub fn app() -> Html {
         };
         html! {
             <tr
-                class="border-b hover:bg-gray-100 relative"
+                class="relative"
                 onclick={on_row_click}
             >
-                <td class="px-4 py-2">{ &agg.year_month }</td>
+                <td>{ &agg.year_month }</td>
                 <td class={classes!(
-                    "px-4",
-                    "py-2",
                     if agg.sum < 0.0 { "text-red-700" } else { "text-green-700" },
                 )} style="text-align: right">{ '€' }{ format!("{:.02}", agg.sum.abs()) }</td>
             </tr>
@@ -94,14 +92,14 @@ pub fn app() -> Html {
     });
 
     html! {
-        <>
-            <div class="p-4 max-h-screen overflow-auto">
-                <div class="min-w-full overflow-x-auto border rounded shadow-md">
-                    <table class="min-w-full table-auto bg-white">
-                        <thead class="bg-gray-200 sticky top-0 z-10">
+        <div class="flex flex-row gap-5">
+            <div class="container basis-xs">
+                <div class="table-container">
+                    <table>
+                        <thead>
                             <tr>
-                                <th class="px-4 py-2 text-left">{ "Value" }</th>
-                                <th class="px-4 py-2 text-left">{ "Name" }</th>
+                                <th class="text-left">{ "Value" }</th>
+                                <th class="text-left">{ "Name" }</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -110,8 +108,10 @@ pub fn app() -> Html {
                     </table>
                 </div>
             </div>
+            <div class="basis-md">
             <InfoPanel selected_data={(*selected_data).clone()} transactions={(*selected_transactions).clone()} />
-        </>
+            </div>
+        </div>
     }
 }
 

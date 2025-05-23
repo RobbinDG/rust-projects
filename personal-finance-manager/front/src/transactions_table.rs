@@ -70,7 +70,7 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
 
         html! {
             <tr
-                class="border-b hover:bg-gray-100 relative"
+                class="relative"
                 onmouseenter={on_mouse_enter}
                 onmouseleave={on_mouse_leave}
                 onclick={Callback::from(move |_| {
@@ -80,8 +80,6 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
                 })}
             >
                 <td class={classes!(
-                    "px-4",
-                    "py-2",
                     if transaction.value < 0.0 { "text-red-700" } else { "text-green-700" },
                 )} style="text-align: right">{ '€' }{ format!("{:.02}", transaction.value.abs()) }</td>
                 <td class="px-4 py-2">{ &transaction.name_other.clone() }</td>
@@ -91,14 +89,14 @@ pub fn transactions_table(props: &TransactionTableProps) -> Html {
     });
     html! {
         <>
-        { tooltip }
-        <div class="flex-1 overflow-y-auto">
-            <table class="table-auto bg-white">
-                <thead class="bg-gray-200 sticky top-0 z-10">
+        <div class="table-container h-full">
+            { tooltip }
+            <table>
+                <thead>
                     <tr>
-                        <th class="px-4 py-2 text-left">{ "Value" }</th>
-                        <th class="px-4 py-2 text-left">{ "Name" }</th>
-                        <th class="px-4 py-2 text-left">{ "Category" }</th>
+                        <th class="text-left">{ "Value" }</th>
+                        <th class="text-left">{ "Name" }</th>
+                        <th class="text-left">{ "Category" }</th>
                     </tr>
                 </thead>
                 <tbody>
