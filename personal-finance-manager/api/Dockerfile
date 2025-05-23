@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y pkg-config libssl-dev build-essential
 
-COPY Cargo.toml Rocket.toml ./
+COPY Cargo.toml ./
 COPY .env ./
 COPY src src/
 COPY migrations migrations/
