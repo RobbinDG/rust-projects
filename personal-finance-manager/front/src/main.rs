@@ -8,6 +8,7 @@ mod info_panel;
 mod row_editor;
 mod transactions_page;
 mod change_category;
+mod overview_page;
 
 use crate::routes::{switch, AppRoute};
 use yew::prelude::*;
@@ -17,11 +18,9 @@ use yew_router::prelude::*;
 pub fn app() -> Html {
     html! {
         <BrowserRouter>
-            <nav>
-                <ul>
-                    <li><Link<AppRoute> to={AppRoute::Transactions}>{ "Transactions" }</Link<AppRoute>></li>
-                    <li><Link<AppRoute> to={AppRoute::Overview}>{ "Overview" }</Link<AppRoute>></li>
-                </ul>
+            <nav class="flex space-x-4 p-4">
+                    <Link<AppRoute> to={AppRoute::Transactions}>{ "Transactions" }</Link<AppRoute>>
+                    <Link<AppRoute> to={AppRoute::Overview}>{ "Overview" }</Link<AppRoute>>
             </nav>
             <Switch<AppRoute> render={switch} />
         </BrowserRouter>

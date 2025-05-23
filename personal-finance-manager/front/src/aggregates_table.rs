@@ -1,8 +1,8 @@
+use crate::info_panel::InfoPanel;
+use crate::transactions_page::TransactionWithCategory;
 use gloo_net::http::Request;
 use serde::Deserialize;
 use yew::prelude::*;
-use crate::info_panel::InfoPanel;
-use crate::transactions_page::TransactionWithCategory;
 
 pub const API_URL: &str = "http://127.0.0.1:8000";
 
@@ -95,22 +95,22 @@ pub fn app() -> Html {
 
     html! {
         <>
-        <div class="p-4 max-h-screen overflow-auto">
-            <div class="min-w-full overflow-x-auto border rounded shadow-md">
-                <table class="min-w-full table-auto bg-white">
-                    <thead class="bg-gray-200 sticky top-0 z-10">
-                        <tr>
-                            <th class="px-4 py-2 text-left">{ "Value" }</th>
-                            <th class="px-4 py-2 text-left">{ "Name" }</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        { for rows }
-                    </tbody>
-                </table>
+            <div class="p-4 max-h-screen overflow-auto">
+                <div class="min-w-full overflow-x-auto border rounded shadow-md">
+                    <table class="min-w-full table-auto bg-white">
+                        <thead class="bg-gray-200 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-2 text-left">{ "Value" }</th>
+                                <th class="px-4 py-2 text-left">{ "Name" }</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            { for rows }
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
-        <InfoPanel selected_data={(*selected_data).clone()} transactions={(*selected_transactions).clone()} />
+            <InfoPanel selected_data={(*selected_data).clone()} transactions={(*selected_transactions).clone()} />
         </>
     }
 }

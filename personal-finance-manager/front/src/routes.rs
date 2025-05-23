@@ -1,4 +1,4 @@
-use crate::aggregates_table::AggregatesTable;
+use crate::overview_page::OverviewPage;
 use crate::transactions_page::TransactionsPage;
 use yew::{html, Html};
 use yew_router::prelude::*;
@@ -13,7 +13,7 @@ pub enum AppRoute {
 
 pub fn switch(route: AppRoute) -> Html {
     match route {
-        AppRoute::Overview => html! { <AggregatesTable /> },
+        AppRoute::Overview => html! { <OverviewPage /> },
         AppRoute::Transactions => html! { <TransactionsPage /> },
     }
 }
