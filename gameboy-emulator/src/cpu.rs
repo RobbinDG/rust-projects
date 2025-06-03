@@ -5,8 +5,8 @@ use crate::instruction::Instruction;
 use crate::memory::Memory;
 use crate::reg::Reg;
 use crate::register::Registers;
-use std::collections::VecDeque;
 use log::{debug, info};
+use std::collections::VecDeque;
 
 const MSB_MASK: u8 = 0b1000_0000;
 const LSB_MASK: u8 = 0b0000_0001;
@@ -17,6 +17,7 @@ struct ExecLog {
     byte: u8,
     instruction: Instruction,
     registers: Registers,
+    timer_regs: [u8; 4],
 }
 
 pub struct CPU {
@@ -97,10 +98,6 @@ impl CPU {
         // Fetch
         let byte = self.next_byte(mem);
         let dbg_current_pc = self.reg.pc - 1;
-
-        if dbg_current_pc == 0x02f5 {
-            // self.breakpoint_delay = 100;
-        }
 
         // Decode
         let instruction = match byte {
@@ -431,6 +428,10 @@ impl CPU {
         };
         self.instructions_count[byte as usize] += 1;
 
+        if dbg_current_pc == 0xc3dc {
+            println!("{:?}", instruction);
+        }
+
         // Execute
         let mut conditional_extra_cycles = 0u32;
         match instruction.clone() {
@@ -515,25 +516,10 @@ impl CPU {
                 );
             }
             Instruction::LDH1(o) => {
-                // println!(
-                //     "Write to hram {:04x}, ({:02x}) <- {:02x}",
-                //     self.reg.pc, o, self.reg.a
-                // );
-                if o == 0x85 {
-                    // println!("Write to 85 {:04x} {:02x}", self.reg.pc, self.reg.a)
-                    // self.breakpoint_delay = 10;
-                }
                 mem[0xFF00 | o as u16] = self.reg.a;
             }
             Instruction::LDH2(o) => {
                 self.reg.a = mem[0xFF00 | o as u16];
-                if !(o == 0x85 && self.reg.a == 0x00) {
-                    // println!(
-                    //     "Read from hram {:04x}, ({:02x}): {:02x}",
-                    //     self.reg.pc, o, self.reg.a
-                    // );
-                    // self.breakpoint_delay = 190;
-                }
             }
             Instruction::LDI(a, b) => {
                 self.ld_8_bit(a, b, mem);
@@ -876,6 +862,7 @@ impl CPU {
                 byte,
                 instruction: instruction.clone(),
                 registers: self.reg.clone(),
+                timer_regs: [mem[0xFF04], mem[0xFF05], mem[0xFF06], mem[0xFF07]],
             };
             // println!("Executed {:04x} {:02x} {:x?} \t\t {:x?}", entry.pc, entry.byte, entry.instruction, entry.registers);
             self.dbg_exec_log.push_front(entry);
@@ -1027,11 +1014,12 @@ impl CPU {
     pub fn print_exec_log(&mut self) {
         while let Some(entry) = self.dbg_exec_log.pop_back() {
             println!(
-                "Executed {:04x} {:02x} {:<30} {:x?}",
+                "Executed {:04x} {:02x} {:<30} {:x?} {:02x?}",
                 entry.pc,
                 entry.byte,
                 format!("{:x?}", entry.instruction),
                 entry.registers,
+                entry.timer_regs,
             );
         }
     }

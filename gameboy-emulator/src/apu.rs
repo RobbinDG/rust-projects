@@ -82,7 +82,13 @@ struct PulseChannel<S: Sweep> {
 }
 
 impl<S: Sweep> PulseChannel<S> {
-    pub fn new(sweep: S, length_duty: u16, volume_envelope: u16, period_hi: u16, period_lo: u16) -> PulseChannel<S> {
+    pub fn new(
+        sweep: S,
+        length_duty: u16,
+        volume_envelope: u16,
+        period_hi: u16,
+        period_lo: u16,
+    ) -> PulseChannel<S> {
         Self {
             reg_length_duty: length_duty,
             reg_volume_envelope: volume_envelope,
@@ -255,7 +261,8 @@ impl APU {
     pub fn div_apu_tick(&mut self, mem: &mut Memory, div_apu: u8) {
         let mut ch1 = self.ch1.lock().unwrap();
         ch1.div_apu_tick(mem, div_apu);
-        if ch1.enabled() { // Set enabled bit
+        if ch1.enabled() {
+            // Set enabled bit
             mem[0xFF26] |= 1 << 0;
         } else {
             mem[0xFF26] &= !(1 << 0);
@@ -263,7 +270,8 @@ impl APU {
 
         let mut ch2 = self.ch2.lock().unwrap();
         ch2.div_apu_tick(mem, div_apu);
-        if ch2.enabled() { // Set enabled bit
+        if ch2.enabled() {
+            // Set enabled bit
             mem[0xFF26] |= 1 << 1;
         } else {
             mem[0xFF26] &= !(1 << 1);
@@ -285,5 +293,36 @@ impl APU {
         let volume_vin = mem[0xFF24];
 
         let on_off = (master_ctrl & BIT_7_MASK) != 0;
+
+        if mem[0xFF10] & 0b10000000 != 0b10000000 {
+            mem[0xFF10] |= 0b10000000;
+        }
+        if mem[0xFF14] & 0b00111000 != 0b00111000 {
+            mem[0xFF14] |= 0b00111000;
+        }
+        if mem[0xFF19] & 0b00111000 != 0b00111000 {
+            mem[0xFF19] |= 0b00111000;
+        }
+        if mem[0xFF1A] & 0b01111111 != 0b01111111 {
+            mem[0xFF1A] |= 0b01111111;
+        }
+        if mem[0xFF1C] & 0b10011111 != 0b10011111 {
+            mem[0xFF1C] |= 0b10011111;
+        }
+        if mem[0xFF1C] & 0b10011111 != 0b10011111 {
+            mem[0xFF1C] |= 0b10011111;
+        }
+        if mem[0xFF1E] & 0b00111000 != 0b00111000 {
+            mem[0xFF1E] |= 0b00111000;
+        }
+        if mem[0xFF20] & 0b11000000 != 0b11000000 {
+            mem[0xFF20] |= 0b11000000;
+        }
+        if mem[0xFF23] & 0b00111111 != 0b00111111 {
+            mem[0xFF23] |= 0b00111111;
+        }
+        if mem[0xFF26] & 0b01110000 != 0b01110000 {
+            mem[0xFF26] |= 0b01110000;
+        }
     }
 }

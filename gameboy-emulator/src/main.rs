@@ -1,3 +1,4 @@
+use crate::apu::APU;
 use crate::joypad::JoyPad;
 use crate::joypad_input_handler::JoypadInputHandler;
 use crate::memory::Memory;
@@ -13,9 +14,9 @@ use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
-use crate::apu::APU;
 
 mod addrreg;
+mod apu;
 mod cartridge_header;
 mod condition;
 mod cpu;
@@ -27,9 +28,12 @@ mod memory;
 mod ppu;
 mod reg;
 mod register;
-mod apu;
 
 const CLOCK_FREQ_UPDATE_INTERVAL: u32 = 1_000_000;
+const REF_AUDIO_REGS: [u8; 0x17] = [
+    0x80, 0xBF, 0xF3, 0xFF, 0xBF, 0x00, 0x3F, 0x00, 0xFF, 0xBF, 0x7F, 0xFF, 0x9f, 0xFF, 0xBF, 0x00,
+    0xFF, 0x00, 0x00, 0xBF, 0x77, 0xF3, 0xF1,
+];
 
 struct GameBoy {
     mem: Memory,
@@ -87,7 +91,17 @@ impl GameBoy {
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..100_000_000 {
+        for _ in 0usize..5_000_500 {
+            if self.cpu.reg.pc == 0x0100 {
+                println!("Starting ROM");
+                for addr in 0u8..=0x16 {
+                    if self.mem[addr as u16 + 0xFF10] != REF_AUDIO_REGS[addr as usize] {
+                        println!("Audio register {:04x} was not of value {:08b} ({:08b}) after boot ROM.", addr as u16 + 0xFF10, REF_AUDIO_REGS[addr as usize], self.mem[addr as u16 + 0xFF10]);
+                        self.mem[addr as u16 + 0xFF10] = REF_AUDIO_REGS[addr as usize];
+                    }
+                }
+            }
+
             {
                 self.joy_pad.lock().unwrap().update(&mut self.mem);
             }
@@ -124,6 +138,7 @@ impl GameBoy {
                     CLOCK_FREQ_UPDATE_INTERVAL as f32 / dt.as_secs_f32() / 1_000_000.0
                 );
             }
+            self.mem.audio.update();
         }
         self.cpu.print_exec_log();
 
@@ -155,7 +170,10 @@ fn main() {
     // let filename = "./Tetris (JUE) (V1.1) [!].gb";
     // let filename = "./cpu_instrs.gb";
     // let filename = "./instr_timing.gb";
-    let filename = "./dmg_sound.gb";
+    // let filename = "./mem_timing.gb";
+    // let filename = "./interrupt_time.gb";
+    // let filename = "./dmg_sound.gb";
+    let filename = "./01-registers.gb";
     let mut gb = GameBoy::from_cartridge(filename);
     gb.skip_boot_rom();
     gb.start();
