@@ -14,6 +14,7 @@ use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
+use crate::div_timer::DivTimer;
 
 mod addrreg;
 mod apu;
@@ -28,6 +29,8 @@ mod memory;
 mod ppu;
 mod reg;
 mod register;
+mod audio_registers;
+mod div_timer;
 
 const CLOCK_FREQ_UPDATE_INTERVAL: u32 = 1_000_000;
 const REF_AUDIO_REGS: [u8; 0x17] = [
@@ -40,11 +43,9 @@ struct GameBoy {
     cpu: CPU,
     ppu: PPU,
     apu: APU,
-    apu_div: u8,
     joy_pad: Arc<Mutex<JoyPad>>,
     cpu_last_cycle_cnt_reset: SystemTime,
     cpu_cycle_counter: u32,
-    div_counter: u8,
     dot_counter: u32,
 }
 
@@ -68,11 +69,9 @@ impl GameBoy {
             cpu,
             ppu,
             apu,
-            apu_div: 0,
             joy_pad: jp,
             cpu_last_cycle_cnt_reset: SystemTime::now(),
             cpu_cycle_counter: 0,
-            div_counter: 0,
             dot_counter: 0,
         }
     }
@@ -91,7 +90,7 @@ impl GameBoy {
     }
 
     pub fn start(mut self) {
-        for _ in 0usize..5_000_500 {
+        for _ in 0usize..1_000_500 {
             if self.cpu.reg.pc == 0x0100 {
                 println!("Starting ROM");
                 for addr in 0u8..=0x16 {
@@ -106,17 +105,12 @@ impl GameBoy {
                 self.joy_pad.lock().unwrap().update(&mut self.mem);
             }
             self.cpu.check_interrupts(&mut self.mem);
-            let last_div_ctr = self.div_counter;
+
             let m_cycles = self.cpu.run_cycle(&mut self.mem);
-            self.div_counter = self.div_counter.wrapping_add(4 * m_cycles as u8);
-            if self.div_counter < last_div_ctr {
-                // DIV register
-                let last_div = self.mem[0xFF04];
-                let new_div = last_div.wrapping_add(1);
-                if new_div & 0b0000_1000 == 0 && last_div & 0b0000_1000 != 0 {
-                    self.apu_div = self.apu_div.wrapping_add(1);
-                }
-                self.mem[0xFF04] = new_div;
+            self.mem.audio.update();
+            if self.mem.div.tick(m_cycles as u8) {
+                let div_apu = self.mem.div.div_apu;
+                self.apu.div_apu_tick(&mut self.mem, div_apu);
             }
             for _ in 0..(m_cycles * 4) {
                 self.ppu.run_dot(&mut self.mem);
@@ -138,7 +132,6 @@ impl GameBoy {
                     CLOCK_FREQ_UPDATE_INTERVAL as f32 / dt.as_secs_f32() / 1_000_000.0
                 );
             }
-            self.mem.audio.update();
         }
         self.cpu.print_exec_log();
 
@@ -173,7 +166,9 @@ fn main() {
     // let filename = "./mem_timing.gb";
     // let filename = "./interrupt_time.gb";
     // let filename = "./dmg_sound.gb";
-    let filename = "./01-registers.gb";
+    // let filename = "./01-registers.gb";
+    let filename = "./02-len ctr.gb";
+    // let filename = "./03-trigger.gb";
     let mut gb = GameBoy::from_cartridge(filename);
     gb.skip_boot_rom();
     gb.start();

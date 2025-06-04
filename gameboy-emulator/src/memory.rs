@@ -1,62 +1,12 @@
+use crate::audio_registers::AudioRegisters;
 use crate::cartridge_header::CartridgeHeader;
+use crate::div_timer::DivTimer;
 use log::error;
 use std::cmp::{max, min};
 use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::ops::{Index, IndexMut};
-
-pub const APU_READ_MASKS: [u8; 0x17] = [
-    0b0111_1111, // FF10 - NR10
-    0b1100_0000, // FF11 - NR11
-    0b1111_1111, // FF12 - NR12
-    0b0000_0000, // FF13 - NR13
-    0b0100_0000, // FF14 - NR14
-    0b0000_0000,
-    0b1100_0000, // FF16 - NR21
-    0b1111_1111, // FF17 - NR22
-    0b0000_0000, // FF18 - NR23
-    0b0100_0000, // FF19 - NR24
-    0b1000_0000, // FF1A - NR30
-    0x0000_0000, // FF1B - NR31
-    0b0110_0000, // FF1C - NR32
-    0x0000_0000, // FF1D - NR33
-    0b0100_0000, // FF1E - NR34
-    0b0000_0000,
-    0b0000_0000, // FF20 - NR41
-    0b1111_1111, // FF21 - NR42
-    0b1111_1111, // FF22 - NR43
-    0b0100_0000, // FF23 - NR44
-    0b1111_1111, // FF24 - NR50
-    0b1111_1111, // FF25 - NR51
-    0b1000_1111, // FF26 - NR52
-];
-
-pub const APU_WRITE_MASKS: [u8; 0x17] = [
-    0b0111_1111, // FF10 - NR10
-    0b1111_1111, // FF11 - NR11
-    0b1111_1111, // FF12 - NR12
-    0b1111_1111, // FF13 - NR13
-    0b1100_0111, // FF14 - NR14
-    0b0000_0000,
-    0b1111_1111, // FF16 - NR21
-    0b1111_1111, // FF17 - NR22
-    0b1111_1111, // FF18 - NR23
-    0b1100_0111, // FF19 - NR24
-    0b1000_0000, // FF1A - NR30
-    0b1111_1111, // FF1B - NR31
-    0b0110_0000, // FF1C - NR32
-    0b1111_1111, // FF1D - NR33
-    0b1100_0111, // FF1E - NR34
-    0b0000_0000,
-    0b1111_1111, // FF20 - NR41
-    0b1111_1111, // FF21 - NR42
-    0b1111_1111, // FF22 - NR43
-    0b1100_0000, // FF23 - NR44
-    0b1111_1111, // FF24 - NR50
-    0b1111_1111, // FF25 - NR51
-    0b1000_0000, // FF26 - NR52
-];
 
 pub struct ROMOnly {
     null: u8,
@@ -212,56 +162,6 @@ impl MemoryBankController {
     }
 }
 
-pub struct AudioRegisters {
-    read: [u8; 0x17],
-    internal: [u8; 0x17],
-    write: [u8; 0x17],
-}
-
-impl Index<u16> for AudioRegisters {
-    type Output = u8;
-
-    fn index(&self, index: u16) -> &Self::Output {
-        &self.read[index as usize]
-    }
-}
-
-impl IndexMut<u16> for AudioRegisters {
-    fn index_mut(&mut self, index: u16) -> &mut u8 {
-        &mut self.write[index as usize]
-    }
-}
-
-impl AudioRegisters {
-    pub fn new() -> Self {
-        Self {
-            read: [0; 0x17],
-            internal: [0; 0x17],
-            write: [0; 0x17],
-        }
-    }
-
-    pub fn update(&mut self) {
-        let nr52_power_before = self.internal[0x16] & (1 << 7);
-        if nr52_power_before == 0 {
-            let old = self.write[0x16];
-            self.write = [0; 0x17];
-            self.write[0x16] = old;
-        }
-
-        for addr in 0usize..0x17 {
-            self.update_bits(addr);
-        }
-    }
-
-    fn update_bits(&mut self, addr: usize) {
-        let write_bits = APU_WRITE_MASKS[addr] & self.write[addr];
-        let no_write_bits = self.read[addr] & !APU_WRITE_MASKS[addr];
-        self.internal[addr] = write_bits | no_write_bits;
-        self.read[addr] = (APU_READ_MASKS[addr] & self.internal[addr]) | !APU_READ_MASKS[addr];
-    }
-}
-
 pub struct Memory {
     bank_ctrl: MemoryBankController,
     num_rom_banks: usize,
@@ -280,12 +180,13 @@ pub struct Memory {
     unused_response: u8,
     unused_write_dummy: u8,
     audio_disabled: u8,
+    pub div: DivTimer,
     void: u8,
 }
 
 impl Memory {
     pub fn new(boot_rom: Vec<u8>, rom: Vec<u8>, header: CartridgeHeader) -> Result<Self, String> {
-        let mut mem = Self {
+        Ok(Self {
             bank_ctrl: header.memory_bank_controller()?,
             num_rom_banks: 2usize.pow(header.rom_size as u32 + 1),
             boot_rom,
@@ -303,10 +204,9 @@ impl Memory {
             unused_response: 0xFF,
             unused_write_dummy: 0,
             audio_disabled: 0,
+            div: DivTimer::new(),
             void: 0xFF,
-        };
-        mem.audio[0xFF10 - 0xFF10] |= 0x80;
-        Ok(mem)
+        })
     }
 
     pub fn write_contents(&self) -> io::Result<()> {
@@ -348,8 +248,10 @@ impl Index<u16> for Memory {
             0xC000..=0xDFFF => &self.wram[(addr - 0xC000) as usize],
             0xE000..=0xFDFF => &self.wram[(addr - 0xE000) as usize], // Echo RAM
             0xFE00..=0xFE9F => &self.sprite[(addr - 0xFE00) as usize],
-            0xFF00..=0xFF0F => &self.io1[(addr - 0xFF00) as usize],
-            0xFF10..=0xFF26 => &self.audio[addr - 0xFF10],
+            0xFF00..=0xFF03 => &self.io1[(addr - 0xFF00) as usize],
+            0xFF04 => &self.div.read(),
+            0xFF05..=0xFF0F => &self.io1[(addr - 0xFF00) as usize],
+            0xFF10..=0xFF26 => &self.audio[addr],
             0xFF30..=0xFF3F => &self.wave_ram[(addr - 0xFF30) as usize],
             0xFF40..=0xFF77 => &self.io2[(addr - 0xFF40) as usize],
             0xFF77..=0xFFFF => &self.high_ram[(addr - 0xFF77) as usize],
@@ -365,28 +267,18 @@ impl IndexMut<u16> for Memory {
     fn index_mut(&mut self, addr: u16) -> &mut Self::Output {
         match addr {
             0x0000..=0x7FFF => self.bank_ctrl.rom_write(addr),
-            0x8000..=0x97FF => {
-                // println!("write to tile ram {:04x}", addr);
-                &mut self.tile_ram[(addr - 0x8000) as usize]
-            }
-            0x9800..=0x9FFF => {
-                if addr - 0x9800 == 0x43 {
-                    // panic!()
-                }
-                // println!("write to background map {:04x}", addr - 0x9800);
-                &mut self.background_map[(addr - 0x9800) as usize]
-            }
+            0x8000..=0x97FF => &mut self.tile_ram[(addr - 0x8000) as usize],
+            0x9800..=0x9FFF => &mut self.background_map[(addr - 0x9800) as usize],
             0xA000..=0xBFFF => match self.bank_ctrl.ram_bank() {
                 Some(bank) => &mut self.cartridge_ram[(addr - 0xA000) as usize + 0x2000 * bank],
                 None => &mut self.void,
             },
             0xC000..=0xDFFF => &mut self.wram[(addr - 0xC000) as usize],
             0xFE00..=0xFE9F => &mut self.sprite[(addr - 0xFE00) as usize],
-            0xFF00..=0xFF0F => &mut self.io1[(addr - 0xFF00) as usize],
-            0xFF10..=0xFF26 => {
-                // println!("write to audio {:04x}", addr);
-                &mut self.audio[addr - 0xFF10]
-            }
+            0xFF00..=0xFF03 => &mut self.io1[(addr - 0xFF00) as usize],
+            0xFF04 => self.div.write(),
+            0xFF05..=0xFF0F => &mut self.io1[(addr - 0xFF00) as usize],
+            0xFF10..=0xFF26 => &mut self.audio[addr],
             0xFF30..=0xFF3F => &mut self.wave_ram[(addr - 0xFF30) as usize],
             0xFF40..=0xFF77 => &mut self.io2[(addr - 0xFF40) as usize],
             0xFF77..=0xFFFF => &mut self.high_ram[(addr - 0xFF77) as usize],

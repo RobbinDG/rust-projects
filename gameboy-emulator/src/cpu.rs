@@ -99,6 +99,10 @@ impl CPU {
         let byte = self.next_byte(mem);
         let dbg_current_pc = self.reg.pc - 1;
 
+        if dbg_current_pc >= 0xc925 && dbg_current_pc < 0xc930 {
+            // self.breakpoint_delay = 100;
+        }
+
         // Decode
         let instruction = match byte {
             // INC
@@ -628,6 +632,9 @@ impl CPU {
                 self.apply_to_7_bit_reg(Self::swap, r, mem);
             }
             Instruction::CP(l) => {
+                if matches!(l, DataLoc::Value(0x70)) {
+                    // self.breakpoint_delay = 3;
+                }
                 let _ = self.sub_set_flags(l, false, mem);
             }
             Instruction::CALL(addr) => {
@@ -862,11 +869,11 @@ impl CPU {
                 byte,
                 instruction: instruction.clone(),
                 registers: self.reg.clone(),
-                timer_regs: [mem[0xFF04], mem[0xFF05], mem[0xFF06], mem[0xFF07]],
+                timer_regs: [mem[0xFF26], mem[0xFF11], mem[0xFF14], mem[0xFF12]],
             };
             // println!("Executed {:04x} {:02x} {:x?} \t\t {:x?}", entry.pc, entry.byte, entry.instruction, entry.registers);
             self.dbg_exec_log.push_front(entry);
-            if self.dbg_exec_log.len() > 200 {
+            if self.dbg_exec_log.len() > 1000 {
                 let _ = self.dbg_exec_log.pop_back();
             }
         }
@@ -1098,9 +1105,7 @@ impl CPU {
         self.reg.set_flag(6, true);
         self.reg.set_flag(5, h);
         self.reg.set_flag(4, c);
-
-        // println!("Performed subtraction ({} {}) {} - {} -> {} ({} {})", add_carry, self.reg.get_flag(4), a, n, r as u8, h, c);
-        (r & 0x00FF) as u8
+        r & 0x00FF
     }
 
     fn and_set_flags(&mut self, l: DataLoc, mem: &mut Memory) -> u8 {

@@ -1,3 +1,4 @@
+use crate::audio_registers::{AudioRegisters, InternalAudioRegisters};
 use crate::memory::Memory;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Sample;
@@ -9,22 +10,27 @@ use std::time::Duration;
 const BIT_6_MASK: u8 = 1 << 6;
 const BIT_7_MASK: u8 = 1 << 7;
 
-fn read_period(mem: &Memory, reg_hi: u16, reg_lo: u16) -> u16 {
-    let ch1_period_lo = mem[reg_lo];
-    let ch1_period_hi = mem[reg_hi];
+fn read_period(regs: &InternalAudioRegisters, reg_hi: u16, reg_lo: u16) -> u16 {
+    let ch1_period_lo = regs[reg_lo];
+    let ch1_period_hi = regs[reg_hi];
     (((ch1_period_hi & 0b111) as u16) << 8) | (ch1_period_lo as u16)
 }
 
 pub trait Sweep {
-    fn write_period(&mut self, mem: &mut Memory, period: u16) -> bool {
+    fn write_period(&mut self, regs: &mut InternalAudioRegisters, period: u16) -> bool {
         let period_lo = (period & 0xFF) as u8;
         let period_hi = (period >> 8) as u8 & 0b111;
-        mem[0xFF13] = period_lo;
-        mem[0xFF14] = (mem[0xFF14] & 0b1111_1000) | period_hi;
+        regs[0xFF13] = period_lo;
+        regs[0xFF14] = (regs[0xFF14] & 0b1111_1000) | period_hi;
         !(period > 0x7FF)
     }
-    fn read_sweep(&mut self, mem: &Memory);
-    fn sweep_iteration(&mut self, mem: &mut Memory, reg_hi: u16, reg_lo: u16) -> bool;
+    fn read_sweep(&mut self, mem: &InternalAudioRegisters);
+    fn sweep_iteration(
+        &mut self,
+        mem: &mut InternalAudioRegisters,
+        reg_hi: u16,
+        reg_lo: u16,
+    ) -> bool;
 }
 
 struct WithSweep {
@@ -34,39 +40,45 @@ struct WithSweep {
 }
 
 impl Sweep for WithSweep {
-    fn read_sweep(&mut self, mem: &Memory) {
-        let byte = mem[0xFF10];
+    fn read_sweep(&mut self, regs: &InternalAudioRegisters) {
+        let byte = regs[0xFF10];
         self.pace = (byte >> 4) & 0b111;
         self.direction = (byte >> 3) & 1;
         let step = byte & 0b111;
         self.step_pow = 1 << step;
     }
 
-    fn sweep_iteration(&mut self, mem: &mut Memory, reg_hi: u16, reg_lo: u16) -> bool {
-        let period = read_period(mem, reg_hi, reg_lo);
+    fn sweep_iteration(
+        &mut self,
+        regs: &mut InternalAudioRegisters,
+        reg_hi: u16,
+        reg_lo: u16,
+    ) -> bool {
+        let period = read_period(regs, reg_hi, reg_lo);
         let new_period = if self.direction == 0 {
             period + period / self.step_pow
         } else {
             period - period / self.step_pow
         };
-        self.write_period(mem, new_period)
+        self.write_period(regs, new_period)
     }
 }
 
 struct WithoutSweep {}
 
 impl Sweep for WithoutSweep {
-    fn read_sweep(&mut self, _: &Memory) {
+    fn read_sweep(&mut self, _: &InternalAudioRegisters) {
         // No-op
     }
 
-    fn sweep_iteration(&mut self, _: &mut Memory, _: u16, _: u16) -> bool {
+    fn sweep_iteration(&mut self, _: &mut InternalAudioRegisters, _: u16, _: u16) -> bool {
         // No-op
         true
     }
 }
 
 struct PulseChannel<S: Sweep> {
+    channel_num: u8,
     reg_length_duty: u16,
     reg_volume_envelope: u16,
     reg_period_lo: u16,
@@ -74,7 +86,6 @@ struct PulseChannel<S: Sweep> {
     enabled: bool,
     freq: f32,
     duty: u8,
-    length_enabled: bool,
     initial_length: u8,
     length_timer: u8,
     period_divider: u16,
@@ -84,12 +95,14 @@ struct PulseChannel<S: Sweep> {
 impl<S: Sweep> PulseChannel<S> {
     pub fn new(
         sweep: S,
+        channel_num: u8,
         length_duty: u16,
         volume_envelope: u16,
         period_hi: u16,
         period_lo: u16,
     ) -> PulseChannel<S> {
         Self {
+            channel_num,
             reg_length_duty: length_duty,
             reg_volume_envelope: volume_envelope,
             reg_period_hi: period_hi,
@@ -97,7 +110,6 @@ impl<S: Sweep> PulseChannel<S> {
             enabled: false,
             freq: 0.0,
             duty: 0,
-            length_enabled: false,
             initial_length: 0,
             length_timer: 0,
             period_divider: 0,
@@ -105,59 +117,93 @@ impl<S: Sweep> PulseChannel<S> {
         }
     }
 
-    pub fn set_pulse_divider(&mut self, mem: &Memory) {
-        let period = read_period(mem, self.reg_period_hi, self.reg_period_lo);
+    pub fn set_pulse_divider(&mut self, regs: &InternalAudioRegisters) {
+        let period = read_period(regs, self.reg_period_hi, self.reg_period_lo);
         self.period_divider = period;
         self.freq = (131072 / (2048 - period as u32)) as f32;
     }
 
     pub fn div_apu_tick(&mut self, mem: &mut Memory, div_apu: u8) {
         if div_apu % 4 == 0 {
-            self.enabled &= self
-                .sweep
-                .sweep_iteration(mem, self.reg_period_hi, self.reg_period_lo);
+            let sweep_enabled = self.sweep.sweep_iteration(
+                &mut mem.audio.internal,
+                self.reg_period_hi,
+                self.reg_period_lo,
+            );
+            let channel_enabled = self.get_channel_enabled(&mem.audio.internal);
+            self.set_channel_enabled(&mut mem.audio.internal, channel_enabled & sweep_enabled)
         }
-        if (div_apu & 1) != 0 && self.length_enabled {
+
+        if (div_apu & 1) == 0 && self.length_enabled(&mem.audio.internal) {
             if self.length_timer == 64 {
-                self.enabled = false;
-                self.length_enabled = false;
+                self.set_channel_enabled(&mut mem.audio.internal, false);
+                println!("lt a{} {} {:08b} {:08b}", self.channel_num, self.length_timer, mem.audio.internal[0xFF26], mem.audio.internal[0xFF14]);
+                self.set_length_enabled(&mut mem.audio.internal, false);
             } else {
                 self.length_timer += 1;
             }
+            println!("lt{} {} {:08b} {:08b}", self.channel_num, self.length_timer, mem.audio.internal[0xFF26], mem.audio.internal[0xFF14]);
         }
+    }
+
+    fn get_channel_enabled(&mut self, regs: &InternalAudioRegisters) -> bool {
+        let value = ((regs[0xFF26] >> self.channel_num) & 1) > 0;
+        self.enabled = value;
+        value
+    }
+
+    fn set_channel_enabled(&mut self, regs: &mut InternalAudioRegisters, enabled: bool) {
+        if enabled {
+            regs[0xFF26] |= 1 << self.channel_num;
+            if !self.enabled {
+                println!("Trigger {:08b}", regs[0xFF26]);
+            }
+        } else {
+            if self.enabled {
+                println!("Cleared");
+            }
+            regs[0xFF26] &= !(1 << self.channel_num);
+        }
+        self.enabled = enabled;
     }
 
     pub fn clock_pulse(&mut self, mem: &mut Memory) {
         self.period_divider += 1;
 
-        let ch1_period_hi = mem[self.reg_period_hi];
-        let duty_length = mem[self.reg_length_duty];
+        let ch1_period_hi = mem.audio.internal[self.reg_period_hi];
+        let duty_length = mem.audio.internal[self.reg_length_duty];
         self.duty = duty_length >> 6;
         self.initial_length = duty_length & 0b0011_1111;
 
         if ch1_period_hi & BIT_6_MASK != 0 {
-            self.length_enabled = true;
-            mem[self.reg_period_hi] &= !BIT_6_MASK;
+            self.set_length_enabled(&mut mem.audio.internal, true);
         }
 
+        // Trigger event
         if ch1_period_hi & BIT_7_MASK != 0 {
-            self.enabled = true;
+            println!("Trigger a {:08b}", ch1_period_hi);
+            self.set_channel_enabled(&mut mem.audio.internal, true);
             self.length_timer = self.initial_length;
-            self.set_pulse_divider(mem);
+            self.set_pulse_divider(&mut mem.audio.internal);
             // TODO reset envelope timer
             // TODO set to initial volume (NR12)
             // TODO do sweep things
-            self.sweep.read_sweep(mem);
-            mem[self.reg_period_hi] &= !BIT_7_MASK;
+            self.sweep.read_sweep(&mem.audio.internal);
+            mem.audio.internal[self.reg_period_hi] &= !BIT_7_MASK;
         }
 
         if self.period_divider >= 0x7FF {
-            self.set_pulse_divider(mem);
+            self.set_pulse_divider(&mut mem.audio.internal);
         }
     }
 
-    pub fn enabled(&self) -> bool {
-        self.enabled
+    fn length_enabled(&self, regs: &InternalAudioRegisters) -> bool {
+        (regs[self.reg_period_hi] >> 6) & 1 > 0
+    }
+
+    fn set_length_enabled(&self, regs: &mut InternalAudioRegisters, value: bool) {
+        let mask = 1 << 6;
+        regs[self.reg_period_hi] = (regs[self.reg_period_hi] & !mask) | (value as u8 * mask);
     }
 }
 
@@ -176,6 +222,7 @@ impl APU {
                 direction: 0,
                 step_pow: 1,
             },
+            0,
             0xFF11,
             0xFF12,
             0xFF14,
@@ -183,6 +230,7 @@ impl APU {
         )));
         let ch2 = Arc::new(Mutex::new(PulseChannel::new(
             WithoutSweep {},
+            1,
             0xFF16,
             0xFF17,
             0xFF19,
@@ -259,32 +307,34 @@ impl APU {
     }
 
     pub fn div_apu_tick(&mut self, mem: &mut Memory, div_apu: u8) {
+        if !self.apu_enabled(&mem.audio.internal) {
+            // TODO disable audio players as well
+            return;
+        }
         let mut ch1 = self.ch1.lock().unwrap();
         ch1.div_apu_tick(mem, div_apu);
-        if ch1.enabled() {
-            // Set enabled bit
-            mem[0xFF26] |= 1 << 0;
-        } else {
-            mem[0xFF26] &= !(1 << 0);
-        }
 
         let mut ch2 = self.ch2.lock().unwrap();
         ch2.div_apu_tick(mem, div_apu);
-        if ch2.enabled() {
-            // Set enabled bit
-            mem[0xFF26] |= 1 << 1;
-        } else {
-            mem[0xFF26] &= !(1 << 1);
-        }
     }
 
     pub fn clock_pulse(&mut self, mem: &mut Memory) {
+        if !self.apu_enabled(&mem.audio.internal) {
+            return;
+        }
         let mut ch1 = self.ch1.lock().unwrap();
         ch1.clock_pulse(mem);
     }
 
     pub fn clock_wave(&mut self, mem: &mut Memory) {
+        if !self.apu_enabled(&mem.audio.internal) {
+            return;
+        }
         self.wave_period_divider += 1;
+    }
+
+    fn apu_enabled(&self, mem: &InternalAudioRegisters) -> bool {
+        mem[0xFF26] & (1 << 7) == 0
     }
 
     pub fn update(&mut self, mem: &mut Memory) {
